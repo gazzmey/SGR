@@ -1,0 +1,207 @@
+/* SGR — hoja de estilos común del prototipo.
+   Principio: el color saturado se reserva para lo que significa algo.
+   Todo el cromo de la interfaz es neutro; verde, ámbar y rojo solo aparecen
+   cuando comunican el estado del semáforo o el resultado de una validación. */
+
+:root {
+  --papel:        #EDEFF1;
+  --superficie:   #FFFFFF;
+  --tinta:        #16212B;
+  --tinta-suave:  #5B6B78;
+  --linea:        #D5DBE0;
+  --linea-fuerte: #B6C0C8;
+  --chrome:       #1D2C38;
+  --chrome-alto:  #2C3F4E;
+  --accion:       #29465B;
+  --verde:        #2E7D51;
+  --verde-fondo:  #E4F0E9;
+  --ambar:        #B57614;
+  --ambar-fondo:  #F8EEDC;
+  --rojo:         #B4382B;
+  --rojo-fondo:   #F7E6E3;
+  --radio:        3px;
+  --sombra:       0 1px 2px rgba(22,33,43,.06);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+a { color: var(--accion); }
+
+/* ---------- estructura ---------- */
+
+.marco { display: flex; align-items: stretch; min-height: 100vh; }
+
+.rail {
+  width: 232px; flex: 0 0 232px;
+  background: var(--chrome);
+  color: #C7D2DA;
+  display: flex; flex-direction: column;
+}
+.rail-id { padding: 18px 18px 14px; border-bottom: 1px solid var(--chrome-alto); }
+.rail-id b { display: block; color: #fff; font-size: 15px; letter-spacing: -.01em; }
+.rail-id span { font-size: 12px; color: #93A6B2; }
+.rail nav { padding: 10px 0; flex: 1; }
+.rail h3 { margin: 16px 18px 6px; font-size: 11px; font-weight: 600; color: #7C919F; }
+.rail a {
+  display: block; padding: 7px 18px; color: #C7D2DA; text-decoration: none;
+  font-size: 13.5px; border-left: 3px solid transparent;
+}
+.rail a:hover { background: var(--chrome-alto); color: #fff; }
+.rail a[aria-current="page"] {
+  background: var(--chrome-alto); color: #fff; border-left-color: #7FA8C4; font-weight: 600;
+}
+.rail-pie { padding: 12px 18px; border-top: 1px solid var(--chrome-alto); font-size: 12px; }
+
+.columna { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+
+.barra {
+  background: var(--superficie); border-bottom: 1px solid var(--linea);
+  padding: 10px 26px; display: flex; align-items: center; flex-wrap: wrap;
+}
+.barra > * + * { margin-left: 22px; }
+.barra .derecha { margin-left: auto; }
+
+main { padding: 26px; max-width: 1180px; }
+
+.titulo { margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -.015em; }
+.bajada { margin: 0 0 22px; color: var(--tinta-suave); max-width: 68ch; }
+.migas { font-size: 12.5px; color: var(--tinta-suave); margin: 0 0 8px; }
+.migas span { margin: 0 6px; }
+.sub { color: var(--tinta-suave); font-size: 12.5px; }
+
+section { margin-bottom: 26px; }
+h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+
+/* ---------- superficies ---------- */
+
+.panel {
+  background: var(--superficie); border: 1px solid var(--linea);
+  border-radius: var(--radio); box-shadow: var(--sombra);
+}
+.panel > header {
+  padding: 12px 16px; border-bottom: 1px solid var(--linea);
+  display: flex; align-items: center;
+}
+.panel > header h2 { margin: 0; }
+.panel > header .derecha { margin-left: auto; }
+.panel .cuerpo { padding: 16px; }
+
+.acciones {
+  display: flex; align-items: center; padding: 14px 16px;
+  border-top: 1px solid var(--linea); background: #F7F9FA;
+}
+.acciones > * + * { margin-left: 10px; }
+.acciones .derecha { margin-left: auto; }
+
+/* ---------- pista de avance: el elemento característico ---------- */
+
+.avance-fila { display: flex; align-items: center; margin-bottom: 16px; }
+.avance-fila > * + * { margin-left: 14px; }
+.avance-fila .nombre { flex: 0 0 240px; font-size: 13.5px; }
+.avance-fila .nombre small { display: block; color: var(--tinta-suave); font-size: 12px; }
+.avance-fila .cifra { flex: 0 0 84px; text-align: right; font-size: 17px; font-weight: 600; }
+.pista { position: relative; height: 22px; background: #E7EAEE; border-radius: 2px;
+         flex: 1 1 auto; }
+.pista i { position: absolute; top: 0; bottom: 0; left: 0; display: block;
+           border-radius: 2px 0 0 2px; max-width: 100%; }
+.pista .marca { position: absolute; top: -4px; bottom: -4px; width: 2px;
+                background: var(--tinta); }
+.pista .marca::after {
+  content: "meta al día"; position: absolute; top: -16px; left: 50%;
+  transform: translateX(-50%); font-size: 10.5px; color: var(--tinta-suave);
+  white-space: nowrap;
+}
+.verde i, i.verde { background: var(--verde); }
+.ambar i, i.ambar { background: var(--ambar); }
+.rojo  i, i.rojo  { background: var(--rojo); }
+.verde .cifra, .cifra.verde { color: var(--verde); }
+.ambar .cifra, .cifra.ambar { color: var(--ambar); }
+.rojo  .cifra, .cifra.rojo  { color: var(--rojo); }
+
+/* ---------- tablas ---------- */
+
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+thead th {
+  text-align: left; font-weight: 600; color: var(--tinta-suave); font-size: 12.5px;
+  padding: 9px 16px; border-bottom: 1px solid var(--linea-fuerte); white-space: nowrap;
+}
+tbody td { padding: 10px 16px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: #F6F8F9; }
+td.num, th.num { text-align: right; }
+
+/* ---------- señales de estado ---------- */
+
+.sello {
+  display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px;
+  font-weight: 600; border: 1px solid;
+}
+.sello.ok     { color: var(--verde); background: var(--verde-fondo); border-color: #BCDCC9; }
+.sello.espera { color: var(--ambar); background: var(--ambar-fondo); border-color: #E7D2AC; }
+.sello.mal    { color: var(--rojo);  background: var(--rojo-fondo);  border-color: #E7C3BD; }
+.sello.gris   { color: var(--tinta-suave); background: #EDF0F2; border-color: var(--linea); }
+
+.aviso {
+  padding: 12px 16px; border-radius: var(--radio); border: 1px solid; font-size: 13.5px;
+  margin-bottom: 20px;
+}
+.aviso p { margin: 0; }
+.aviso.info { background: #EEF3F6; border-color: #C6D5DF; }
+.aviso.alto { background: var(--ambar-fondo); border-color: #E7D2AC; }
+.aviso.malo { background: var(--rojo-fondo); border-color: #E7C3BD; }
+.aviso.bueno { background: var(--verde-fondo); border-color: #BCDCC9; }
+
+/* ---------- filtros, listas y vacíos ---------- */
+
+.filtros {
+  display: flex; flex-wrap: wrap; align-items: center;
+  padding: 12px 16px; border-bottom: 1px solid var(--linea);
+}
+.filtros > * + * { margin-left: 8px; }
+
+.boton {
+  font-size: 13.5px; font-weight: 600; padding: 7px 13px; border-radius: var(--radio);
+  border: 1px solid var(--linea-fuerte); background: var(--superficie); color: var(--tinta);
+  text-decoration: none; display: inline-block;
+}
+.boton:hover { border-color: var(--tinta-suave); }
+.primario { background: var(--accion); border-color: var(--accion); color: #fff; }
+
+.vacio { padding: 44px 16px; text-align: center; }
+.vacio p { margin: 0 0 14px; color: var(--tinta-suave); }
+
+.lista-limpia { list-style: none; margin: 0; padding: 0; }
+.lista-limpia li { padding: 9px 0; border-bottom: 1px solid var(--linea); }
+.lista-limpia li:last-child { border-bottom: 0; }
+
+.grilla-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.datos { display: grid; grid-template-columns: 190px 1fr; gap: 8px 14px;
+         font-size: 13.5px; margin: 0; }
+.datos dt { color: var(--tinta-suave); }
+.datos dd { margin: 0; }
+
+/* ---------- responsivo ---------- */
+
+@media screen and (max-width: 700px) {
+  .marco { flex-wrap: wrap; }
+  .rail { flex-basis: 100%; width: 100%; }
+  .rail nav { display: flex; flex-wrap: wrap; padding: 6px; }
+  .rail h3 { display: none; }
+  .rail a { border-left: 0; border-bottom: 3px solid transparent; padding: 8px 12px; }
+  .rail a[aria-current="page"] { border-left: 0; border-bottom-color: #7FA8C4; }
+  .avance-fila { display: block; }
+  .avance-fila .cifra { text-align: left; }
+  .grilla-2 { grid-template-columns: 1fr; }
+  .datos { grid-template-columns: 1fr; }
+  main { padding: 18px; }
+}
