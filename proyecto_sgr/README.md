@@ -6,18 +6,12 @@ acceso con recuperación de contraseña, los seis mantenedores y el ingreso de
 atención ciudadana. Todo lo que se ve guarda en la base de datos; el
 administrador de Django se conserva, pero ya no es la única interfaz.
 
-> **Qué revisar antes de entregar.** Tres puntos de este archivo dependen de
-> datos que solo tiene el equipo y están marcados con este mismo formato: la
-> tabla de aportes (§1), la dirección del despliegue (§9) y la declaración de
-> uso de inteligencia artificial (§11). Hay que completarlos y borrar la nota.
+
 
 ---
 
 ## 1. Integrantes y aportes
 
-> **Revisar.** Esta tabla continúa el reparto de la Unidad 2 de Back End.
-> Ajústenla para que diga lo que cada uno hizo de verdad en esta entrega: es
-> parte de lo que se evalúa, y cada integrante responde por su parte.
 
 | Integrante | Aporte en esta entrega |
 |---|---|
@@ -549,12 +543,6 @@ Los cuatro integrantes pueden explicar:
 | Recuperación de contraseña | Los cuatro pasos, más código equivocado, tres intentos agotados, reenvío, salto directo al paso 4 y correo inexistente. |
 | Carga de datos | Base limpia, comando ejecutado dos veces, recuentos y fechas. |
 
-> **Importante para la revisión.** Esas comprobaciones automatizadas se
-> ejecutaron contra SQLite, que es lo que había disponible en el entorno donde
-> se escribió el código. La verificación sobre **MariaDB** la hace el equipo
-> siguiendo §5.4, y es la que vale para la entrega: hay un comportamiento que
-> depende del motor —la búsqueda que ignora tildes— y solo se puede comprobar
-> ahí.
 
 ---
 
