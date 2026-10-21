@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% comment %}
+  Crear y editar comparten plantilla: lo único que cambia es el título y el
+  rótulo del botón. Los campos se agrupan en secciones según lo que declara
+  la vista, igual que en la maqueta.
+
+  Los errores salen del formulario de Django, no de JavaScript: lo que vale
+  es lo que valida el servidor.
+{% endcomment %}
+
+{% block titulo %}{% if es_nuevo %}Nuev{% if genero == 'la' %}a{% else %}o{% endif %} {{ singular }}{% else %}Editar {{ singular }}{% endif %}{% endblock %}
+
+{% block ruta %}
+  <a href="{% url url_lista %}">{{ plural|capfirst }}</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">{% if es_nuevo %}Nuev{% if genero == 'la' %}a{% else %}o{% endif %}{% else %}Editar{% endif %}</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>{% if es_nuevo %}Nuev{% if genero == 'la' %}a{% else %}o{% endif %} {{ singular }}{% else %}Editar {{ singular }}{% endif %}</h1>
+    <p>
+      {% if es_nuevo %}
+        Qued{% if genero == 'la' %}a{% else %}a{% endif %} activ{% if genero == 'la' %}a{% else %}o{% endif %}
+        desde que se guarda y aparece de inmediato en los selectores del sistema.
+      {% else %}
+        Estás editando <b>{{ object }}</b>. El código no cambia nunca.
+      {% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    {% if not es_nuevo and url_detalle %}
+      <a class="btn btn-ghost" href="{% url url_detalle object.pk %}">Ver ficha completa</a>
+    {% endif %}
+    <a class="btn btn-ghost" href="{% url url_lista %}">Volver al listado</a>
+  </div>
+</div>
+
+{% if not es_nuevo and object.motivo_bloqueo %}
+  <div class="notice warn" role="status" style="margin-bottom: 20px">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>No se puede desactivar</b>{{ object.motivo_bloqueo }}</div>
+  </div>
+{% endif %}
+
+<form class="grid g-side" method="post" novalidate>
+  {% csrf_token %}
+
+  <section class="card" style="align-self: start">
+    {% if form.errors %}
+      <div class="notice bad" role="alert" style="margin: 20px 24px 0">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div>
+          <b>Revisa el formulario antes de guardar</b>
+          <ul>
+            {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+            {% for campo in form %}
+              {% for error in campo.errors %}<li>{{ campo.label }}: {{ error }}</li>{% endfor %}
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+
+    {% for seccion in secciones %}
+      <div class="form-sec">
+        <h3><span class="num">{{ seccion.numero }}</span>{{ seccion.titulo }}</h3>
+        <p>{{ seccion.bajada }}</p>
+        <div class="form-grid">
+          {% for campo in seccion.campos %}
+            {% include "comun/_campo.html" %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+
+    <div class="form-foot">
+      <span class="small soft">Los campos con <span class="req">*</span> son obligatorios.</span>
+      <div class="end">
+        <a class="btn btn-secondary" href="{% url url_lista %}">Cancelar</a>
+        <button type="submit" class="btn btn-primary">
+          {% if es_nuevo %}Guardar {{ singular }}{% else %}Guardar cambios{% endif %}
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="spec" style="align-self: start">
+    {% include lateral %}
+  </aside>
+</form>
+{% endblock %}

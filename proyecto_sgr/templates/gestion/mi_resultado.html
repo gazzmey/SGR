@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% load l10n %}
+
+{% comment %}
+Mi resultado del período. Es la pantalla MiPanel de la maqueta aprobada,
+con las cifras calculadas por gestion/calculo.py en vez de escritas a mano.
+
+Tres cosas que valen la pena mirar en el código:
+
+· La pista de avance lleva una marca en el avance esperado. Es el elemento
+  característico del diseño: un porcentaje solo no dice nada hasta que se
+  compara con la fecha.
+· Cada número viene con su origen. El cumplimiento de un ítem muestra «8 de
+  10», no solo «80 %», para que se pueda comprobar de dónde sale.
+· El rótulo de las reglas aparece siempre, y dice si están aprobadas o si
+  son todavía una propuesta.
+{% endcomment %}
+
+{% block titulo %}Mi resultado{% endblock %}
+{% block ruta %}<span aria-current="page">Mi resultado</span>{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>{% if perfil %}Hola, {{ perfil.usuario.first_name|default:perfil.nombre }}{% else %}Mi resultado{% endif %}</h1>
+    <p>
+      {% if perfil %}
+        {{ perfil.cargo_asignado.nombre|default:"Sin cargo asignado" }} ·
+        {{ perfil.delegacion.nombre }} ·
+      {% endif %}
+      {% if res %}Datos al {{ res.al_dia|date:"d \d\e F \d\e Y" }}.{% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    {% if periodos %}
+      <form method="get" class="row" style="gap: 8px">
+        <span class="selw">
+          <select class="input" name="periodo" aria-label="Período" style="width: 240px" onchange="this.form.submit()">
+            {% for p in periodos %}
+              <option value="{{ p.pk }}"{% if periodo and p.pk == periodo.pk %} selected{% endif %}>{{ p.nombre }} ({{ p.get_estado_display|lower }})</option>
+            {% endfor %}
+          </select>
+          <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+        </span>
+        <noscript><button class="btn btn-secondary" type="submit">Ver</button></noscript>
+      </form>
+    {% endif %}
+    {% if sgr_permisos.registrar_actividad %}
+      <a class="btn btn-primary" href="{% url 'gestion:actividad_nueva' %}">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Registrar actividad
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if sin_datos %}
+  <div class="notice info">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>Nada que mostrar todavía</b>{{ sin_datos }}</div>
+  </div>
+{% else %}
+
+<div class="grid g-side">
+  <section class="card" aria-labelledby="t-avance">
+    <div class="card-h">
+      <h2 id="t-avance">Tu avance del período</h2>
+      <span class="sub">Se recalcula al aprobarse cada evidencia</span>
+      <div class="end"><span class="chip {{ res.clase_chip }}">{{ res.semaforo_texto }}</span></div>
+    </div>
+    <div class="card-b">
+      {% if res.definido %}
+        <div class="row" style="gap: 32px; align-items: flex-end">
+          <div>
+            <div class="hero-num">{{ res.avance|floatformat:1 }}<small>%</small></div>
+            <p class="soft mt8">Cumplimiento ponderado</p>
+          </div>
+          <div style="flex: 1 1 280px; min-width: 0">
+            <p class="soft" style="max-width: 52ch">
+              A la fecha se espera un <b style="color: var(--tinta)">{{ res.esperado|floatformat:1 }} %</b> del período.
+              {% if res.brecha >= 0 %}
+                Vas <b style="color: var(--tinta)">{{ res.brecha|floatformat:1 }} puntos por encima</b> de lo esperado.
+              {% else %}
+                Te faltan <b style="color: var(--tinta)">{{ res.brecha_absoluta|floatformat:1 }} puntos</b> para estar al día.
+              {% endif %}
+            </p>
+          </div>
+        </div>
+        <div class="mt24" style="padding-top: 28px">
+          <div class="pista lg">
+            <div class="fill {{ res.clase_barra }}" style="width: {{ res.barra|unlocalize }}%"></div>
+            {% if res.esperado %}
+              <div class="marca" style="left: {{ res.barra_esperado|unlocalize }}%"><span class="marca-lbl">Esperado hoy {{ res.esperado|floatformat:1 }} %</span></div>
+            {% endif %}
+          </div>
+          <div class="escala">
+            <span>0 %</span>
+            <span>Día {{ res.dias_transcurridos }} de {{ res.dias_totales }}{% if res.dias_restantes %} · quedan {{ res.dias_restantes }} días{% endif %}</span>
+            <span>100 %</span>
+          </div>
+        </div>
+      {% else %}
+        <div class="notice warn">
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/></svg>
+          <div><b>El avance está indefinido, no en cero</b>{{ res.motivo_indefinido }}</div>
+        </div>
+      {% endif %}
+
+      <div class="divider" style="margin: 24px 0 18px"></div>
+      <div class="grid g-3" style="gap: 16px">
+        <div>
+          <div class="small soft">Actividades del período</div>
+          <div class="strong" style="font-size: 18px">{{ resumen.total }}
+            <span class="small muted" style="font-weight: 400">· {{ resumen.aprobadas }} {% if resumen.aprobadas == 1 %}aprobada{% else %}aprobadas{% endif %}</span>
+          </div>
+        </div>
+        <div>
+          <div class="small soft">Evidencias por resolver</div>
+          <div class="strong" style="font-size: 18px">{{ resumen.por_resolver }}
+            <span class="small muted" style="font-weight: 400">· {{ resumen.en_revision }} en revisión, {{ resumen.a_corregir }} a corregir</span>
+          </div>
+        </div>
+        <div>
+          <div class="small soft">Ítems al umbral</div>
+          <div class="strong" style="font-size: 18px">{{ res.items_alcanzados }} de {{ res.items_medidos }}
+            <span class="small muted" style="font-weight: 400">· desde {{ res.regla.umbral_realizado }} %</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="t-pend" style="align-self: start">
+    <div class="card-h"><h2 id="t-pend">Pendientes para ti</h2><span class="sub">{{ pendientes|length }}</span></div>
+    {% if pendientes %}
+      <ul class="list">
+        {% for fila in pendientes %}
+          <li>
+            <span class="ic {{ fila.clase }}">
+              <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>
+            </span>
+            <div class="tx"><b>{{ fila.titulo }}</b><span>{{ fila.detalle }}</span></div>
+            <a class="go" href="{{ fila.url }}" aria-label="Abrir {{ fila.titulo }}">
+              <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="card-b"><p class="soft">No tienes nada esperando por ti. Todo lo que registraste está respaldado y decidido.</p></div>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card mt20" aria-labelledby="t-items">
+  <div class="card-h">
+    <h2 id="t-items">Avance por ítem</h2>
+    <span class="sub">Solo cuentan las actividades con evidencia aprobada</span>
+    <div class="end legend">
+      <span><i class="lsw" style="background: var(--verde-bar)"></i>Al día</span>
+      <span><i class="lsw" style="background: var(--ambar-bar)"></i>Atrasado</span>
+      <span><i class="lsw" style="background: var(--rojo-bar)"></i>Crítico</span>
+      {% if res.esperado %}<span><i class="ln"></i>Esperado hoy</span>{% endif %}
+    </div>
+  </div>
+  <div class="card-b">
+    {% for fila in res.items %}
+      <div class="item">
+        <div class="nm">
+          <b>{{ fila.item.nombre }}</b>
+          <span>{{ fila.realizado }} de {{ fila.meta }} {{ fila.item.get_unidad_display|lower }}{% if fila.nota %} · {{ fila.nota }}{% endif %}</span>
+        </div>
+        <div class="pista-wrap">
+          <div class="pista">
+            <div class="fill {{ fila.clase_barra }}" style="width: {{ fila.barra|unlocalize }}%"></div>
+            {% if res.esperado %}<div class="marca" style="left: {{ res.barra_esperado|unlocalize }}%"></div>{% endif %}
+          </div>
+        </div>
+        <div class="pct">
+          {% if fila.meta_invalida %}—{% else %}{{ fila.cumplimiento_bruto|floatformat:1 }} %{% endif %}
+          <small>{% if fila.alcanzado %}<span class="chip ok" style="height: 20px; font-size: 11.5px">Al umbral</span>{% elif fila.meta_invalida %}<span class="chip off" style="height: 20px; font-size: 11.5px"><span class="t">Meta inválida</span></span>{% else %}<span class="chip warn" style="height: 20px; font-size: 11.5px">Bajo el umbral</span>{% endif %}</small>
+        </div>
+        <div class="pond"><b>{{ fila.aporte|floatformat:1 }} pts</b>de {{ fila.ponderador }} %</div>
+      </div>
+    {% empty %}
+      <p class="soft">No hay ítems con meta para tu cargo en este período.</p>
+    {% endfor %}
+  </div>
+  {% if res.ponderadores_incompletos %}
+    <div class="card-f">
+      <span class="small soft">Los ponderadores de tu cargo suman {{ res.ponderadores }} % y deberían sumar 100 %. Mientras no se complete la configuración, el avance se calcula sobre lo que hay.</span>
+    </div>
+  {% endif %}
+</section>
+
+<div class="grid g-2 mt20">
+  <section class="card" aria-labelledby="t-res">
+    <div class="card-h"><h2 id="t-res">Cómo se calcula</h2><span class="sub">{{ res.regla.resumen }}</span></div>
+    <div class="card-b">
+      <table class="tabla" style="font-size: 14px">
+        <tbody>
+          {% for fila in res.items %}{% if not fila.meta_invalida %}
+            <tr>
+              <td class="w" style="padding-left: 0">{{ fila.item.nombre }}
+                <span class="t2">{{ fila.cumplimiento|floatformat:1 }} % × {{ fila.ponderador }} % ÷ 100</span>
+              </td>
+              <td class="r" style="padding-right: 0">{{ fila.aporte|floatformat:1 }}</td>
+            </tr>
+          {% endif %}{% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td style="padding-left: 0; background: transparent">Cumplimiento ponderado</td>
+            <td class="r" style="padding-right: 0; background: transparent; font-size: 18px">{% if res.definido %}{{ res.avance|floatformat:1 }} %{% else %}Indefinido{% endif %}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <p class="formula mt16">aporte = cumplimiento × ponderador ÷ 100 · cumplimiento = mínimo(realizado ÷ meta × 100, {{ res.regla.tope_aporte }})</p>
+      <p class="small soft mt12">{{ res.regla.rotulo }}</p>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="t-rec">
+    <div class="card-h">
+      <h2 id="t-rec">Actividad reciente</h2>
+      {% if sgr_permisos.registrar_actividad %}<div class="end"><a class="link small" href="{% url 'gestion:actividades' %}">Ver todas</a></div>{% endif %}
+    </div>
+    <div class="card-b">
+      {% if recientes %}
+        <ol class="tl">
+          {% for suceso in recientes %}
+            <li><span class="pt {{ suceso.punto }}"></span><b>{{ suceso.titulo }}</b><span>{{ suceso.cuando|date:"d-m-Y · H:i" }} · {{ suceso.detalle }}</span></li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <p class="soft">Todavía no hay movimientos en este período.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

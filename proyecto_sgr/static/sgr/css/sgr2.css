@@ -1,0 +1,1032 @@
+/* SGR · segunda entrega — añadidos sobre sgr.css
+   Se carga DESPUÉS de sgr.css y no redefine nada de la hoja original:
+   solo agrega lo que los mantenedores necesitan y que la maqueta anterior
+   no tenía. Usa las mismas variables de color, los mismos radios y las
+   mismas transiciones, para que todo siga siendo la misma interfaz.
+
+   Bloques:
+     1. Delegación activa en la cabecera
+     2. Barra de acciones masivas y columna de selección
+     3. Encabezados ordenables
+     4. Barra de paginación
+     5. Estados: cargando, vacío, sin coincidencias y error
+     6. Detalle de consulta
+     7. SweetAlert2 con la paleta municipal
+*/
+
+/* ============================================================
+   0. Correcciones de base
+   ============================================================ */
+
+/* Cualquier clase que declare su propio display (.notice, .field, .msg,
+   .masiva…) le gana al display:none que el navegador aplica a [hidden],
+   porque una clase pesa más que una etiqueta. Sin esta regla, esconder algo
+   con el atributo hidden no lo esconde.
+
+   Es la única declaración con !important de la hoja, y lo lleva a propósito:
+   [hidden] significa escondido, sin excepciones. */
+[hidden] { display: none !important }
+
+/* Un interruptor deshabilitado tiene que verse deshabilitado. */
+.sw[disabled] { opacity: .5; cursor: not-allowed }
+.switch-row input[disabled] ~ span b { color: var(--tinta2) }
+
+/* En la barra superior solo la búsqueda se encoge: el nombre de la
+   persona y la delegación activa se leen enteros o no sirven. */
+.top-tools .user, .top-tools .icon-btn { flex: none }
+.top-tools .user-txt b, .top-tools .user-txt small { white-space: nowrap }
+
+/* ============================================================
+   1. Delegación activa en la cabecera
+   ============================================================ */
+
+.deleg {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--linea2);
+  border-radius: var(--rs);
+  background: #fff;
+  color: var(--tinta);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 280px;
+  transition: background-color var(--tf) ease, border-color var(--tf) ease,
+    box-shadow var(--t) var(--ease);
+}
+
+.deleg:hover { border-color: #B7AAA2; box-shadow: var(--sh1) }
+.deleg:focus-visible { outline: 2px solid var(--g700); outline-offset: 2px }
+.deleg[aria-expanded="true"] { border-color: var(--g700); box-shadow: 0 0 0 3px rgba(var(--g700-rgb), .14) }
+
+.deleg .cod {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--g700);
+  background: var(--g50);
+  border-radius: 6px;
+  padding: 3px 7px;
+  flex: none;
+}
+
+.deleg .nom {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.deleg .nom b { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; max-width: 150px }
+.deleg .nom small { font-size: 11px; color: var(--tinta3) }
+.deleg > .i { color: var(--tinta3); flex: none }
+
+/* Un solo lugar autorizado: se muestra, pero no se puede cambiar. */
+.deleg.fijo { cursor: default; background: var(--hueso); border-color: var(--linea) }
+.deleg.fijo:hover { border-color: var(--linea); box-shadow: none }
+
+.deleg-menu { min-width: 300px }
+.deleg-menu .hd { padding: 8px 10px 6px }
+.deleg-menu button { align-items: flex-start; gap: 10px }
+.deleg-menu .cod {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--g700);
+  background: var(--g50);
+  border-radius: 5px;
+  padding: 2px 6px;
+  flex: none;
+  margin-top: 1px;
+}
+.deleg-menu .tx { display: flex; flex-direction: column; gap: 1px; min-width: 0 }
+.deleg-menu .tx small { font-size: 12px; color: var(--tinta3) }
+.deleg-menu button[aria-current="true"] { background: var(--g50) }
+.deleg-menu .ck { margin-left: auto; color: var(--g700); flex: none; margin-top: 2px }
+.deleg-menu .pie {
+  border-top: 1px solid var(--linea);
+  margin-top: 6px;
+  padding: 10px 10px 4px;
+  font-size: 12px;
+  color: var(--tinta3);
+  line-height: 1.45;
+}
+
+@media (max-width: 1100px) { .deleg .nom small { display: none } }
+@media (max-width: 860px) { .deleg { max-width: none; flex: 1 1 auto } }
+
+/* ============================================================
+   2. Acciones masivas y columna de selección
+   ============================================================ */
+
+.tabla td.ck, .tabla th.ck { width: 44px; padding-left: 18px; padding-right: 0 }
+
+.tabla input[type="checkbox"].pick {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--g700);
+  cursor: pointer;
+  margin: 0;
+  display: block;
+}
+
+.masiva {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--g50);
+  border-bottom: 1px solid #E8C9C4;
+  font-size: 13.5px;
+  color: var(--g900);
+}
+
+.masiva b { font-weight: 600 }
+.masiva .end { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px }
+.masiva[hidden] { display: none }
+
+/* ============================================================
+   3. Encabezados ordenables
+   ============================================================ */
+
+.tabla th.sort { padding: 0; background: var(--sup2) }
+
+.tabla th.sort button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tinta2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--tf) ease, background-color var(--tf) ease;
+}
+
+.tabla th.sort button:hover { background: var(--hueso); color: var(--tinta) }
+.tabla th.sort .ar { opacity: 0; transition: opacity var(--tf) ease, transform var(--t) var(--ease) }
+.tabla th.sort button:hover .ar { opacity: .4 }
+.tabla th.sort[aria-sort] button { color: var(--g700) }
+.tabla th.sort[aria-sort] .ar { opacity: 1 }
+.tabla th.sort[aria-sort="descending"] .ar { transform: rotate(180deg) }
+.tabla th.sort.r button { justify-content: flex-end }
+.tabla th.sort.c button { justify-content: center }
+
+/* ============================================================
+   4. Barra de paginación
+   ============================================================ */
+
+.pager-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--linea);
+  background: var(--sup2);
+  border-radius: 0 0 12px 12px;
+  font-size: 13px;
+  color: var(--tinta2);
+}
+
+.pager-bar .cuenta b { color: var(--tinta); font-weight: 600 }
+.pager-bar .por { display: flex; align-items: center; gap: 8px; white-space: nowrap }
+.pager-bar .por .input { min-height: 34px; padding: 4px 30px 4px 10px; font-size: 13px; width: auto }
+.pager-bar .por .selw { min-width: 0 }
+.pager-bar .pager { margin-left: auto }
+
+.pager button {
+  min-width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  border: 1px solid var(--linea);
+  background: #fff;
+  color: var(--tinta2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color var(--tf) ease, border-color var(--tf) ease, color var(--tf) ease;
+}
+
+.pager button:hover:not([disabled]) { border-color: var(--linea2); color: var(--tinta) }
+.pager button[disabled] { color: #BDB2AC; cursor: not-allowed; background: var(--sup2) }
+.pager button[aria-current="page"] {
+  background: var(--g700);
+  border-color: var(--g700);
+  color: #fff;
+  font-weight: 600;
+}
+.pager button[aria-current="page"]:hover { background: var(--g800); border-color: var(--g800); color: #fff }
+.pager .hueco { min-width: 20px; text-align: center; color: var(--tinta3) }
+
+@media (max-width: 720px) {
+  .pager-bar .pager { margin-left: 0; width: 100% }
+  .pager-bar .por { order: 3 }
+}
+
+/* ============================================================
+   5. Estados: cargando, vacío, sin coincidencias y error
+   ============================================================ */
+
+/* Esqueleto de carga: mantiene la altura de la tabla para que nada salte. */
+.sk {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--hueso) 25%, #F8F4F1 50%, var(--hueso) 75%);
+  background-size: 400% 100%;
+  animation: sgr-sk 1.3s ease-in-out infinite;
+}
+
+.sk.w40 { width: 40% }
+.sk.w60 { width: 60% }
+.sk.w80 { width: 80% }
+
+@keyframes sgr-sk {
+  0%   { background-position: 100% 0 }
+  100% { background-position: 0 0 }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; background: var(--hueso) }
+}
+
+.cargando-pie {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--linea);
+  background: var(--sup2);
+  border-radius: 0 0 12px 12px;
+  font-size: 13px;
+  color: var(--tinta3);
+}
+
+.spin {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--linea2);
+  border-top-color: var(--g700);
+  animation: sgr-spin .7s linear infinite;
+  flex: none;
+}
+
+@keyframes sgr-spin { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s } }
+
+/* El bloque .empty ya existe en sgr.css; aquí solo se le dan variantes. */
+.empty .ic.bad { background: var(--rojo-bg); color: var(--rojo) }
+.empty .ic.warn { background: var(--ambar-bg); color: var(--ambar) }
+.empty .row { margin-top: 4px }
+.empty .code {
+  margin-top: 8px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--tinta3);
+  background: var(--sup2);
+  border: 1px solid var(--linea);
+  border-radius: var(--rs);
+  padding: 8px 12px;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre;
+  text-align: left;
+}
+
+/* Conmutador del prototipo: permite mostrar cada estado en la revisión.
+   En Django esta barra desaparece; los estados los decide el servidor. */
+.demo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border: 1px dashed var(--linea2);
+  border-radius: var(--r);
+  background: var(--sup2);
+  font-size: 12.5px;
+  color: var(--tinta3);
+}
+
+.demo-bar > b { font-weight: 600; color: var(--tinta2) }
+.demo-bar .seg { margin-left: auto }
+.demo-bar .seg button { height: 32px; font-size: 12.5px; padding: 0 10px }
+
+/* Franja que deja a la vista qué filtro está aplicado. Importa porque el
+   paginador y la exportación trabajan sobre ese filtro, no sobre el total. */
+.filtro-activo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--linea);
+  background: var(--info-bg);
+  font-size: 12.5px;
+  color: #163F63;
+}
+
+.filtro-activo > .i { flex: none }
+.filtro-activo b { font-weight: 600 }
+.filtro-activo .end { margin-left: auto }
+.filtro-activo[hidden] { display: none }
+
+/* ============================================================
+   6. Detalle de consulta
+   ============================================================ */
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px 24px;
+  padding: 20px;
+}
+
+.datos .par { display: flex; flex-direction: column; gap: 4px; min-width: 0 }
+.datos .par dt { font-size: 12.5px; font-weight: 600; color: var(--tinta3) }
+.datos .par dd { font-size: 14px; color: var(--tinta); word-break: break-word }
+.datos .par dd.mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13.5px }
+.datos .par dd .t2 { display: block; font-size: 12.5px; color: var(--tinta3); margin-top: 2px }
+.datos .par.ancho { grid-column: 1 / -1 }
+
+/* Grupos de casillas: permisos de un rol, roles de un usuario, delegaciones
+   autorizadas. Reutilizan .check de la hoja original. */
+.opciones { display: grid; gap: 8px }
+.opciones .grupo {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--tinta3);
+  margin-top: 6px;
+}
+.opciones .grupo:first-child { margin-top: 0 }
+
+/* Listas dentro del panel lateral de los formularios. */
+.spec ul { margin: 0; padding-left: 20px; font-size: 13px; color: var(--tinta2); line-height: 1.55 }
+.spec ul li + li { margin-top: 6px }
+.spec .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px }
+
+/* ============================================================
+   6 bis. Ventana modal
+   ----------------------------------------------------------------
+   La hoja original ya trae .dialog, .dialog-h, .dialog-b y .dialog-f,
+   pero sobre un escenario de maqueta (.dialog-stage). Aquí se agrega
+   el telón real para poder abrirla encima de la página.
+   ============================================================ */
+
+.telon {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(30, 23, 21, .42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+  animation: sgr-telon .18s ease both;
+}
+
+@keyframes sgr-telon { from { opacity: 0 } to { opacity: 1 } }
+
+.telon .dialog {
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  animation: sgr-rise .26s var(--ease) both;
+}
+
+.telon .dialog-b { overflow-y: auto }
+.telon .dialog-h { padding: 22px 22px 0 }
+.telon .dialog-h .cerrar {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--tinta3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.telon .dialog-h .cerrar:hover { background: var(--hueso); color: var(--tinta) }
+
+@media (prefers-reduced-motion: reduce) {
+  .telon, .telon .dialog { animation: none }
+}
+
+/* Tarjeta de resumen usada como filtro, cuando está activa. */
+.card.kpi.sel {
+  border-color: var(--g700);
+  background: var(--g50);
+  box-shadow: 0 0 0 1px var(--g700);
+}
+
+/* Fila recién agregada a una tabla, para que se note de dónde salió. */
+.tabla tbody tr.nueva td { background: var(--g50) }
+.tabla tbody tr.nueva td:first-child { box-shadow: inset 3px 0 0 var(--g700) }
+
+/* ============================================================
+   6 ter. Calendario del mes
+   ----------------------------------------------------------------
+   La hoja original trae .cal, que es el calendario chico del panel
+   lateral. Este es el grande, el de la vista de calendario: mismas
+   siete columnas, pero con sitio para los compromisos de cada día.
+   ============================================================ */
+
+.cal-mes {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--linea);
+  border: 1px solid var(--linea);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.cal-mes .h {
+  background: var(--sup2);
+  padding: 8px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--tinta3);
+  text-align: center;
+}
+
+.cal-mes .d {
+  background: #fff;
+  min-height: 104px;
+  padding: 6px 7px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cal-mes .d.out { background: var(--sup2) }
+.cal-mes .d.out .n { color: #C9BEB7 }
+
+.cal-mes .n {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tinta2);
+  align-self: flex-start;
+  min-width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.cal-mes .d.hoy .n { background: var(--g700); color: #fff }
+
+.cal-mes .ev {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-left: 3px solid var(--tinta3);
+  border-radius: 5px;
+  background: var(--hueso);
+  color: var(--tinta);
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.3;
+  padding: 4px 6px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color var(--tf) ease, transform var(--t) var(--ease);
+}
+
+.cal-mes .ev:hover { background: var(--g50); transform: translateX(1px) }
+.cal-mes .ev .cod { font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 600; font-size: 10.5px }
+
+.cal-mes .ev.vencidos { border-left-color: var(--rojo-bar); background: var(--rojo-bg); color: #86180F }
+.cal-mes .ev.proximos { border-left-color: var(--ambar-bar); background: var(--ambar-bg); color: #5E3A00 }
+.cal-mes .ev.realizados { border-left-color: var(--verde-bar); background: var(--verde-bg); color: var(--verde) }
+.cal-mes .ev.curso { border-left-color: var(--info); background: var(--info-bg); color: #163F63 }
+
+.cal-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cal-barra h3 { font-size: 15px; font-weight: 600; min-width: 170px }
+.cal-barra .end { margin-left: auto; display: flex; gap: 6px; align-items: center }
+
+.cal-leyenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--tinta3) }
+.cal-leyenda span { display: inline-flex; align-items: center; gap: 6px }
+.cal-leyenda i { width: 10px; height: 10px; border-radius: 3px; display: inline-block }
+
+@media (max-width: 860px) {
+  .cal-mes .d { min-height: 72px; padding: 4px }
+  .cal-mes .ev { font-size: 10.5px }
+}
+
+/* Fila de la agenda recién traída desde el calendario. */
+.agenda-row.destacada { background: var(--g50); box-shadow: inset 3px 0 0 var(--g700) }
+
+/* ============================================================
+   7. Autenticación y recuperación de contraseña
+   ============================================================ */
+
+/* Paso actual del recorrido, en el panel de la izquierda. */
+.lb-steps li.on {
+  background: rgba(255, 255, 255, .14);
+  border-radius: var(--rs);
+  outline: 1px solid rgba(255, 255, 255, .22);
+}
+
+.lb-steps li.on .n { background: #fff; color: var(--g800) }
+.lb-steps li.hecho .n { background: rgba(255, 255, 255, .32); color: #fff }
+.lb-steps li.pend { opacity: .55 }
+
+/* Las seis casillas del código de verificación. */
+.pin {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.pin input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 56px;
+  text-align: center;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--tinta);
+  border: 1px solid var(--linea2);
+  border-radius: var(--rs);
+  background: #fff;
+  padding: 0;
+  transition: border-color var(--tf) ease, box-shadow var(--t) var(--ease);
+}
+
+.pin input::-webkit-outer-spin-button,
+.pin input::-webkit-inner-spin-button { appearance: none; margin: 0 }
+
+.pin input:focus {
+  outline: none;
+  border-color: var(--g700);
+  box-shadow: 0 0 0 3px rgba(var(--g700-rgb), .14);
+}
+
+.pin input.lleno { border-color: var(--tinta3); background: var(--sup2) }
+.pin.err input { border-color: var(--rojo); background: #FFF8F7 }
+
+@media (max-width: 420px) { .pin input { height: 48px; font-size: 18px } }
+
+/* Cuenta atrás de vigencia del código. */
+.cuenta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--tinta2);
+}
+
+.cuenta .reloj {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 600;
+  color: var(--tinta);
+  font-variant-numeric: tabular-nums;
+}
+
+.cuenta.poco .reloj { color: var(--rojo) }
+.cuenta.vencida { color: var(--rojo) }
+
+/* Requisitos de la contraseña, que se van cumpliendo al escribir. */
+.reglas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
+
+.reglas li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--tinta3);
+  transition: color var(--tf) ease;
+}
+
+.reglas li .pt {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--linea2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: transparent;
+  transition: background-color var(--tf) ease, border-color var(--tf) ease, color var(--tf) ease;
+}
+
+.reglas li.ok { color: var(--verde) }
+.reglas li.ok .pt { background: var(--verde-bar); border-color: var(--verde-bar); color: #fff }
+
+/* El medidor de fuerza reutiliza .meter de la hoja original. */
+.meter.floja span.on { background: var(--rojo-bar) }
+.meter.media span.on { background: var(--ambar-bar) }
+.meter.fuerte span.on { background: var(--verde-bar) }
+
+.fuerza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--tinta3);
+}
+
+.fuerza b { font-weight: 600 }
+.fuerza.floja b { color: var(--rojo) }
+.fuerza.media b { color: var(--ambar) }
+.fuerza.fuerte b { color: var(--verde) }
+
+/* Barra de revisión de estados en las pantallas de acceso. */
+.login-demo {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px dashed var(--linea2);
+  box-shadow: var(--sh2);
+  font-size: 12px;
+  color: var(--tinta3);
+  max-width: calc(100% - 32px);
+}
+
+.login-demo .seg button { height: 28px; font-size: 12px; padding: 0 10px; border-radius: 999px }
+
+/* ============================================================
+   8. SweetAlert2 con la paleta municipal
+   ============================================================ */
+
+.sgr-swal {
+  border-radius: 14px !important;
+  padding: 24px 24px 20px !important;
+  font-family: "IBM Plex Sans", system-ui, sans-serif !important;
+  box-shadow: 0 18px 48px rgba(30, 23, 21, .3) !important;
+  border: 1px solid var(--linea) !important;
+}
+
+.sgr-swal .swal2-title {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: var(--tinta) !important;
+  padding: 0 !important;
+  line-height: 1.3 !important;
+}
+
+.sgr-swal .swal2-html-container {
+  font-size: 13.5px !important;
+  color: var(--tinta2) !important;
+  line-height: 1.55 !important;
+  margin: 10px 0 0 !important;
+  padding: 0 !important;
+}
+
+.sgr-swal .swal2-html-container b { color: var(--tinta); font-weight: 600 }
+.sgr-swal .swal2-html-container .mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.sgr-swal .swal2-actions { margin: 20px 0 0 !important; gap: 8px !important }
+
+.sgr-swal .swal2-styled {
+  font: inherit !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  height: 40px !important;
+  padding: 0 16px !important;
+  border-radius: var(--rs) !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  transition: background-color var(--tf) ease, border-color var(--tf) ease !important;
+}
+
+.sgr-swal .swal2-confirm {
+  background: var(--g700) !important;
+  border: 1px solid var(--g700) !important;
+  color: #fff !important;
+}
+.sgr-swal .swal2-confirm:hover { background: var(--g800) !important; border-color: var(--g800) !important }
+
+.sgr-swal.peligro .swal2-confirm {
+  background: var(--rojo) !important;
+  border-color: var(--rojo) !important;
+}
+.sgr-swal.peligro .swal2-confirm:hover { background: #8F1C13 !important; border-color: #8F1C13 !important }
+
+.sgr-swal .swal2-cancel {
+  background: #fff !important;
+  border: 1px solid var(--linea2) !important;
+  color: var(--tinta2) !important;
+}
+.sgr-swal .swal2-cancel:hover { background: var(--hueso) !important; color: var(--tinta) !important }
+
+/* El tamaño del icono se ajusta con font-size, NO con width/height:
+   SweetAlert2 dibuja el círculo, el anillo y el visto con medidas en em
+   relativas al font-size de este elemento (5em de ancho, el trazo largo del
+   visto 2,9375em…). Al forzar los píxeles, la caja se achicaba a 56 px pero
+   el visto se seguía dibujando para 80 px y se desbordaba sobre el título.
+   5em × 11,2px = 56px, que es el tamaño que se buscaba. */
+.sgr-swal .swal2-icon { margin: 0 auto 4px !important; font-size: 11.2px !important }
+.sgr-swal .swal2-icon .swal2-icon-content { font-size: 32px !important }
+.sgr-swal .swal2-icon.swal2-warning { border-color: #EBD09D !important; color: var(--ambar) !important; background: var(--ambar-bg) !important }
+.sgr-swal .swal2-icon.swal2-error { border-color: #F0C0BA !important; color: var(--rojo) !important; background: var(--rojo-bg) !important }
+.sgr-swal .swal2-icon.swal2-success { border-color: #BCDDC9 !important; color: var(--verde) !important; background: var(--verde-bg) !important }
+.sgr-swal .swal2-icon.swal2-question { border-color: #C5D8EA !important; color: var(--info) !important; background: var(--info-bg) !important }
+.sgr-swal .swal2-icon.swal2-success [class^="swal2-success-line"] { background-color: var(--verde) !important }
+.sgr-swal .swal2-icon.swal2-success .swal2-success-ring { border-color: #BCDDC9 !important }
+
+.swal2-container.sgr-fondo { background: rgba(30, 23, 21, .42) !important }
+
+.sgr-swal .aviso {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  text-align: left;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  border: 1px solid #F0C0BA;
+  background: var(--rojo-bg);
+  color: #86180F;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sgr-swal .aviso.neu { border-color: var(--linea); background: var(--sup2); color: var(--tinta2) }
+.sgr-swal .lista { text-align: left; margin: 12px 0 0; padding-left: 20px }
+.sgr-swal .lista li + li { margin-top: 4px }
+
+/* ============================================================
+   9. Añadidos de la versión Django
+   ----------------------------------------------------------------
+   Lo que cambia respecto de la maqueta estática: la delegación activa
+   es un formulario que envía al servidor, y los avisos del sistema
+   llegan en el cuerpo de la página además de como aviso flotante.
+   ============================================================ */
+
+/* El selector de delegación de la cabecera, ahora un formulario. */
+.deleg-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--linea2);
+  border-radius: var(--rs);
+  background: #fff;
+  flex: none;
+  max-width: 300px;
+}
+
+.deleg-form:focus-within { border-color: var(--g700); box-shadow: 0 0 0 3px rgba(var(--g700-rgb), .14) }
+
+.deleg-form .cod {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--g700);
+  background: var(--g50);
+  border-radius: 6px;
+  padding: 3px 7px;
+  flex: none;
+}
+
+.deleg-form .nom {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+.deleg-form .nom b { font-weight: 600; font-size: 13px; white-space: nowrap }
+.deleg-form .nom small { font-size: 11px; color: var(--tinta3); white-space: nowrap }
+
+.deleg-select {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta);
+  cursor: pointer;
+  max-width: 180px;
+  padding: 2px 4px;
+}
+.deleg-select:focus { outline: none }
+
+@media (max-width: 1100px) { .deleg-form .nom small { display: none } }
+
+/* Un formulario que es solo un botón no debe romper la fila. */
+.sgr-inline { display: inline-flex; margin: 0 }
+
+/* Los mensajes del sistema, arriba del contenido. */
+.avisos { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px }
+
+/* Encabezados ordenables: en Django el orden es un enlace, no un botón. */
+.tabla th.sort a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: inherit;
+  text-decoration: none;
+}
+.tabla th.sort a:hover { color: var(--tinta) }
+.tabla th.sort .ar { opacity: 0; transition: opacity var(--tf) ease, transform var(--t) var(--ease) }
+.tabla th.sort a:hover .ar { opacity: .4 }
+.tabla th.sort[aria-sort] a { color: var(--g700) }
+.tabla th.sort[aria-sort] .ar { opacity: 1 }
+.tabla th.sort[aria-sort="descending"] .ar { transform: rotate(180deg) }
+
+/* El paginador vuelve a ser de enlaces, como manda el HTML sin JavaScript. */
+.pager span[aria-disabled] {
+  min-width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  border: 1px solid var(--linea);
+  background: var(--sup2);
+  color: #BDB2AC;
+  font-size: 13px;
+}
+
+/* Casillas del código de recuperación en su versión de formulario. */
+.pin-casilla {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 56px;
+  text-align: center;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--tinta);
+  border: 1px solid var(--linea2);
+  border-radius: var(--rs);
+  background: #fff;
+  padding: 0;
+}
+.pin-casilla:focus { outline: none; border-color: var(--g700); box-shadow: 0 0 0 3px rgba(var(--g700-rgb), .14) }
+.pin-casilla.lleno { border-color: var(--tinta3); background: var(--sup2) }
+
+/* El campo ancho de un formulario ocupa las dos columnas. */
+.form-grid .field.ancho { grid-column: 1 / -1 }
+
+/* Estado de la búsqueda del RUT en el ingreso de atención. Son variantes de
+   .help: el mismo texto de ayuda, con color según lo que encontró. */
+.field .help.bueno { color: var(--verde) }
+.field .help.malo  { color: var(--rojo) }
+
+/* ============================================================
+   Márgenes laterales de las tablas de listado
+   ============================================================
+
+   La primera columna se veía pegada al borde de la tarjeta, y no era una
+   impresión: la tabla y la tarjeta usaban dos medidas distintas. Las celdas
+   llevan 16 px de relleno lateral (.tabla th, .tabla td en sgr.css) mientras
+   la cabecera, el cuerpo y el pie de la tarjeta llevan 20 px (.card-h,
+   .card-b, .card-f). Esos cuatro píxeles de diferencia dejaban la palabra
+   «Código» más afuera que el título de la tarjeta que está justo arriba y
+   que el texto del pie que está justo abajo, y el ojo lo nota aunque no
+   sepa por qué.
+
+   Se iguala a 20 px solo en las columnas de los extremos. Entre columnas los
+   16 px están bien: ahí el relleno separa datos de datos, y agrandarlo
+   desarma la lectura de la fila. Lo que tiene que coincidir es el borde.
+
+   Hay que cubrir tres casos, que son tres sitios distintos del mismo borde:
+
+     th            cabecera de columna no ordenable
+     td            celda de dato
+     th.sort > button   cabecera ordenable, que pone su relleno en el botón
+                        porque el botón ocupa toda la celda y es él quien
+                        recibe el clic y el foco (.tabla th.sort{padding:0})
+
+   El :not(.ck) no es adorno. La columna de casillas de selección fija su
+   propio relleno (.tabla td.ck, más arriba en este archivo) y pesa lo mismo
+   que esta regla; al estar esta después, ganaría y le correría la casilla.
+   Excluirla deja esa columna como estaba. Hoy ninguna pantalla la usa, pero
+   la regla que la rompería estaría escrita y en silencio hasta el día en que
+   alguien agregue la columna y no entienda por qué quedó torcida. */
+
+.tabla th:first-child:not(.ck),
+.tabla td:first-child:not(.ck) { padding-left: 20px }
+
+.tabla th:last-child:not(.ck),
+.tabla td:last-child:not(.ck) { padding-right: 20px }
+
+.tabla th.sort:first-child button { padding-left: 20px }
+.tabla th.sort:last-child button { padding-right: 20px }
+
+/* ============================================================
+   Filas de grupo dentro de una tabla
+   ============================================================
+
+   Las usa el informe para separar una delegación de la siguiente. La
+   maqueta las escribía como <tr class="grp"> pero nunca definió la clase,
+   así que se veían como una fila de datos más y el agrupamiento no se
+   entendía.
+
+   Se les da el mismo fondo y el mismo peso que a la cabecera de la tabla:
+   quien mira la tabla ya aprendió que ese gris significa «esto no es un
+   dato, es un rótulo», y conviene no enseñarle un segundo código. */
+
+.tabla tr.grp td {
+  background: var(--sup2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tinta2);
+  padding: 9px 20px;
+  border-top: 1px solid var(--linea);
+  border-bottom: 1px solid var(--linea);
+  white-space: nowrap;
+}
+
+/* El pie con los totales se lee como conclusión, no como una fila más. */
+.tabla tfoot td {
+  background: var(--sup2);
+  font-size: 13px;
+  padding: 12px 16px;
+  border-top: 2px solid var(--linea2);
+}
+.tabla tfoot td:first-child { padding-left: 20px }
+.tabla tfoot td:last-child { padding-right: 20px }
+
+/* ============================================================
+   Selector de tipo de informe: cuatro opciones en rejilla
+   ============================================================
+
+   La maqueta las dibujaba en una columna. Con cuatro opciones, esa columna
+   empuja los filtros y el botón «Generar informe» fuera de la pantalla, y
+   ahí aparece un problema que no se ve mirando el diseño: se elige un tipo,
+   no se alcanza a ver el botón, y el panel de la derecha sigue mostrando el
+   informe anterior. La pantalla queda diciendo dos cosas distintas y nadie
+   entiende por qué.
+
+   En dos columnas las cuatro opciones ocupan la mitad del alto, y el botón
+   queda a la vista junto con lo que se está eligiendo. Bajo 560 px vuelven
+   a una columna, donde apilar es lo correcto. */
+
+.decision.decision-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.decision.decision-2 .opt {
+  padding: 10px 12px;
+  align-items: flex-start;
+}
+.decision.decision-2 .opt span b { display: block; line-height: 1.25 }
+.decision.decision-2 .opt span span { font-size: 11.5px; line-height: 1.3 }
+
+@media (max-width: 560px) {
+  .decision.decision-2 { grid-template-columns: 1fr }
+}
+
+/* El aviso de «cambiaste la configuración» va pegado sobre el botón, que es
+   donde la persona está mirando cuando le hace falta. */
+.generar { display: grid; gap: 8px }
+.generar .sin-generar { margin: 0; color: var(--ambar, var(--tinta2)) }

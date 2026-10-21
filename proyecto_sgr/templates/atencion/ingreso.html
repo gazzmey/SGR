@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% comment %}
+  Ingreso de atención ciudadana.
+
+  Los campos se escriben a mano en lugar de usar comun/_campo.html porque
+  esta pantalla necesita atributos propios: el RUT que busca la ficha, el
+  tipo que recarga las subatenciones y la sección del documento que aparece
+  cuando la subatención lo exige.
+{% endcomment %}
+
+{% block titulo %}Ingreso de atención{% endblock %}
+
+{% block ruta %}
+  <span>Comunidad</span>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Atención ciudadana</span>
+{% endblock %}
+
+{% block contenido %}
+{{ por_tipo|json_script:"subatenciones-por-tipo" }}
+
+<div class="page-head">
+  <div>
+    <h1>Ingreso de atención ciudadana</h1>
+    <p>
+      Registra lo que se atendió en
+      {% if activa %}<b>{{ activa.nombre }}</b>{% else %}la delegación{% endif %}.
+      Cada atención queda asociada a quien la realizó y a la delegación activa.
+    </p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="{% url 'atencion:registradas' %}">Ver las atenciones registradas</a>
+  </div>
+</div>
+
+{% if not activa %}
+  <div class="notice warn" role="alert" style="margin-bottom: 20px">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div>
+      <b>No hay delegación activa</b>
+      Tu sesión no tiene ninguna delegación seleccionada, así que la atención no sabría a dónde asociarse. Si tu perfil tiene varias, elige una en la cabecera; si no tiene ninguna, pídele al administrador que te asigne delegación.
+    </div>
+  </div>
+{% endif %}
+
+<form class="grid g-side" method="post" novalidate>
+  {% csrf_token %}
+  {% comment %}
+    Ficha de un solo uso contra el doble envío: la comprueba el servidor, no
+    el navegador. Ver comun/envio.py.
+
+    Va en bloque y no en el comentario de una línea: ese no admite saltos, y
+    partido en dos Django lo imprime tal cual. Aquí además el texto se colaba
+    como celda del grid del formulario y descuadraba la pantalla entera.
+  {% endcomment %}
+  <input type="hidden" name="{{ campo_envio }}" value="{{ ficha_envio }}">
+
+  <section class="card" style="align-self: start">
+    {% if form.errors %}
+      <div class="notice bad" role="alert" style="margin: 20px 24px 0">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div>
+          <b>Revisa el formulario antes de guardar</b>
+          <ul>
+            {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+            {% for campo in form %}{% for error in campo.errors %}<li>{{ campo.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="form-sec">
+      <h3><span class="num">1</span>Quién consulta</h3>
+      <p>Si la persona ya fue atendida antes, el RUT la encuentra y completa el resto. Si no, se crea su ficha.</p>
+      <div class="form-grid">
+        <div class="field{% if form.rut.errors %} err{% endif %}">
+          <label for="{{ form.rut.id_for_label }}">{{ form.rut.label }}<span class="req">*</span></label>
+          {{ form.rut }}
+          <span class="help" data-rut-estado>{{ form.rut.help_text }}</span>
+        </div>
+        <div class="field{% if form.nombre.errors %} err{% endif %}">
+          <label for="{{ form.nombre.id_for_label }}">{{ form.nombre.label }}<span class="req">*</span></label>
+          {{ form.nombre }}
+        </div>
+        <div class="field{% if form.telefono.errors %} err{% endif %}">
+          <label for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}<span class="optn"> · opcional</span></label>
+          {{ form.telefono }}
+          <span class="help">{{ form.telefono.help_text }}</span>
+        </div>
+        <div class="field{% if form.territorio.errors %} err{% endif %}">
+          <label for="{{ form.territorio.id_for_label }}">{{ form.territorio.label }}<span class="req">*</span></label>
+          <span class="selw">
+            {{ form.territorio }}
+            <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-sec">
+      <h3><span class="num">2</span>Qué se atendió</h3>
+      <p>La subatención depende del tipo: al elegir uno, se cargan solo las suyas.</p>
+      <div class="form-grid">
+        <div class="field{% if form.tipo.errors %} err{% endif %}">
+          <label for="{{ form.tipo.id_for_label }}">{{ form.tipo.label }}<span class="req">*</span></label>
+          <span class="selw">
+            {{ form.tipo }}
+            <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+          </span>
+          <span class="help">{{ form.tipo.help_text }}</span>
+        </div>
+        <div class="field{% if form.subatencion.errors %} err{% endif %}">
+          <label for="{{ form.subatencion.id_for_label }}">{{ form.subatencion.label }}<span class="req">*</span></label>
+          <span class="selw">
+            {{ form.subatencion }}
+            <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+          </span>
+          <span class="help" data-sub-ayuda>Se habilita al elegir el tipo.</span>
+        </div>
+        <div class="field{% if form.detalle.errors %} err{% endif %}" style="grid-column: 1 / -1">
+          <label for="{{ form.detalle.id_for_label }}">{{ form.detalle.label }}<span class="req">*</span></label>
+          {{ form.detalle }}
+          <span class="help">{{ form.detalle.help_text }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-sec">
+      <h3><span class="num">3</span>Documento de respaldo</h3>
+      <p>
+        Solo es obligatorio en las subatenciones que lo exigen; el selector de arriba lo
+        indica y el aviso aparece al elegirla.
+      </p>
+      <div class="notice warn" data-doc-aviso hidden role="status" style="margin-bottom: 14px">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Esta subatención exige respaldo</b>Indica cuál es el documento: sin él, la atención no se guarda.</div>
+      </div>
+      <div class="field{% if form.documento.errors %} err{% endif %}">
+        <label for="{{ form.documento.id_for_label }}">Documento<span class="optn"> · según la subatención</span></label>
+        {{ form.documento }}
+        <span class="help">Nombre o número del informe social, la receta, la resolución o el acta. En esta entrega se guarda la referencia, no el archivo.</span>
+      </div>
+    </div>
+
+    <div class="form-foot">
+      <span class="small soft">Los campos con <span class="req">*</span> son obligatorios.</span>
+      <div class="end">
+        <a class="btn btn-secondary" href="{% url 'comun:panel' %}">Cancelar</a>
+        <button type="submit" class="btn btn-primary"{% if not activa %} disabled{% endif %}>Registrar atención</button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="stack" style="align-self: start">
+    <div class="spec">
+      <div class="spec-h">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.1 7.5 9.5 4.3-1.4 7.5-4.9 7.5-9.5V6z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>
+        <h3>Dónde queda registrada</h3>
+      </div>
+      <dl class="datos" style="padding: 0; grid-template-columns: 1fr">
+        <div class="par"><dt>Delegación activa</dt><dd>{{ activa.nombre|default:"—" }}{% if activa %}<span class="t2">{{ activa.codigo }}</span>{% endif %}</dd></div>
+        <div class="par">
+          <dt>Quien atiende</dt>
+          <dd>{{ sgr_perfil.nombre|default:user.get_username }}<span class="t2">{% if sgr_perfil %}{{ sgr_perfil.rol.nombre }}{% else %}Superusuario{% endif %}</span></dd>
+        </div>
+        <div class="par"><dt>Fecha y hora</dt><dd>Las pone el servidor al guardar<span class="t2">campo <span class="mono">auto_now_add</span></span></dd></div>
+      </dl>
+      <div class="divider"></div>
+      <p class="small soft">La delegación y el funcionario <b>no viajan en el formulario</b>: los pone la vista con lo que hay en la sesión. Si viajaran, bastaría con cambiarlos a mano para registrar a nombre de otra persona.</p>
+    </div>
+
+    {% if ultimas %}
+      <section class="card">
+        <div class="card-h"><h2>Últimas de esta delegación</h2></div>
+        <ul class="list">
+          {% for atencion in ultimas %}
+            <li>
+              <span class="tx">
+                <b>{{ atencion.solicitante.nombre }}</b>
+                <span>{{ atencion.subatencion.nombre }} · {{ atencion.registrada|date:"d-m-Y H:i" }}</span>
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  </aside>
+</form>
+{% endblock %}

@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% comment %}
+  Alertas de la delegación. Sigue la maqueta aprobada: activas arriba con su
+  enlace y su botón de revisar, el panel de reglas vigentes al lado, y las
+  revisadas al final.
+
+  La frase de la bajada no es decorativa: marcar una alerta como revisada
+  escribe una fila aparte y no toca lo que la originó. Decirlo en pantalla
+  evita que alguien crea que revisar «arregla» el compromiso vencido.
+{% endcomment %}
+
+{% block titulo %}Alertas{% endblock %}
+{% block ruta %}
+  <span>Supervisión</span>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Alertas</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Alertas</h1>
+    <p>Avisos de la delegación {{ delegacion.nombre|default:"—" }} que requieren atención. Marcar una alerta como revisada no borra el evento que la originó.</p>
+  </div>
+  <div class="actions">
+    {% if delegaciones|length > 1 %}
+      <form method="get" class="sgr-inline">
+        <label class="sr-only" for="sel-del">Delegación</label>
+        <select class="input" id="sel-del" name="delegacion" onchange="this.form.submit()">
+          {% for d in delegaciones %}
+            <option value="{{ d.pk }}"{% if d.pk == delegacion.pk %} selected{% endif %}>{{ d.nombre }}</option>
+          {% endfor %}
+        </select>
+        {% if periodo %}<input type="hidden" name="periodo" value="{{ periodo.pk }}">{% endif %}
+      </form>
+    {% endif %}
+    {% if periodos|length > 1 %}
+      <form method="get" class="sgr-inline">
+        <label class="sr-only" for="sel-per">Período</label>
+        <select class="input" id="sel-per" name="periodo" onchange="this.form.submit()">
+          {% for p in periodos %}
+            <option value="{{ p.pk }}"{% if p.pk == periodo.pk %} selected{% endif %}>{{ p.nombre }}</option>
+          {% endfor %}
+        </select>
+        {% if delegacion %}<input type="hidden" name="delegacion" value="{{ delegacion.pk }}">{% endif %}
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if sin_datos %}
+  <div class="notice info">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>Nada que mostrar todavía</b>{{ sin_datos }}</div>
+  </div>
+{% else %}
+
+<div class="grid g-side">
+  <section class="card" style="align-self: start">
+    <div class="card-h">
+      <h2>Activas</h2>
+      <span class="sub">{{ activas|length }}</span>
+    </div>
+
+    {% if activas %}
+      <ul class="list">
+        {% for a in activas %}
+          <li>
+            <span class="tx">
+              <b>{{ a.titulo }}</b>
+              <span>{{ a.detalle }}</span>
+              <span>Responsable: {{ a.responsable }} · desde el {{ a.desde|date:"d-m-Y" }}</span>
+            </span>
+            <span class="end">
+              <span class="chip {{ a.clase_chip }}">{% if a.gravedad == 'alta' %}Atender{% else %}Avisar{% endif %}</span>
+              {% comment %}
+                Las alertas que abren una ficha le dicen de dónde viene, para
+                que su «Volver» traiga de vuelta a esta lista con el período y
+                el filtro puestos. ``get_full_path`` incluye la consulta, y el
+                filtro ``urlencode`` la deja en condiciones de viajar dentro
+                de otra dirección.
+              {% endcomment %}
+              <a class="btn btn-sm btn-secondary" href="{{ a.url }}{% if a.vuelve %}?volver={{ request.get_full_path|urlencode }}{% endif %}">{{ a.rotulo_enlace }}</a>
+              <form method="post" action="{% url 'gestion:alerta_revisar' %}" class="sgr-inline">
+                {% csrf_token %}
+                <input type="hidden" name="clave" value="{{ a.clave }}">
+                <input type="hidden" name="tipo" value="{{ a.tipo }}">
+                <input type="hidden" name="titulo" value="{{ a.titulo }}">
+                <input type="hidden" name="detalle" value="{{ a.detalle }}">
+                <input type="hidden" name="volver" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-ghost">Marcar como revisada</button>
+              </form>
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="card-b" style="padding: 24px">
+        <p class="small soft">No hay alertas activas en esta delegación. Las condiciones se vuelven a evaluar cada vez que se abre esta pantalla, así que si algo cambia aparecerá solo.</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <aside class="stack" style="align-self: start">
+    <section class="card">
+      <div class="card-h"><h2>Reglas vigentes</h2></div>
+      <dl class="datos" style="grid-template-columns: 1fr">
+        <div class="par"><dt>Compromiso próximo a vencer</dt><dd>{{ regla.dias_aviso_vencimiento }} días antes<span class="t2">Avisa al responsable</span></dd></div>
+        <div class="par"><dt>Compromiso vencido</dt><dd>Al vencer<span class="t2">Avisa al delegado</span></dd></div>
+        <div class="par"><dt>Avance bajo el umbral</dt><dd>Menos del {{ regla.umbral_ambar }} % de lo esperado<span class="t2">Es el mismo umbral del semáforo, para que no se contradigan</span></dd></div>
+        <div class="par"><dt>Sin registros</dt><dd>{{ regla.dias_sin_registrar }} días sin registrar<span class="t2">Avisa al delegado</span></dd></div>
+        <div class="par"><dt>Evidencia sin revisar</dt><dd>{{ regla.dias_evidencia_espera }} días en espera<span class="t2">Avisa a quien valida</span></dd></div>
+      </dl>
+      <div class="card-f">
+        <span class="small soft">Los umbrales se configuran en Período → Reglas de cálculo. Cada cambio queda en la auditoría. {{ regla.rotulo }}</span>
+      </div>
+    </section>
+
+    {% if vigentes %}
+      <div class="notice">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>{{ vigentes|length }} revisada{{ vigentes|length|pluralize }} que sigue{{ vigentes|length|pluralize:",n" }} dándose</b>Marcarlas como revisadas las sacó de la lista de arriba, pero la condición que las originó no cambió.</div>
+      </div>
+    {% endif %}
+  </aside>
+</div>
+
+<section class="card mt20">
+  <div class="card-h">
+    <h2>Alertas revisadas</h2>
+    <span class="sub">las {{ revisadas|length }} más recientes</span>
+  </div>
+  {% if revisadas %}
+    <ul class="list">
+      {% for r in revisadas %}
+        <li>
+          <span class="tx">
+            <b>{{ r.titulo }}</b>
+            <span>{{ r.detalle }}</span>
+            <span>Revisada por {{ r.usuario_visible }} · {{ r.cuando|date:"d-m-Y H:i" }}</span>
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="card-b" style="padding: 20px 24px">
+      <p class="small soft">Todavía nadie ha marcado ninguna alerta como revisada.</p>
+    </div>
+  {% endif %}
+  <div class="card-f">
+    <span class="small soft">Revisar deja constancia de que alguien miró el aviso. No cierra el compromiso, no valida la evidencia y no cambia el avance: eso se hace en su propia pantalla.</span>
+  </div>
+</section>
+
+{% endif %}
+{% endblock %}

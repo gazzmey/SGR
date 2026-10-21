@@ -1,0 +1,229 @@
+{% load static sgr %}<!doctype html>
+{% comment %}
+  Plantilla institucional del SGR.
+
+  Es el marco que la maqueta repetía en cada archivo: el menú lateral y la
+  barra superior. Aquí está una sola vez, y cada pantalla rellena
+  {% templatetag openblock %} block contenido {% templatetag closeblock %}.
+
+  El menú muestra solo los módulos que el rol habilita. Esconder una opción
+  es cortesía, no seguridad: la vista de destino vuelve a comprobar el
+  permiso de todas maneras.
+{% endcomment %}
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titulo %}SGR{% endblock %} · SGR</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
+<link rel="icon" type="image/png" href="{% static 'sgr/img/favicon.png' %}">
+<link rel="stylesheet" href="{% static 'sgr/css/sgr.css' %}">
+<link rel="stylesheet" href="{% static 'sgr/css/sgr2.css' %}">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.14.5/dist/sweetalert2.all.min.js" defer></script>
+<script src="{% static 'sgr/js/sgr.js' %}" defer></script>
+<script src="{% static 'sgr/js/sgr-app.js' %}" defer></script>
+</head>
+<body class="web">
+<div class="app">
+
+<aside class="side">
+  <a class="brand" href="{% url 'comun:panel' %}" aria-label="SGR, inicio">
+    <span class="brand-logo"><img src="{% static 'sgr/img/escudo.png' %}" alt="" width="268" height="288"></span>
+    <span class="brand-txt"><b>SGR</b><small>Municipalidad de La Serena<br>Delegaciones municipales</small></span>
+  </a>
+
+  <nav class="nav" aria-label="Módulos">
+    <h3>Mi gestión</h3>
+    <a href="{% url 'comun:panel' %}"{% if menu == 'panel' %} aria-current="page"{% endif %}>
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="9" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5" rx="1.5"/><rect x="13.5" y="11" width="7.5" height="10" rx="1.5"/><rect x="3" y="15" width="7.5" height="6" rx="1.5"/></svg><span>Mi panel</span>
+    </a>
+
+    <a href="{% url 'gestion:mi_resultado' %}"{% if menu == 'mi_resultado' %} aria-current="page"{% endif %}>
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5h16"/><path d="M7 19.5v-6M12 19.5V7M17 19.5v-9"/></svg><span>Mi resultado</span>
+    </a>
+
+    {% if sgr_permisos.registrar_actividad %}
+      <a href="{% url 'gestion:actividades' %}"{% if menu == 'actividades' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5h11M8 12h11M8 18.5h11"/><path d="M4 5.5h.01M4 12h.01M4 18.5h.01"/></svg><span>Mis actividades</span>
+      </a>
+    {% endif %}
+
+    <h3>Comunidad</h3>
+    {% comment %}
+      La agenda no se restringe por permiso: es colectiva, y el sentido de
+      que lo sea es que cualquiera de la delegación pueda ver qué hay
+      comprometido. Lo que se limita es qué delegaciones muestra, y eso lo
+      hace la vista.
+    {% endcomment %}
+    <a href="{% url 'gestion:agenda' %}"{% if menu == 'agenda' %} aria-current="page"{% endif %}>
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3.5v3M16 3.5v3M3.5 10h17"/><path d="m9 14.5 1.8 1.8L15 12.5"/></svg><span>Agenda de compromisos</span>
+    </a>
+    {% if sgr_permisos.registrar_atencion %}
+      <a href="{% url 'atencion:ingreso' %}"{% if menu == 'atencion' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10.5h8M8 14h5"/><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V18H4.5A1.5 1.5 0 0 1 3 16.5V7a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Atención ciudadana</span>
+      </a>
+    {% endif %}
+
+    {% if sgr_permisos.validar_evidencia or sgr_permisos.ver_tablero or sgr_permisos.ver_informes %}
+      <h3>Supervisión</h3>
+      {% if sgr_permisos.validar_evidencia %}
+        <a href="{% url 'gestion:validar' %}"{% if menu == 'validar' %} aria-current="page"{% endif %}>
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/><path d="M3 19.5h18"/></svg><span>Validar evidencias</span>
+        </a>
+      {% endif %}
+      {% if sgr_permisos.ver_tablero %}
+        <a href="{% url 'gestion:alertas' %}"{% if menu == 'alertas' %} aria-current="page"{% endif %}>
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8.5a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5z"/><path d="M13.7 19a2 2 0 0 1-3.4 0"/></svg><span>Alertas</span>
+        </a>
+      {% endif %}
+      {% if sgr_permisos.ver_tablero %}
+        <a href="{% url 'gestion:tablero' %}"{% if menu == 'tablero' %} aria-current="page"{% endif %}>
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M8 16V9.5M12 16v-4M16 16v-7"/></svg><span>Tablero de delegación</span>
+        </a>
+      {% endif %}
+      {% if sgr_permisos.ver_informes %}
+        <a href="{% url 'gestion:informes' %}"{% if menu == 'informes' %} aria-current="page"{% endif %}>
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h8l4.5 4.5v12.5H6z"/><path d="M14 3.5V8h4.5"/><path d="M9 17v-3.5M12 17v-6M15 17v-2"/></svg><span>Informes</span>
+        </a>
+      {% endif %}
+    {% endif %}
+
+    {% if sgr_permisos.configurar_periodo or sgr_permisos.definir_meta %}
+      <h3>Período</h3>
+      {% if sgr_permisos.configurar_periodo %}
+        <a href="{% url 'gestion:periodos' %}"{% if menu == 'periodos' %} aria-current="page"{% endif %}>
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg><span>Períodos</span>
+        </a>
+      {% endif %}
+      {% if sgr_permisos.definir_meta %}
+        <a href="{% url 'gestion:cargos' %}"{% if menu == 'cargos' %} aria-current="page"{% endif %}>
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 20.5v-2a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v2"/><circle cx="12" cy="8" r="3.5"/></svg><span>Cargos</span>
+        </a>
+        <a href="{% url 'gestion:metas' %}"{% if menu == 'metas' %} aria-current="page"{% endif %}>
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg><span>Metas y ponderadores</span>
+        </a>
+      {% endif %}
+      {% if sgr_permisos.configurar_periodo %}
+        <a href="{% url 'gestion:reglas' %}"{% if menu == 'reglas' %} aria-current="page"{% endif %}>
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/><circle cx="9" cy="7" r="2.2"/><circle cx="15" cy="12" r="2.2"/><circle cx="17" cy="17" r="2.2"/></svg><span>Reglas de cálculo</span>
+        </a>
+      {% endif %}
+    {% endif %}
+
+    {% if sgr_permisos.gestionar_catalogo %}
+      <h3>Configuración</h3>
+      <a href="{% url 'catalogos:items' %}"{% if menu == 'items' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5h16"/><path d="M7 19.5V9M12 19.5V4.5M17 19.5v-7"/></svg><span>Ítems y metas</span>
+      </a>
+      <a href="{% url 'catalogos:tipos' %}"{% if menu == 'tipos' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8.5 4.5v15"/></svg><span>Tipos de atención</span>
+      </a>
+      <a href="{% url 'catalogos:subatenciones' %}"{% if menu == 'subatenciones' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4v10a3 3 0 0 0 3 3h11"/><path d="m15.5 13.5 3.5 3.5-3.5 3.5"/></svg><span>Subatenciones</span>
+      </a>
+    {% endif %}
+
+    {% if sgr_permisos.gestionar_usuario %}
+      <h3>Administración</h3>
+      <a href="{% url 'organizacion:delegaciones' %}"{% if menu == 'delegaciones' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V8.5l7-4.5 7 4.5V21"/><path d="M10 21v-5h4v5"/><path d="M9 11h.01M15 11h.01"/></svg><span>Delegaciones</span>
+      </a>
+      <a href="{% url 'organizacion:usuarios' %}"{% if menu == 'usuarios' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.8"/><path d="M4.5 20c.7-4 3.6-6 7.5-6s6.8 2 7.5 6"/></svg><span>Usuarios</span>
+      </a>
+      <a href="{% url 'organizacion:roles' %}"{% if menu == 'roles' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.1 7.5 9.5 4.3-1.4 7.5-4.9 7.5-9.5V6z"/><path d="M12 9.5v5M9.5 12h5"/></svg><span>Roles</span>
+      </a>
+    {% endif %}
+
+    {% comment %}
+      La auditoría va en su propia comprobación y no dentro de la de
+      administración: consultarla es un permiso distinto de gestionar
+      usuarios, y puede corresponderle a alguien que no administra cuentas.
+    {% endcomment %}
+    {% if sgr_permisos.ver_auditoria %}
+      {% if not sgr_permisos.gestionar_usuario %}<h3>Administración</h3>{% endif %}
+      <a href="{% url 'gestion:auditoria' %}"{% if menu == 'auditoria' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h8l4.5 4.5v12.5H6z"/><path d="M14 3.5V8h4.5"/><path d="M9 13h6M9 16.5h4"/></svg><span>Auditoría</span>
+      </a>
+    {% endif %}
+
+    {% if user.is_superuser %}
+      <h3>Sistema</h3>
+      <a href="{% url 'admin:index' %}">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.5 12a7.6 7.6 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7.4 7.4 0 0 0-2-1.2L14.7 3H9.3l-.4 2.7a7.4 7.4 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a7.4 7.4 0 0 0 2 1.2l.4 2.7h5.4l.4-2.7a7.4 7.4 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.07-.4.1-.8.1-1.2z"/></svg><span>Django Admin</span>
+      </a>
+    {% endif %}
+  </nav>
+
+  <div class="side-foot">
+    <div class="row">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>
+      <div><b>Proyecto Integrado</b>Segunda entrega · maqueta sobre Django</div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="top">
+    <nav class="crumbs" aria-label="Ruta">{% block ruta %}<span aria-current="page">SGR</span>{% endblock %}</nav>
+
+    <div class="top-tools">
+      {% if sgr_delegacion %}
+        <form method="post" action="{% url 'comun:cambiar_delegacion' %}" class="deleg-form">
+          {% csrf_token %}
+          <input type="hidden" name="volver" value="{{ request.get_full_path }}">
+          <span class="cod">{{ sgr_delegacion.codigo }}</span>
+          {% if sgr_puede_cambiar_delegacion %}
+            <label class="sr" for="deleg-activa">Delegación activa</label>
+            <select class="deleg-select" id="deleg-activa" name="delegacion" data-autoenviar>
+              {% for d in sgr_delegaciones %}
+                <option value="{{ d.pk }}"{% if d.pk == sgr_delegacion.pk %} selected{% endif %}>{{ d.nombre }}</option>
+              {% endfor %}
+            </select>
+            <noscript><button type="submit" class="btn btn-sm btn-secondary">Cambiar</button></noscript>
+          {% else %}
+            <span class="nom"><b>{{ sgr_delegacion.nombre }}</b><small>Delegación activa</small></span>
+          {% endif %}
+        </form>
+      {% endif %}
+
+      {% if user.is_authenticated %}
+        <span class="user">
+          <span class="avatar">{{ sgr_perfil.nombre|default:user.get_username|iniciales }}</span>
+          <span class="user-txt">
+            <b>{{ sgr_perfil.nombre|default:user.get_username }}</b>
+            <small>{% if sgr_perfil %}{{ sgr_perfil.rol.nombre }}{% else %}Superusuario{% endif %}</small>
+          </span>
+        </span>
+        <form method="post" action="{% url 'cuenta:logout' %}" class="sgr-inline">
+          {% csrf_token %}
+          <button type="submit" class="icon-btn" aria-label="Cerrar sesión">
+            <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M10 16.5 14.5 12 10 7.5M14.5 12H4"/></svg>
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="content">
+    {% include "comun/_resultado.html" %}
+
+    {% if messages %}
+      <div class="avisos" data-mensajes>
+        {% for mensaje in messages %}
+          <div class="notice {% if mensaje.tags == 'error' %}bad{% elif mensaje.tags == 'warning' %}warn{% elif mensaje.tags == 'success' %}ok{% else %}info{% endif %}" role="status">
+            <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8h.01"/></svg>
+            <div>{{ mensaje }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% block contenido %}{% endblock %}
+  </main>
+</div>
+
+</div>
+</body>
+</html>

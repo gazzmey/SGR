@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ obj.codigo }}{% endblock %}
+{% block ruta %}
+  <a href="{% url 'gestion:agenda' %}">Agenda de compromisos</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">{{ obj.codigo }}</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>{{ obj.solicitante }}</h1>
+    <p>{{ obj.codigo }} · {{ obj.territorio }} · vence el {{ obj.vencimiento|date:"d-m-Y" }}</p>
+  </div>
+  <div class="actions">
+    {% comment %}
+      «Volver» devuelve a donde se venía —la agenda, o las alertas si se llegó
+      desde ahí—. La ruta de arriba no cambia: ahí sigue diciendo «Agenda de
+      compromisos» porque es el lugar al que pertenece este registro, venga
+      uno de donde venga. Son dos cosas distintas y conviene que se vean
+      distintas: la ruta dice dónde estoy, el botón dice de dónde vine.
+    {% endcomment %}
+    <a class="btn btn-ghost" href="{{ url_volver }}">Volver</a>
+  </div>
+</div>
+
+{% if obj.cerrado %}
+  {% if obj.cerrado_con_atraso %}
+    <div class="notice bad">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+      <div><b>Se cerró con atraso</b>{{ obj.dias_de_atraso }} día{{ obj.dias_de_atraso|pluralize }} después del vencimiento. El atraso se guardó al cerrar y no cambia aunque después se modifique la regla de fechas.</div>
+    </div>
+  {% endif %}
+{% elif atraso_hoy %}
+  <div class="notice bad">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>Vencido</b>Lleva {{ atraso_hoy }} día{{ atraso_hoy|pluralize }} de atraso. Si se cierra ahora, el atraso queda escrito en su historial.</div>
+  </div>
+{% endif %}
+
+<div class="grid g-side">
+  <section class="card" style="align-self: start">
+    <div class="card-h">
+      <h2>El compromiso</h2>
+      <div class="end">
+        {% if obj.estado == 'realizado' %}<span class="chip ok">Realizado</span>
+        {% elif obj.estado == 'en_proceso' %}<span class="chip warn">En proceso</span>
+        {% elif obj.estado == 'pendiente' %}<span class="chip warn">Pendiente</span>
+        {% elif obj.estado == 'anulado' %}<span class="chip off"><span class="t">Anulado</span></span>
+        {% else %}<span class="chip line">Ingresado</span>{% endif %}
+      </div>
+    </div>
+    <dl class="datos">
+      <div class="par"><dt>Código</dt><dd class="mono">{{ obj.codigo }}</dd></div>
+      <div class="par"><dt>Vencimiento</dt><dd>{{ obj.vencimiento|date:"d-m-Y" }}</dd></div>
+      <div class="par"><dt>Solicitante</dt><dd>{{ obj.solicitante }}</dd></div>
+      <div class="par"><dt>Territorio</dt><dd>{{ obj.territorio }}</dd></div>
+      <div class="par"><dt>Responsable</dt><dd>{{ obj.responsable.get_full_name|default:obj.responsable.get_username }}
+        {% if obj.responsable_original and obj.responsable_original_id != obj.responsable_id %}
+          <span class="t2">Venía de {{ obj.responsable_original.get_full_name|default:obj.responsable_original.get_username }}</span>
+        {% endif %}</dd></div>
+      <div class="par"><dt>Apoyo</dt><dd>{{ obj.apoyo|default:"—" }}</dd></div>
+      <div class="par"><dt>Período</dt><dd>{{ obj.periodo.nombre }}</dd></div>
+      <div class="par"><dt>Delegación</dt><dd>{{ obj.delegacion.nombre }}</dd></div>
+      <div class="par ancho"><dt>Descripción</dt><dd>{{ obj.descripcion }}</dd></div>
+      {% if obj.actividad %}
+        <div class="par ancho"><dt>Nació de</dt><dd><a class="link" href="{% url 'gestion:actividad_detalle' obj.actividad.pk %}">{{ obj.actividad.codigo }} — {{ obj.actividad.accion }}</a></dd></div>
+      {% endif %}
+    </dl>
+    <div class="card-f">
+      <span class="small soft">Ingresado el {{ obj.creado|date:"d-m-Y H:i" }}{% if obj.cerrado_el %} · cerrado el {{ obj.cerrado_el|date:"d-m-Y" }}{% endif %}.</span>
+    </div>
+  </section>
+
+  <aside class="stack" style="align-self: start">
+    <section class="card">
+      <div class="card-h"><h2>Puntaje</h2></div>
+      <div class="card-b" style="padding: 20px 24px">
+        {% if obj.item %}
+          <p>Alimenta la meta de <b>{{ obj.item.nombre }}</b>.</p>
+          {% if obj.aporta %}
+            <p><span class="chip ok">Ya cuenta</span></p>
+          {% else %}
+            <p><span class="chip line">Todavía no cuenta</span></p>
+            <p class="small soft">{{ obj.motivo_sin_puntaje }}</p>
+          {% endif %}
+          {% if obj.requiere_validacion %}
+            <p class="small soft">Exige validación: realizarlo no basta, tiene que validarlo alguien distinto de quien lo ejecutó.</p>
+          {% else %}
+            <p class="small soft">No exige validación: cuenta al quedar realizado.</p>
+          {% endif %}
+          {% if obj.validado %}
+            <p class="small soft">Validado por {{ obj.validado_por.get_full_name|default:obj.validado_por.get_username }} el {{ obj.validado_el|date:"d-m-Y H:i" }}.</p>
+          {% endif %}
+        {% else %}
+          <p class="small soft">No alimenta ninguna meta: se ingresó sin ítem asignado. Sigue contando para el indicador de la agenda.</p>
+        {% endif %}
+      </div>
+      {% if puede_validar %}
+        <div class="card-f">
+          <form method="post" action="{% url 'gestion:compromiso_validar' obj.pk %}{{ vuelta_qs }}">
+            {% csrf_token %}
+            <div class="end"><button type="submit" class="btn btn-sm btn-primary">Validar el cumplimiento</button></div>
+          </form>
+        </div>
+      {% endif %}
+    </section>
+
+    {% if pasos %}
+      <section class="card">
+        <div class="card-h"><h2>Mover de estado</h2></div>
+        <div class="card-b" style="padding: 20px 24px">
+          <p class="small soft">Desde «{{ obj.get_estado_display|lower }}» se puede ir a los estados de abajo y a ninguno más. La observación queda en el historial.</p>
+          {% for p in pasos %}
+            <form method="post" action="{{ p.url }}{{ vuelta_qs }}" style="margin-top: 12px">
+              {% csrf_token %}
+              {% if p.peligroso %}
+                <label class="lb" for="obs-{{ p.clave }}">Motivo de la anulación <span class="req">*</span></label>
+                <textarea class="input" id="obs-{{ p.clave }}" name="observacion" rows="3" required placeholder="Por qué se da de baja sin cumplirlo"></textarea>
+              {% else %}
+                <label class="lb" for="obs-{{ p.clave }}">Observación</label>
+                <textarea class="input" id="obs-{{ p.clave }}" name="observacion" rows="2" placeholder="Qué se hizo. Opcional."></textarea>
+              {% endif %}
+              <div class="end" style="margin-top: 10px">
+                <button type="submit" class="btn btn-sm {% if p.peligroso %}btn-danger{% else %}btn-primary{% endif %}">{{ p.rotulo }}</button>
+              </div>
+            </form>
+            {% if not forloop.last %}<div class="divider"></div>{% endif %}
+          {% endfor %}
+        </div>
+      </section>
+    {% else %}
+      <div class="notice">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Sin cambios posibles</b>{% if obj.cerrado %}El compromiso está cerrado y no se reabre. Si hace falta hacer algo más, ingresa uno nuevo que lo cite.{% else %}No tienes permiso para moverlo de estado.{% endif %}</div>
+      </div>
+    {% endif %}
+
+    {% if form_reasignar %}
+      <section class="card">
+        <div class="card-h"><h2>Reasignar</h2></div>
+        <form method="post" action="{% url 'gestion:compromiso_reasignar' obj.pk %}{{ vuelta_qs }}">
+          {% csrf_token %}
+          <div class="card-b" style="padding: 20px 24px">
+            <p class="small soft">Para cuando el responsable no puede seguir. Se conserva de quién venía y por qué cambió.</p>
+            <div class="form-grid">
+              {% include "comun/_campo.html" with campo=form_reasignar.responsable %}
+              {% include "comun/_campo.html" with campo=form_reasignar.motivo %}
+            </div>
+          </div>
+          <div class="card-f">
+            <div class="end"><button type="submit" class="btn btn-sm btn-secondary">Reasignar</button></div>
+          </div>
+        </form>
+      </section>
+    {% endif %}
+
+    <section class="card">
+      <div class="card-h"><h2>Historial</h2><span class="sub">{{ cambios|length }}</span></div>
+      {% if cambios %}
+        <ul class="list">
+          {% for c in cambios %}
+            <li>
+              <span class="tx">
+                <b>{{ c.get_tipo_display }}</b>
+                <span>{{ c.resumen }}</span>
+                <span>{{ c.cuando|date:"d-m-Y H:i" }} · {{ c.usuario_visible }}</span>
+                {% if c.observacion %}<span>{{ c.observacion }}</span>{% endif %}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="card-b" style="padding: 20px 24px">
+          <p class="small soft">Sin movimientos todavía.</p>
+        </div>
+      {% endif %}
+      <div class="card-f">
+        <span class="small soft">El historial solo recibe filas nuevas. Un historial que se puede editar no es un historial.</span>
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

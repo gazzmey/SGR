@@ -1,0 +1,76 @@
+{% extends "cuenta/_marco.html" %}
+
+{% block titulo %}Crear contraseña{% endblock %}
+{% block paso %}Paso 4 de 4{% endblock %}
+{% block titular %}Última parte: elige tu contraseña nueva.{% endblock %}
+{% block lead %}Se guarda cifrada. Desde ese momento, es la única con la que se entra a tu cuenta.{% endblock %}
+
+{% block pasos %}
+  <ol class="lb-steps">
+    <li class="hecho"><span class="n">1</span>Pides el código</li>
+    <li class="hecho"><span class="n">2</span>Lo recibes por correo</li>
+    <li class="hecho"><span class="n">3</span>Lo validas</li>
+    <li class="on"><span class="n">4</span>Creas tu contraseña</li>
+  </ol>
+{% endblock %}
+
+{% block tarjeta %}
+<h2>Crea tu contraseña nueva</h2>
+<p>Código verificado para <b>{{ correo }}</b>. Elige una contraseña que no hayas usado antes.</p>
+
+{% if form.errors %}
+  <div class="notice bad mt20" role="alert">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div>
+      <b>Revisa la contraseña</b>
+      <ul>
+        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        {% for campo in form %}{% for error in campo.errors %}<li>{{ error }}</li>{% endfor %}{% endfor %}
+      </ul>
+    </div>
+  </div>
+{% endif %}
+
+<form class="stack mt20" style="gap: 18px" method="post" novalidate>
+  {% csrf_token %}
+
+  <div class="field{% if form.new_password1.errors %} err{% endif %}">
+    <label for="{{ form.new_password1.id_for_label }}">{{ form.new_password1.label }}<span class="req">*</span></label>
+    <div class="pw">
+      {{ form.new_password1 }}
+      <button type="button" aria-label="Mostrar contraseña"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+  </div>
+
+  {% comment %}
+    Medidor informativo. Quien decide si la contraseña sirve son los
+    validadores de AUTH_PASSWORD_VALIDATORS, en el servidor.
+  {% endcomment %}
+  <div class="stack" style="gap: 10px">
+    <div class="meter"><span></span><span></span><span></span></div>
+    <div class="fuerza"><span>Fuerza de la contraseña</span><b>—</b></div>
+    <ul class="reglas">
+      <li data-regla="largo"><span class="pt"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>Al menos 8 caracteres</li>
+      <li data-regla="letra"><span class="pt"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>Alguna letra</li>
+      <li data-regla="numero"><span class="pt"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>Algún número</li>
+      <li data-regla="variada"><span class="pt"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>Una mayúscula o un signo</li>
+    </ul>
+  </div>
+
+  <div class="field{% if form.new_password2.errors %} err{% endif %}">
+    <label for="{{ form.new_password2.id_for_label }}">{{ form.new_password2.label }}<span class="req">*</span></label>
+    <div class="pw">
+      {{ form.new_password2 }}
+      <button type="button" aria-label="Mostrar contraseña"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary btn-block">Guardar la contraseña</button>
+</form>
+
+<div class="divider"></div>
+<div class="row small soft" style="gap: 10px; flex-wrap: nowrap; align-items: flex-start">
+  <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+  <span>La contraseña se guarda con <span class="mono">set_password()</span>, que aplica un hash con sal. En la base de datos no queda la contraseña, sino ese hash: nadie —tampoco quien administra el sistema— puede leerla.</span>
+</div>
+{% endblock %}

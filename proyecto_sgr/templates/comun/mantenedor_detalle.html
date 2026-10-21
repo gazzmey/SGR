@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% comment %}
+  Ficha de consulta. Modo lectura: lo único que se puede hacer desde aquí es
+  ir a editar o cambiar el estado, y el cambio de estado va por POST.
+{% endcomment %}
+
+{% block titulo %}{{ obj }}{% endblock %}
+
+{% block ruta %}
+  <a href="{% url url_lista %}">{{ plural|capfirst }}</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Ficha</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>{{ obj.nombre }}</h1>
+    <p>Ficha de consulta de {{ obj.codigo }}. Todos los datos en modo lectura.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="{% url url_lista %}">Volver al listado</a>
+    {% if url_editar %}
+      <a class="btn btn-primary" href="{% url url_editar obj.pk %}">Editar</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid g-side">
+  <section class="card" style="align-self: start">
+    <div class="card-h">
+      <h2>Datos {{ genero }} {{ singular }}</h2>
+      <div class="end">
+        {% if obj.activo %}
+          <span class="chip ok">Activ{% if genero == 'la' %}a{% else %}o{% endif %}</span>
+        {% else %}
+          <span class="chip off"><span class="t">Inactiv{% if genero == 'la' %}a{% else %}o{% endif %}</span></span>
+        {% endif %}
+      </div>
+    </div>
+
+    <dl class="datos">
+      {% for dato in datos %}
+        <div class="par{% if dato.ancho %} ancho{% endif %}">
+          <dt>{{ dato.etiqueta }}</dt>
+          <dd{% if dato.mono %} class="mono"{% endif %}>{{ dato.valor|default:"—" }}</dd>
+        </div>
+      {% endfor %}
+    </dl>
+
+    <div class="card-f">
+      <span class="small soft">{{ pie }}</span>
+      {% if url_editar %}
+        <div class="end"><a class="btn btn-sm btn-secondary" href="{% url url_editar obj.pk %}">Editar datos</a></div>
+      {% endif %}
+    </div>
+  </section>
+
+  <aside class="stack" style="align-self: start">
+    {% if kpis %}
+      <div class="kpis">
+        {% for kpi in kpis %}
+          <div class="card kpi">
+            <span class="lbl">{{ kpi.etiqueta }}</span>
+            <div class="val">{{ kpi.valor }}</div>
+            <div class="meta">{{ kpi.pie }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if not obj.activo %}
+      <div class="notice neu">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+        <div>
+          <b>Registro desactivado</b>
+          Dejó de ofrecerse en registros nuevos{% if obj.desactivada %} el {{ obj.desactivada|date:"d-m-Y" }}{% endif %}.
+          Su historial se conserva intacto.
+        </div>
+      </div>
+    {% elif motivo_bloqueo %}
+      <div class="notice warn">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>No se puede desactivar</b>{{ motivo_bloqueo }}</div>
+      </div>
+    {% else %}
+      <div class="notice ok">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+        <div>
+          <b>Se puede desactivar</b>
+          No tiene registros asociados, así que desactivarl{% if genero == 'la' %}a{% else %}o{% endif %} no deja nada huérfano.
+        </div>
+      </div>
+    {% endif %}
+
+    {% comment %}
+      Hueco para las acciones propias de un mantenedor. Lo usa el período,
+      que además de activarse y desactivarse se abre, se cierra y se reabre.
+    {% endcomment %}
+    {% block acciones_extra %}{% endblock %}
+
+    <form method="post" action="{% url url_estado obj.pk %}" class="card" style="padding: 16px">
+      {% csrf_token %}
+      <input type="hidden" name="activar" value="{% if obj.activo %}0{% else %}1{% endif %}">
+      <input type="hidden" name="volver" value="{{ request.get_full_path }}">
+      <button type="submit" class="btn btn-block {% if obj.activo %}btn-secondary{% else %}btn-primary{% endif %}"
+              {% if obj.activo %}data-confirmar="Desactivar «{{ obj }}»"
+              data-confirmar-texto="Dejará de ofrecerse en los selectores y en los registros nuevos. Los registros anteriores se conservan: no se borra nada."{% endif %}>
+        {% if obj.activo %}Desactivar{% else %}Activar{% endif %}
+      </button>
+    </form>
+  </aside>
+</div>
+{% endblock %}

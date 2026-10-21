@@ -1,0 +1,68 @@
+{% extends "cuenta/_marco.html" %}
+
+{% block titulo %}Iniciar sesión{% endblock %}
+
+{% block lead %}Cada actividad que registras suma a tus metas cuando un verificador aprueba su evidencia.{% endblock %}
+
+{% block pasos %}
+  <ol class="lb-steps">
+    <li><span class="n">1</span>Registras la actividad</li>
+    <li><span class="n">2</span>Adjuntas la evidencia</li>
+    <li><span class="n">3</span>El verificador la valida</li>
+    <li><span class="n">4</span>Suma a tu indicador</li>
+  </ol>
+{% endblock %}
+
+{% block tarjeta %}
+<h2>Iniciar sesión</h2>
+<p>Ingresa con tu correo institucional.</p>
+
+{% if form.non_field_errors %}
+  <div class="notice bad mt20" role="alert">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div>
+      <b>No pudimos iniciar sesión</b>
+      {% for error in form.non_field_errors %}{{ error }} {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+<form class="stack mt20" style="gap: 16px" method="post" novalidate>
+  {% csrf_token %}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+  <div class="field{% if form.username.errors %} err{% endif %}">
+    <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+    {{ form.username }}
+    {% for error in form.username.errors %}
+      <span class="msg">
+        <svg class="i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>{{ error }}
+      </span>
+    {% endfor %}
+  </div>
+
+  <div class="field{% if form.password.errors %} err{% endif %}">
+    <div class="row between">
+      <label class="lbl" for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+      <a class="link small" href="{% url 'cuenta:recuperar' %}">¿La olvidaste?</a>
+    </div>
+    <div class="pw">
+      {{ form.password }}
+      <button type="button" aria-label="Mostrar contraseña"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+    {% for error in form.password.errors %}
+      <span class="msg">
+        <svg class="i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>{{ error }}
+      </span>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-primary btn-block">Ingresar</button>
+</form>
+
+<div class="divider"></div>
+<div class="row small soft" style="gap: 10px; flex-wrap: nowrap; align-items: flex-start">
+  <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+  <span>Verás solo los módulos de tu rol y la información de tu delegación. Si olvidaste tu contraseña, puedes pedir un código de recuperación a tu correo institucional.</span>
+</div>
+{% endblock %}

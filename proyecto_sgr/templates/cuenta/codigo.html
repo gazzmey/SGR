@@ -1,0 +1,98 @@
+{% extends "cuenta/_marco.html" %}
+
+{% block titulo %}Validar código{% endblock %}
+{% block paso %}Paso 3 de 4{% endblock %}
+{% block titular %}Escribe el código que acabamos de enviarte.{% endblock %}
+{% block lead %}Vence a los diez minutos y sirve una sola vez. Si no llega, puedes pedir otro.{% endblock %}
+
+{% block pasos %}
+  <ol class="lb-steps">
+    <li class="hecho"><span class="n">1</span>Pides el código</li>
+    <li class="hecho"><span class="n">2</span>Lo recibes por correo</li>
+    <li class="on"><span class="n">3</span>Lo validas</li>
+    <li class="pend"><span class="n">4</span>Creas tu contraseña</li>
+  </ol>
+{% endblock %}
+
+{% block tarjeta %}
+<a class="link small" href="{% url 'cuenta:recuperar' %}">&larr; Cambiar el correo</a>
+<h2 style="margin-top: 14px">Validar código</h2>
+<p>Escribe los seis dígitos que enviamos a <b>{{ correo }}</b>.</p>
+
+{% if mostrar_codigo %}
+  {% comment %}
+    Solo aparece con SGR_MOSTRAR_CODIGO encendido, que por omisión sigue a
+    DEBUG. Sirve para la demostración y para las pruebas; en el servidor se
+    apaga y el código viaja únicamente por correo.
+  {% endcomment %}
+  <div class="notice neu mt20">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6 8.5-6"/></svg>
+    <div><b>Modo demostración</b>
+      El correo se envió de verdad —con el backend de consola aparece en la terminal de <span class="mono">runserver</span>—. Para probar el recorrido aquí, el código es:
+      <div class="mt8"><span class="code">{{ mostrar_codigo }}<button type="button" aria-label="Copiar el código"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button></span></div>
+    </div>
+  </div>
+{% endif %}
+
+{% if form.codigo.errors %}
+  <div class="notice bad mt20" role="alert">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>El código no sirve</b>{% for error in form.codigo.errors %}{{ error }} {% endfor %}</div>
+  </div>
+{% endif %}
+
+<form class="stack mt20" style="gap: 16px" method="post" novalidate>
+  {% csrf_token %}
+  {% comment %}
+    El campo real. Con JavaScript, sgr-app.js lo oculta y muestra las
+    casillas de abajo, que escriben en él. Sin JavaScript queda este.
+  {% endcomment %}
+  <div class="field" data-codigo-simple>
+    <label for="{{ form.codigo.id_for_label }}">{{ form.codigo.label }}</label>
+    {{ form.codigo }}
+    <span class="help">Los seis dígitos, sin espacios.</span>
+  </div>
+
+  <div class="field" data-codigo-casillas hidden>
+    <label for="d1">Código de verificación</label>
+    <div class="pin">
+      <input class="pin-casilla" id="d1" type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code" aria-label="Dígito 1">
+      <input class="pin-casilla" id="d2" type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 2">
+      <input class="pin-casilla" id="d3" type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 3">
+      <input class="pin-casilla" id="d4" type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 4">
+      <input class="pin-casilla" id="d5" type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 5">
+      <input class="pin-casilla" id="d6" type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 6">
+    </div>
+    <span class="help">Las seis casillas rellenan un solo campo antes de enviar.</span>
+  </div>
+
+  {% if segundos %}
+    <div class="cuenta" data-cuenta="{{ segundos }}">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>
+      <span>El código vence en <span class="reloj">—</span></span>
+    </div>
+  {% else %}
+    <div class="cuenta vencida">El código caducó. Pide uno nuevo para continuar.</div>
+  {% endif %}
+
+  <button type="submit" class="btn btn-primary btn-block" data-validar>Validar código</button>
+</form>
+
+<form method="post" action="{% url 'cuenta:reenviar' %}" class="mt8">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-secondary btn-block"
+          {% if espera_reenvio %}data-reenviar="{{ espera_reenvio }}"{% endif %}>
+    Reenviar el código
+  </button>
+  {% if espera_reenvio %}
+    <span class="help">Disponible en <b data-reenviar-reloj>{{ espera_reenvio }}</b> s.</span>
+  {% endif %}
+</form>
+
+<div class="divider"></div>
+<p class="small soft">
+  Tienes <b>tres intentos</b> por código.
+  {% if intentos %}Te {% if intentos == 1 %}queda uno{% else %}quedan {{ intentos }}{% endif %}.{% endif %}
+  Después hay que pedir uno nuevo. El código es de un solo uso y caduca aunque no lo uses.
+</p>
+{% endblock %}

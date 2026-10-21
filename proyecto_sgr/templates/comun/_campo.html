@@ -1,0 +1,61 @@
+{% comment %}
+  Un campo de formulario con la apariencia del SGR.
+
+  Hay tres formas distintas porque la maqueta tiene tres: el interruptor, el
+  grupo de casillas y el campo normal. El resto —etiqueta, obligatoriedad,
+  ayuda y error— es igual en los tres.
+
+  El grupo de casillas va primero a propósito: CheckboxSelectMultiple también
+  declara input_type "checkbox", así que si se preguntara antes por el tipo,
+  un grupo de permisos se dibujaría como un solo interruptor.
+{% endcomment %}
+
+{% if campo.field.widget.allow_multiple_selected %}
+  <div class="field{% if campo.errors %} err{% endif %}" style="grid-column: 1 / -1">
+    <label>{{ campo.label }}{% if campo.field.required %}<span class="req">*</span>{% endif %}</label>
+    <div class="opciones">
+      {% for opcion in campo %}
+        <label class="check{% if opcion.data.selected %} on{% endif %}">
+          {{ opcion.tag }}
+          <span><b>{{ opcion.choice_label }}</b></span>
+        </label>
+      {% endfor %}
+    </div>
+    {% if campo.help_text %}<span class="help">{{ campo.help_text }}</span>{% endif %}
+    {% for error in campo.errors %}
+      <span class="msg">
+        <svg class="i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>{{ error }}
+      </span>
+    {% endfor %}
+  </div>
+
+{% elif campo.field.widget.input_type == "checkbox" %}
+  <label class="switch-row" for="{{ campo.id_for_label }}" style="grid-column: 1 / -1">
+    {{ campo }}
+    <span>
+      <b>{{ campo.label }}</b>
+      {% if campo.help_text %}<span>{{ campo.help_text }}</span>{% endif %}
+    </span>
+  </label>
+
+{% else %}
+  <div class="field{% if campo.errors %} err{% endif %}{% if campo.field.widget.attrs.ancho %} ancho{% endif %}"{% if campo.field.widget.attrs.ancho %} style="grid-column: 1 / -1"{% endif %}>
+    <label for="{{ campo.id_for_label }}">
+      {{ campo.label }}{% if campo.field.required %}<span class="req">*</span>{% else %}<span class="optn"> · opcional</span>{% endif %}
+    </label>
+    {% if campo.field.widget.input_type == "select" %}
+      <span class="selw">
+        {{ campo }}
+        <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+      </span>
+    {% else %}
+      {{ campo }}
+    {% endif %}
+    {% if campo.help_text %}<span class="help">{{ campo.help_text }}</span>{% endif %}
+    {% for error in campo.errors %}
+      <span class="msg">
+        <svg class="i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>{{ error }}
+      </span>
+    {% endfor %}
+  </div>
+{% endif %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block titulo %}Adjuntar evidencia{% endblock %}
+{% block ruta %}
+  <a href="{% url 'gestion:actividades' %}">Mis actividades</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <a href="{% url 'gestion:actividad_detalle' actividad.pk %}">{{ actividad.codigo }}</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Evidencia</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Adjuntar evidencia</h1>
+    <p>Respalda «{{ actividad.accion }}». Al adjuntarla, la actividad pasa a pendiente de validación.</p>
+  </div>
+</div>
+
+<form class="grid g-side" method="post" novalidate>
+  {% csrf_token %}
+  <section class="card" style="align-self: start">
+    {% if form.errors %}
+      <div class="notice bad" role="alert" style="margin: 20px 24px 0">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Revisa los datos</b><ul>{% for c in form %}{% for e in c.errors %}<li>{{ c.label }}: {{ e }}</li>{% endfor %}{% endfor %}</ul></div>
+      </div>
+    {% endif %}
+    <div class="form-sec">
+      <h3><span class="num">1</span>El documento</h3>
+      <p>En esta entrega se registra la referencia del documento, no el archivo.</p>
+      <div class="form-grid">
+        {% include "comun/_campo.html" with campo=form.descripcion %}
+        {% include "comun/_campo.html" with campo=form.referencia %}
+      </div>
+    </div>
+    <div class="form-foot">
+      <span class="small soft">Los campos con <span class="req">*</span> son obligatorios.</span>
+      <div class="end">
+        <a class="btn btn-secondary" href="{% url 'gestion:actividad_detalle' actividad.pk %}">Cancelar</a>
+        <button type="submit" class="btn btn-primary">Adjuntar</button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="spec" style="align-self: start">
+    <div class="spec-h">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4.5 15v3.5a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+      <h3>Qué respalda</h3>
+    </div>
+    <dl class="datos" style="padding: 0; grid-template-columns: 1fr">
+      <div class="par"><dt>Actividad</dt><dd>{{ actividad.accion }}<span class="t2">{{ actividad.codigo }}</span></dd></div>
+      <div class="par"><dt>Ítem</dt><dd>{{ actividad.item.nombre }}</dd></div>
+      <div class="par"><dt>Fecha</dt><dd>{{ actividad.fecha|date:"d-m-Y" }}</dd></div>
+    </dl>
+    <div class="divider"></div>
+    <p class="small soft">La evidencia recibe un <b>código propio que no cambia nunca</b>. Eso permite identificarla meses después aunque la actividad se haya editado.</p>
+  </aside>
+</form>
+{% endblock %}

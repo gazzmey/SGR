@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block titulo %}Ingresar compromiso{% endblock %}
+{% block ruta %}
+  <a href="{% url 'gestion:agenda' %}">Agenda de compromisos</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Ingresar</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Ingresar compromiso</h1>
+    <p>Queda en <b>{{ periodo.nombre }}</b> y en la delegación <b>{{ delegacion.nombre }}</b>. Lo verá toda la delegación, no solo tú.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="{% url 'gestion:agenda' %}">Volver</a>
+  </div>
+</div>
+
+<form class="grid g-side" method="post" novalidate>
+  {% csrf_token %}
+  <section class="card" style="align-self: start">
+    {% if form.errors %}
+      <div class="notice bad" role="alert" style="margin: 20px 24px 0">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Revisa el formulario antes de guardar</b>
+          <ul>
+            {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
+            {% for c in form %}{% for e in c.errors %}<li>{{ c.label }}: {{ e }}</li>{% endfor %}{% endfor %}
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="form-sec">
+      <h3><span class="num">1</span>Con quién y dónde</h3>
+      <p>Quién pidió el compromiso y en qué territorio se cumple.</p>
+      <div class="form-grid">
+        {% include "comun/_campo.html" with campo=form.solicitante %}
+        {% include "comun/_campo.html" with campo=form.territorio %}
+        {% include "comun/_campo.html" with campo=form.descripcion %}
+      </div>
+    </div>
+
+    <div class="form-sec">
+      <h3><span class="num">2</span>Quién responde y hasta cuándo</h3>
+      <p>Sin responsable no hay a quién preguntarle, y sin plazo no hay atraso que medir. Los dos son obligatorios.</p>
+      <div class="form-grid">
+        {% include "comun/_campo.html" with campo=form.responsable %}
+        {% include "comun/_campo.html" with campo=form.vencimiento %}
+        {% include "comun/_campo.html" with campo=form.apoyo %}
+      </div>
+    </div>
+
+    <div class="form-sec">
+      <h3><span class="num">3</span>Si alimenta una meta</h3>
+      <p>Opcional. Si eliges un ítem, el compromiso cumplido cuenta para esa meta — y si además exige validación, solo cuenta cuando alguien lo valide.</p>
+      <div class="form-grid">
+        {% include "comun/_campo.html" with campo=form.item %}
+        {% include "comun/_campo.html" with campo=form.requiere_validacion %}
+      </div>
+    </div>
+
+    <div class="form-foot">
+      <span class="small soft">Los campos con <span class="req">*</span> son obligatorios.</span>
+      <div class="end">
+        <a class="btn btn-secondary" href="{% url 'gestion:agenda' %}">Cancelar</a>
+        <button type="submit" class="btn btn-primary">Ingresar compromiso</button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="spec" style="align-self: start">
+    <div class="spec-h">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3.5v3M16 3.5v3M3.5 10h17"/></svg>
+      <h3>El recorrido del compromiso</h3>
+    </div>
+    <ol class="lb-steps" style="color: var(--tinta)">
+      <li><span class="n">1</span>Ingresado</li>
+      <li><span class="n">2</span>Pendiente</li>
+      <li><span class="n">3</span>En proceso</li>
+      <li><span class="n">4</span>Realizado</li>
+    </ol>
+    <div class="divider"></div>
+    <p class="small soft">Se avanza de uno en uno. <b>No se puede pasar de Ingresado directo a Realizado</b>: cerrar algo que nadie trabajó dejaría la agenda diciendo lo que no es.</p>
+    <div class="divider"></div>
+    <dl class="datos" style="padding: 0; grid-template-columns: 1fr">
+      <div class="par"><dt>Período</dt><dd>{{ periodo.nombre }}<span class="t2">{{ periodo.inicio|date:"d-m-Y" }} al {{ periodo.termino|date:"d-m-Y" }}</span></dd></div>
+      <div class="par"><dt>Delegación</dt><dd>{{ delegacion.nombre }}</dd></div>
+    </dl>
+    <div class="divider"></div>
+    <p class="small soft">La delegación y el período <b>no viajan en el formulario</b>: los pone la vista. El responsable sí se elige, porque el punto de la agenda es que el compromiso pueda quedar a nombre de otra persona.</p>
+  </aside>
+</form>
+{% endblock %}

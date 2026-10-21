@@ -1,0 +1,63 @@
+{% extends "comun/mantenedor_detalle.html" %}
+
+{% comment %}
+  La ficha del período añade el ciclo: abrir, cerrar y reabrir. Son pasos
+  distintos de activar y desactivar, y por eso van en su propia tarjeta con
+  su propia confirmación. Cada uno es un POST: cambian datos.
+{% endcomment %}
+
+{% block acciones_extra %}
+<div class="card" style="padding: 16px; margin-bottom: 14px">
+  <div class="spec-h" style="margin-bottom: 10px">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>
+    <h3>Ciclo del período</h3>
+  </div>
+
+  {% if obj.estado == 'borrador' %}
+    <p class="small soft" style="margin-bottom: 12px">
+      Está en preparación: se configuran sus metas sin que nadie registre todavía.
+      Para abrirlo necesita al menos una meta.
+    </p>
+    <form method="post" action="{% url 'gestion:periodo_paso' obj.pk 'abrir' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary btn-block"
+              data-confirmar="Abrir «{{ obj.nombre }}»"
+              data-confirmar-texto="Desde ese momento se pueden registrar actividades en este período.">
+        Abrir el período
+      </button>
+    </form>
+
+  {% elif obj.estado == 'abierto' %}
+    <p class="small soft" style="margin-bottom: 12px">
+      Está abierto y recibiendo actividades. Lleva
+      <b>{{ obj.dias_transcurridos }} de {{ obj.dias_totales }} días</b>.
+    </p>
+    <form method="post" action="{% url 'gestion:periodo_paso' obj.pk 'cerrar' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-secondary btn-block"
+              data-confirmar="Cerrar «{{ obj.nombre }}»"
+              data-confirmar-texto="Las metas y el resultado quedan congelados tal como están. Se puede reabrir después, y la reapertura queda registrada.">
+        Cerrar el período
+      </button>
+    </form>
+
+  {% else %}
+    <div class="notice neu" style="margin-bottom: 12px">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+      <div>
+        <b>Cerrado{% if obj.cerrado_el %} el {{ obj.cerrado_el|date:"d-m-Y" }}{% endif %}</b>
+        {% if obj.cerrado_por %}Lo cerró {{ obj.cerrado_por.get_full_name|default:obj.cerrado_por.get_username }}.{% endif %}
+        Sus metas y su resultado están congelados.
+      </div>
+    </div>
+    <form method="post" action="{% url 'gestion:periodo_paso' obj.pk 'reabrir' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-secondary btn-block"
+              data-confirmar="Reabrir «{{ obj.nombre }}»"
+              data-confirmar-texto="Vuelve a recibir actividades y sus metas se pueden cambiar otra vez. La reapertura queda registrada con tu nombre.">
+        Reabrir el período
+      </button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ obj.codigo }}{% endblock %}
+{% block ruta %}
+  <a href="{% url 'gestion:validar' %}">Validar evidencias</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">{{ obj.codigo }}</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>{{ obj.descripcion }}</h1>
+    <p>{{ obj.codigo }} · respalda «{{ obj.actividad.accion }}» de {{ obj.actividad.funcionario.get_full_name|default:obj.actividad.funcionario.get_username }}</p>
+  </div>
+  <div class="actions"><a class="btn btn-ghost" href="{% url 'gestion:validar' %}">Volver a la cola</a></div>
+</div>
+
+<div class="grid g-side">
+  <section class="card" style="align-self: start">
+    <div class="card-h">
+      <h2>Qué se está validando</h2>
+      <div class="end">
+        {% if obj.anulada %}<span class="chip off"><span class="t">Anulada</span></span>
+        {% elif obj.decision == 'aprobada' %}<span class="chip ok">Aprobada</span>
+        {% elif obj.decision == 'rechazada' %}<span class="chip bad">Rechazada</span>
+        {% else %}<span class="chip warn">Pendiente</span>{% endif %}
+      </div>
+    </div>
+    <dl class="datos">
+      <div class="par"><dt>Evidencia</dt><dd class="mono">{{ obj.codigo }}</dd></div>
+      <div class="par"><dt>Referencia</dt><dd>{{ obj.referencia }}</dd></div>
+      <div class="par"><dt>Cargada</dt><dd>{{ obj.creada|date:"d-m-Y H:i" }}<span class="t2">{{ obj.autor.get_full_name|default:obj.autor.get_username }}</span></dd></div>
+      <div class="par"><dt>Actividad</dt><dd>{{ obj.actividad.codigo }}<span class="t2">{{ obj.actividad.fecha|date:"d-m-Y" }}</span></dd></div>
+      <div class="par"><dt>Ítem al que sumaría</dt><dd>{{ obj.actividad.item.nombre }}</dd></div>
+      <div class="par"><dt>Delegación</dt><dd>{{ obj.actividad.delegacion.nombre }}</dd></div>
+      <div class="par ancho"><dt>Detalle de la actividad</dt><dd>{{ obj.actividad.detalle }}</dd></div>
+      {% if obj.motivo %}<div class="par ancho"><dt>Motivo del rechazo</dt><dd>{{ obj.motivo }}</dd></div>{% endif %}
+      {% if obj.motivo_anulacion %}<div class="par ancho"><dt>Motivo de la anulación</dt><dd>{{ obj.motivo_anulacion }}</dd></div>{% endif %}
+    </dl>
+    {% if obj.decidida %}
+      <div class="card-f"><span class="small soft">Decidida el {{ obj.decidida|date:"d-m-Y H:i" }} por {{ obj.verificador_visible }}.</span></div>
+    {% endif %}
+  </section>
+
+  <aside class="stack" style="align-self: start">
+    {% if obj.decision == 'pendiente' and not obj.anulada %}
+      <form method="post" action="{% url 'gestion:evidencia_decidir' obj.pk 'aprobar' %}" class="card" style="padding: 16px">
+        {% csrf_token %}
+        <p class="small soft" style="margin-bottom: 12px">Aprobar hace que la actividad sume a la meta del período. Suma una sola vez.</p>
+        <button type="submit" class="btn btn-primary btn-block"
+                data-confirmar="Aprobar «{{ obj.descripcion }}»"
+                data-confirmar-texto="La actividad pasará a contar en la meta de su autor dentro de este período.">Aprobar</button>
+      </form>
+
+      <form method="post" action="{% url 'gestion:evidencia_decidir' obj.pk 'rechazar' %}" class="card" style="padding: 16px">
+        {% csrf_token %}
+        <div class="field{% if form_rechazo.motivo.errors %} err{% endif %}">
+          <label for="{{ form_rechazo.motivo.id_for_label }}">{{ form_rechazo.motivo.label }}<span class="req">*</span></label>
+          {{ form_rechazo.motivo }}
+          <span class="help">{{ form_rechazo.motivo.help_text }}</span>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-block mt8">Rechazar y devolver</button>
+      </form>
+
+    {% elif obj.decision == 'aprobada' and not obj.anulada %}
+      <form method="post" action="{% url 'gestion:evidencia_decidir' obj.pk 'anular' %}" class="card" style="padding: 16px">
+        {% csrf_token %}
+        <div class="spec-h" style="margin-bottom: 10px">
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+          <h3>Anular la aprobación</h3>
+        </div>
+        <p class="small soft" style="margin-bottom: 12px">Quita puntaje ya otorgado, así que el motivo queda registrado en el historial.</p>
+        <div class="field">
+          <label for="motivo-anulacion">Motivo<span class="req">*</span></label>
+          <textarea class="input" id="motivo-anulacion" name="motivo" rows="3" placeholder="Por qué deja de contar"></textarea>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-block mt8"
+                data-confirmar="Anular «{{ obj.descripcion }}»"
+                data-confirmar-texto="La actividad dejará de sumar al período y quedará el motivo en su historial.">Anular</button>
+      </form>
+
+    {% else %}
+      <div class="notice neu">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8h.01"/></svg>
+        <div><b>Ya está decidida</b>Una evidencia se decide una sola vez. Si hay que revertirla, se anula con su motivo.</div>
+      </div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

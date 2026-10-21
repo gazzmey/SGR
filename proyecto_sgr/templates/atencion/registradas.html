@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% comment %}
+  Consulta de las atenciones de la delegación activa. Es de lectura: no tiene
+  acciones de edición, porque una atención registrada es un hecho con fecha y
+  responsable, no un dato que se corrija.
+{% endcomment %}
+
+{% block titulo %}Atenciones registradas{% endblock %}
+
+{% block ruta %}
+  <a href="{% url 'atencion:ingreso' %}">Atención ciudadana</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Registradas</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Atenciones registradas</h1>
+    <p>Lo atendido en {% if activa %}<b>{{ activa.nombre }}</b>{% else %}la delegación{% endif %}. Se muestran las 100 más recientes.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-primary" href="{% url 'atencion:ingreso' %}">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Registrar atención
+    </a>
+  </div>
+</div>
+
+<section class="card">
+  <div class="card-h">
+    <h2>Listado</h2>
+    <span class="sub">{{ total }} {% if total == 1 %}atención{% else %}atenciones{% endif %}</span>
+  </div>
+
+  <form class="filters" method="get">
+    <div class="field grow">
+      <label for="f-q">Buscar</label>
+      <input class="input" id="f-q" type="search" name="q" value="{{ termino }}"
+             placeholder="Nombre, RUT, subatención o detalle" autocomplete="off">
+      <span class="help">Búsqueda parcial: la colación de la base ignora mayúsculas y tildes.</span>
+    </div>
+    <button type="submit" class="btn btn-secondary">Buscar</button>
+    <a class="btn btn-ghost" href="{% url 'atencion:registradas' %}">Limpiar</a>
+  </form>
+
+  {% if atenciones %}
+    <div class="tabla-wrap">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Solicitante</th>
+            <th>Qué se atendió</th>
+            <th class="w">Detalle</th>
+            <th>Quien atendió</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for atencion in atenciones %}
+            <tr>
+              <td>{{ atencion.registrada|date:"d-m-Y" }}<span class="t2">{{ atencion.registrada|date:"H:i" }}</span></td>
+              <td>{{ atencion.solicitante.nombre }}<span class="t2 mono">{{ atencion.solicitante.rut }}</span></td>
+              <td>{{ atencion.subatencion.nombre }}<span class="t2">{{ atencion.subatencion.tipo_atencion.nombre }}</span></td>
+              <td class="w">
+                {{ atencion.detalle|truncatechars:110 }}
+                {% if atencion.documento %}<span class="t2">Respaldo: {{ atencion.documento }}</span>{% endif %}
+              </td>
+              <td>{{ atencion.funcionario.get_full_name|default:atencion.funcionario.get_username }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="ic">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10.5h8M8 14h5"/><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V18H4.5A1.5 1.5 0 0 1 3 16.5V7a1.5 1.5 0 0 1 1.5-1.5z"/></svg>
+      </span>
+      {% if termino %}
+        <h3>Sin coincidencias</h3>
+        <p>Ninguna atención cumple con lo que buscas. Revisa la escritura o quita el filtro.</p>
+        <div class="row mt8"><a class="btn btn-secondary" href="{% url 'atencion:registradas' %}">Quitar el filtro</a></div>
+      {% else %}
+        <h3>Todavía no hay atenciones</h3>
+        <p>Cuando registres la primera, aparecerá aquí con su fecha, el solicitante y quién la atendió.</p>
+        <div class="row mt8"><a class="btn btn-primary" href="{% url 'atencion:ingreso' %}">Registrar la primera</a></div>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,24 @@
+# Entorno virtual
+venv/
+.venv/
+env/
+entorno/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Secretos
+.env
+
+# Archivos estáticos recolectados
+staticfiles/
+
+# Bases de datos locales de prueba
+*.sqlite3
+db.sqlite3
+
+# Sistema operativo y editores
+.DS_Store
+.idea/
+.vscode/

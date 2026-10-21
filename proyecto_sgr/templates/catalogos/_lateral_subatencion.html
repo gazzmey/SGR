@@ -1,0 +1,11 @@
+{% comment %}Panel lateral del formulario de subatención.{% endcomment %}
+<div class="spec-h">
+  <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4v10a3 3 0 0 0 3 3h11"/><path d="m15.5 13.5 3.5 3.5-3.5 3.5"/></svg>
+  <h3>Documento de respaldo</h3>
+</div>
+<p>Si se marca, el ingreso de atención ciudadana <b>no deja guardar</b> sin indicar cuál es el respaldo.</p>
+<p class="small soft">La comprobación está en el método <code>clean()</code> del modelo de atención, no en el navegador, así que vale igual desde el formulario, desde el administrador de Django o desde cualquier otro camino.</p>
+<div class="divider"></div>
+<p class="small soft">El selector de <b>tipo de atención</b> solo ofrece tipos activos. Si estás editando una subatención cuyo tipo se desactivó, ese tipo sigue apareciendo para que el dato guardado no se pierda en silencio.</p>
+<div class="divider"></div>
+<p class="small soft">Una subatención con atenciones registradas no se puede desactivar hasta que el período se cierre: las atenciones anteriores la seguirán mostrando.</p>

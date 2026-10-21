@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% load l10n %}
+{% load sgr %}
+
+{% comment %}
+Tablero de delegación. Es la pantalla TableroDelegacion de la maqueta
+aprobada, con las cifras del motor.
+
+La tabla y el promedio del pie salen del mismo cálculo, así que no pueden
+diferir: el caso TAB-01 comprueba que el total coincida con el detalle. Por
+eso el pie no se calcula aparte en la plantilla, viene del objeto.
+{% endcomment %}
+
+{% block titulo %}Tablero de delegación{% endblock %}
+{% block ruta %}
+  <span>Supervisión</span>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Tablero de delegación</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Tablero de delegación</h1>
+    <p>
+      {% if res %}Resultados de {{ res.delegacion.nombre }} por funcionario. Datos al {{ res.al_dia|date:"d-m-Y" }}.{% else %}Resultados del período por funcionario.{% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    <form method="get" class="row" style="gap: 8px">
+      {% if delegaciones|length > 1 %}
+        <span class="selw">
+          <select class="input" name="delegacion" aria-label="Delegación" style="width: 210px" onchange="this.form.submit()">
+            {% for d in delegaciones %}
+              <option value="{{ d.pk }}"{% if delegacion and d.pk == delegacion.pk %} selected{% endif %}>{{ d.nombre }}</option>
+            {% endfor %}
+          </select>
+          <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+        </span>
+      {% endif %}
+      {% if periodos %}
+        <span class="selw">
+          <select class="input" name="periodo" aria-label="Período" style="width: 220px" onchange="this.form.submit()">
+            {% for p in periodos %}
+              <option value="{{ p.pk }}"{% if periodo and p.pk == periodo.pk %} selected{% endif %}>{{ p.nombre }}</option>
+            {% endfor %}
+          </select>
+          <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+        </span>
+      {% endif %}
+      <noscript><button class="btn btn-secondary" type="submit">Ver</button></noscript>
+    </form>
+    {% if res %}
+      <a class="btn btn-secondary" href="?{% cola formato='excel' %}">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11.5M7 10.5l5 5 5-5"/><path d="M4 15v3.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V15"/></svg>Exportar
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if sin_datos %}
+  <div class="notice info">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>Nada que mostrar todavía</b>{{ sin_datos }}</div>
+  </div>
+{% else %}
+
+{% if res.semaforo_clase == 'rojo' %}
+  <div class="notice bad" style="margin-bottom: 20px">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/></svg>
+    <div><b>{{ res.delegacion.nombre }} está bajo el umbral del semáforo</b>El promedio de la delegación es {{ res.promedio|floatformat:1 }} %, frente al {{ res.esperado|floatformat:1 }} % esperado a esta fecha.</div>
+  </div>
+{% endif %}
+
+<div class="kpis" style="margin-bottom: 20px">
+  <div class="card kpi">
+    <span class="lbl">Promedio de la delegación</span>
+    <div class="val">{% if res.promedio is not None %}{{ res.promedio|floatformat:1 }}<small>%</small>{% else %}—{% endif %}</div>
+    <div class="meta"><span class="chip {{ res.clase_chip }}">{{ res.semaforo_texto }}</span></div>
+  </div>
+  <div class="card kpi">
+    <span class="lbl">Esperado a la fecha</span>
+    <div class="val">{% if res.esperado is not None %}{{ res.esperado|floatformat:1 }}<small>%</small>{% else %}—{% endif %}</div>
+    <div class="meta">Día {{ res.dias_transcurridos }} de {{ res.dias_totales }} del período</div>
+  </div>
+  {% if sgr_permisos.validar_evidencia %}
+    <a class="card kpi" href="{% url 'gestion:validar' %}" style="text-decoration: none; color: inherit">
+      <span class="lbl">Evidencias por revisar</span>
+      <div class="val">{{ cola.total }}</div>
+      <div class="meta">{% if cola.antiguas %}{{ cola.antiguas }} llevan más de 5 días esperando{% else %}ninguna lleva más de 5 días{% endif %}</div>
+    </a>
+  {% endif %}
+  <div class="card kpi">
+    <span class="lbl">Personas medidas</span>
+    <div class="val">{{ res.medidas|length }} <small>de {{ res.personas|length }}</small></div>
+    <div class="meta">{% if res.sin_medir %}{{ res.sin_medir|length }} sin metas o sin cargo{% else %}todas tienen metas configuradas{% endif %}</div>
+  </div>
+  {% comment %}
+    El indicador colectivo de la agenda. El denominador son los compromisos
+    vigentes: los anulados quedan fuera porque dejaron de ser una deuda.
+  {% endcomment %}
+  <a class="card kpi" href="{% url 'gestion:agenda' %}" style="text-decoration: none; color: inherit">
+    <span class="lbl">Compromisos realizados</span>
+    <div class="val">{% if agenda.realizado is not None %}{{ agenda.realizado|floatformat:1 }}<small>%</small>{% else %}—{% endif %}</div>
+    <div class="meta">
+      {% if agenda.realizado is not None %}
+        <span class="chip {{ agenda.clase_chip }}">{{ agenda.texto }}</span>
+        {{ agenda.realizados }} de {{ agenda.total }} · umbral {{ agenda.umbral }} %
+      {% else %}
+        sin compromisos en el período
+      {% endif %}
+    </div>
+  </a>
+</div>
+
+{% if agenda.realizado is not None %}
+  <div class="notice{% if agenda.atrasados %} warn{% endif %}" style="margin-bottom: 20px">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3.5v3M16 3.5v3M3.5 10h17"/></svg>
+    <div><b>Agenda de la delegación</b>{{ agenda.realizado|floatformat:1 }} % realizado y {{ agenda.no_realizado|floatformat:1 }} % no realizado, sobre {{ agenda.total }} compromiso{{ agenda.total|pluralize }} vigente{{ agenda.total|pluralize }}{% if agenda.anulados %}; {{ agenda.anulados }} anulado{{ agenda.anulados|pluralize }} queda{{ agenda.anulados|pluralize:",n" }} fuera del denominador{% endif %}.{% if agenda.atrasados %} Hay {{ agenda.atrasados }} abierto{{ agenda.atrasados|pluralize }} ya vencido{{ agenda.atrasados|pluralize }}.{% endif %}</div>
+  </div>
+{% endif %}
+
+<section class="card" aria-labelledby="t-func">
+  <div class="card-h">
+    <h2 id="t-func">Desempeño por funcionario</h2>
+    <div class="end legend">
+      <span><i class="lsw" style="background: var(--verde-bar)"></i>Al día</span>
+      <span><i class="lsw" style="background: var(--ambar-bar)"></i>Atrasado</span>
+      <span><i class="lsw" style="background: var(--rojo-bar)"></i>Crítico</span>
+      {% if res.esperado is not None %}<span><i class="ln"></i>Esperado {{ res.esperado|floatformat:1 }} %</span>{% endif %}
+    </div>
+  </div>
+  <div class="tabla-wrap">
+    <table class="tabla">
+      <thead><tr><th>Funcionario</th><th>Cumplimiento ponderado</th><th>Semáforo</th><th class="r">Ítems al umbral</th></tr></thead>
+      <tbody>
+        {% for perfil, propio in res.personas %}
+          <tr{% if not propio.definido %} class="off"{% endif %}>
+            <td>
+              <div class="cell-user">
+                <span class="avatar sm">{{ perfil.nombre|iniciales }}</span>
+                <div><b>{{ perfil.nombre }}</b><span>{{ perfil.cargo_asignado.nombre|default:"Sin cargo" }}{% if propio.definido %} · {{ propio.items_medidos }} {% if propio.items_medidos == 1 %}meta{% else %}metas{% endif %}{% endif %}</span></div>
+              </div>
+            </td>
+            <td>
+              {% if propio.definido %}
+                <div class="mini-pista">
+                  <div class="pista">
+                    <div class="fill {{ propio.clase_barra }}" style="width: {{ propio.barra|unlocalize }}%"></div>
+                    {% if propio.esperado %}<div class="marca" style="left: {{ propio.barra_esperado|unlocalize }}%"></div>{% endif %}
+                  </div>
+                  <b>{{ propio.avance|floatformat:1 }} %</b>
+                </div>
+              {% else %}
+                <span class="small soft">{{ propio.motivo_indefinido }}</span>
+              {% endif %}
+            </td>
+            <td><span class="chip {{ propio.clase_chip }}">{{ propio.semaforo_texto }}</span></td>
+            <td class="r">{% if propio.definido %}{{ propio.items_alcanzados }} de {{ propio.items_medidos }}{% else %}—{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="soft">Esta delegación no tiene personas activas.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if res.promedio is not None %}
+        <tfoot>
+          <tr>
+            <td>Promedio de la delegación</td>
+            <td>
+              <div class="mini-pista">
+                <div class="pista">
+                  <div class="fill {{ res.clase_barra }}" style="width: {{ res.barra|unlocalize }}%"></div>
+                  {% if res.esperado %}<div class="marca" style="left: {{ res.barra_esperado|unlocalize }}%"></div>{% endif %}
+                </div>
+                <b>{{ res.promedio|floatformat:1 }} %</b>
+              </div>
+            </td>
+            <td colspan="2" class="small soft" style="font-weight: 500">Promedio simple de las {{ res.medidas|length }} personas medidas</td>
+          </tr>
+        </tfoot>
+      {% endif %}
+    </table>
+  </div>
+  <div class="card-f">
+    <span class="small muted">El promedio sale del mismo cálculo que cada fila, así que coincide con el detalle. {{ res.regla.rotulo }}</span>
+  </div>
+</section>
+
+<section class="card mt20" aria-labelledby="t-uso">
+  <div class="card-h">
+    <h2 id="t-uso">Uso de la herramienta</h2>
+    <span class="sub">El promedio diario se calcula sobre los {{ uso.dias }} días transcurridos del período</span>
+  </div>
+  <div class="tabla-wrap">
+    <table class="tabla">
+      <thead><tr><th>Funcionario</th><th class="r">Registros del período</th><th class="r">Promedio diario</th><th class="r">Último registro</th><th class="r">Días sin registrar</th></tr></thead>
+      <tbody>
+        {% for fila in uso.filas %}
+          <tr>
+            <td><b>{{ fila.perfil.nombre }}</b></td>
+            <td class="r">{{ fila.registros }}</td>
+            <td class="r">{{ fila.promedio|floatformat:2 }}</td>
+            <td class="r">{% if fila.ultima %}{{ fila.ultima|date:"d-m-Y" }}{% else %}<span class="soft">nunca</span>{% endif %}</td>
+            <td class="r">
+              {% if fila.sin_registrar is None %}
+                <span class="chip bad">sin registros</span>
+              {% elif fila.sin_registrar >= 10 %}
+                <span class="chip warn">{{ fila.sin_registrar }}</span>
+              {% else %}
+                {{ fila.sin_registrar }}
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-f">
+    <span class="small muted">Diez días sin registrar es el aviso que propone el plan. No es una medida de desempeño: es una señal de que el sistema no se está usando.</span>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

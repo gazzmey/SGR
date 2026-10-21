@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block titulo %}Registrar actividad{% endblock %}
+{% block ruta %}<span aria-current="page">Mis actividades</span>{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div><h1>Todavía no se puede registrar</h1>
+    <p>Falta configuración previa. Mientras no esté, una actividad registrada no tendría a qué meta sumar.</p></div>
+</div>
+
+<section class="card">
+  <div class="card-b stack" style="gap: 14px; padding: 24px">
+    {% if not periodo %}
+      <div class="notice warn">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>No hay ningún período abierto</b>Quien configura períodos tiene que abrir uno. Hasta entonces no hay ventana de tiempo a la que asociar lo que registres.</div>
+      </div>
+    {% endif %}
+    {% if perfil and not perfil.cargo_asignado %}
+      <div class="notice warn">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Tu perfil no tiene cargo asignado</b>El cargo es lo que define con qué ítems y metas se te mide. Pídele al administrador que te asigne uno.</div>
+      </div>
+    {% endif %}
+    {% if not perfil %}
+      <div class="notice warn">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Tu cuenta no tiene perfil en el SGR</b>Sin perfil no hay delegación ni cargo con los que registrar.</div>
+      </div>
+    {% endif %}
+    <div class="row"><a class="btn btn-secondary" href="{% url 'comun:panel' %}">Volver al panel</a></div>
+  </div>
+</section>
+{% endblock %}

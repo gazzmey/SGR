@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block titulo %}Registrar actividad{% endblock %}
+{% block ruta %}
+  <a href="{% url 'gestion:actividades' %}">Mis actividades</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Registrar</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Registrar actividad</h1>
+    <p>Queda en <b>{{ periodo.nombre }}</b>, a tu nombre y en tu delegación. Todavía no suma: para eso hace falta la evidencia aprobada.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="{% url 'gestion:actividades' %}">Volver</a>
+  </div>
+</div>
+
+<form class="grid g-side" method="post" novalidate>
+  {% csrf_token %}
+  <section class="card" style="align-self: start">
+    {% if form.errors %}
+      <div class="notice bad" role="alert" style="margin: 20px 24px 0">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Revisa el formulario antes de guardar</b>
+          <ul>
+            {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
+            {% for c in form %}{% for e in c.errors %}<li>{{ c.label }}: {{ e }}</li>{% endfor %}{% endfor %}
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="form-sec">
+      <h3><span class="num">1</span>Qué hiciste</h3>
+      <p>El ítem decide a qué meta suma. Solo aparecen los que te miden a ti.</p>
+      <div class="form-grid">
+        {% include "comun/_campo.html" with campo=form.item %}
+        {% include "comun/_campo.html" with campo=form.fecha %}
+        {% include "comun/_campo.html" with campo=form.cantidad %}
+        {% include "comun/_campo.html" with campo=form.accion %}
+      </div>
+    </div>
+
+    <div class="form-sec">
+      <h3><span class="num">2</span>El detalle</h3>
+      <p>Es lo que lee el verificador para decidir si la aprueba.</p>
+      <div class="form-grid">
+        {% include "comun/_campo.html" with campo=form.detalle %}
+        {% include "comun/_campo.html" with campo=form.contacto %}
+      </div>
+    </div>
+
+    <div class="form-foot">
+      <span class="small soft">Los campos con <span class="req">*</span> son obligatorios.</span>
+      <div class="end">
+        <a class="btn btn-secondary" href="{% url 'gestion:actividades' %}">Cancelar</a>
+        <button type="submit" class="btn btn-primary">Registrar actividad</button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="spec" style="align-self: start">
+    <div class="spec-h">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.1 7.5 9.5 4.3-1.4 7.5-4.9 7.5-9.5V6z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>
+      <h3>Qué pasa después</h3>
+    </div>
+    <ol class="lb-steps" style="color: var(--tinta)">
+      <li><span class="n">1</span>La registras</li>
+      <li><span class="n">2</span>Le adjuntas la evidencia</li>
+      <li><span class="n">3</span>El verificador decide</li>
+      <li><span class="n">4</span>Si aprueba, suma a tu meta</li>
+    </ol>
+    <div class="divider"></div>
+    <dl class="datos" style="padding: 0; grid-template-columns: 1fr">
+      <div class="par"><dt>Período</dt><dd>{{ periodo.nombre }}<span class="t2">{{ periodo.inicio|date:"d-m-Y" }} al {{ periodo.termino|date:"d-m-Y" }}</span></dd></div>
+      <div class="par"><dt>Tu cargo</dt><dd>{{ perfil.cargo_asignado.nombre }}</dd></div>
+      <div class="par"><dt>Delegación</dt><dd>{{ perfil.delegacion.nombre }}</dd></div>
+    </dl>
+    <div class="divider"></div>
+    <p class="small soft">La delegación, el período y tu nombre <b>no viajan en el formulario</b>: los pone la vista. Si viajaran, se podría registrar a nombre de otra persona.</p>
+  </aside>
+</form>
+{% endblock %}

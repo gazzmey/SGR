@@ -1,0 +1,16 @@
+{% comment %}Panel lateral del formulario de usuario.{% endcomment %}
+<div class="spec-h">
+  <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+  <h3>Sobre la contraseña</h3>
+</div>
+<p>Aquí no se escribe ninguna. La cuenta se crea <b>sin contraseña utilizable</b> y la persona define la suya con el enlace de «¿Olvidaste tu contraseña?».</p>
+<p class="small soft">Así nadie —tampoco quien administra— llega a conocerla. En la base de datos queda únicamente el hash que genera Django.</p>
+<div class="divider"></div>
+<div class="spec-h">
+  <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8h.01"/></svg>
+  <h3>Delegación base y autorizadas</h3>
+</div>
+<p class="small soft">La <b>delegación base</b> es donde trabaja la persona y la que queda activa al iniciar sesión. Siempre tiene acceso a ella.</p>
+<p class="small soft">Las <b>autorizadas</b> solo tienen efecto si el alcance del rol es «varias delegaciones»; con «su delegación» se ignoran, y con «todas» sobran.</p>
+<div class="divider"></div>
+<p class="small soft">El correo institucional es el <b>usuario de acceso</b>, así que no puede repetirse. Si cambia, cambia también la forma de entrar.</p>

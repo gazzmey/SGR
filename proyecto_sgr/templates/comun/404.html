@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titulo %}No encontrado{% endblock %}
+{% block ruta %}<span aria-current="page">No encontrado</span>{% endblock %}
+{% block contenido %}
+<div class="card">
+  <div class="empty">
+    <span class="ic bad">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 8 8 8M16 8l-8 8"/></svg>
+    </span>
+    <h3>No encontramos esa página</h3>
+    <p>La dirección no corresponde a ninguna pantalla del sistema, o el registro que buscas ya no existe.</p>
+    <div class="row mt8">
+      <a class="btn btn-primary" href="{% url 'comun:panel' %}">Volver a mi panel</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

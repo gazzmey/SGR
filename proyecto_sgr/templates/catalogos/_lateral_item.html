@@ -1,0 +1,20 @@
+{% comment %}Panel lateral del formulario de ítem.{% endcomment %}
+<div class="spec-h">
+  <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5h16"/><path d="M7 19.5V9M12 19.5V4.5M17 19.5v-7"/></svg>
+  <h3>El ponderador</h3>
+</div>
+<p>Es el peso del ítem en el resultado de la delegación. Entre todos los ítems activos deben sumar <b>100 %</b>.</p>
+<dl class="datos" style="padding: 0; grid-template-columns: 1fr">
+  <div class="par">
+    <dt>Suman los demás ítems activos</dt>
+    <dd class="mono">{{ suma_otros }} %</dd>
+  </div>
+  <div class="par">
+    <dt>Disponible para este</dt>
+    <dd class="mono">hasta {{ ponderador_libre }} %</dd>
+  </div>
+</dl>
+<div class="divider"></div>
+<p class="small soft">Pasarse de 100 % no se guarda: el resultado quedaría calculado sobre una base distinta. Quedarse corto sí se permite, porque mientras se configura el período la suma pasa necesariamente por valores intermedios.</p>
+<div class="divider"></div>
+<p class="small soft">La <b>meta</b> va en la unidad elegida. Con «Porcentaje», una meta de 80 significa 80 %; con «Cantidad», 80 registros.</p>

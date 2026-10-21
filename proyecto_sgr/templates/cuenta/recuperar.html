@@ -1,0 +1,45 @@
+{% extends "cuenta/_marco.html" %}
+
+{% block titulo %}Recuperar contraseña{% endblock %}
+{% block paso %}Paso 1 de 4{% endblock %}
+{% block titular %}¿Olvidaste tu contraseña? Se recupera en cuatro pasos.{% endblock %}
+{% block lead %}Te enviamos un código al correo institucional con el que inicias sesión. Con ese código creas una contraseña nueva.{% endblock %}
+
+{% block pasos %}
+  <ol class="lb-steps">
+    <li class="on"><span class="n">1</span>Pides el código</li>
+    <li class="pend"><span class="n">2</span>Lo recibes por correo</li>
+    <li class="pend"><span class="n">3</span>Lo validas</li>
+    <li class="pend"><span class="n">4</span>Creas tu contraseña</li>
+  </ol>
+{% endblock %}
+
+{% block tarjeta %}
+<a class="link small" href="{% url 'cuenta:login' %}">&larr; Volver a iniciar sesión</a>
+<h2 style="margin-top: 14px">Recuperar contraseña</h2>
+<p>Escribe tu correo institucional y te enviamos un código de seis dígitos para crear una contraseña nueva.</p>
+
+<div class="notice info mt20">
+  <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6 8.5-6"/></svg>
+  <div><b>El código llega a tu correo institucional</b>Si la dirección existe y la cuenta está activa, recibirás el código en unos minutos. Revisa también la carpeta de no deseados.</div>
+</div>
+
+<form class="stack mt20" style="gap: 16px" method="post" novalidate>
+  {% csrf_token %}
+  <div class="field{% if form.correo.errors %} err{% endif %}">
+    <label for="{{ form.correo.id_for_label }}">{{ form.correo.label }}</label>
+    {{ form.correo }}
+    <span class="help">{{ form.correo.help_text }}</span>
+    {% for error in form.correo.errors %}
+      <span class="msg">
+        <svg class="i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>{{ error }}
+      </span>
+    {% endfor %}
+  </div>
+  <button type="submit" class="btn btn-primary btn-block">Enviar código</button>
+  <a class="btn btn-secondary btn-block" href="{% url 'cuenta:login' %}">Cancelar</a>
+</form>
+
+<div class="divider"></div>
+<p class="small soft">Por seguridad, el sistema responde lo mismo exista o no la dirección. Así nadie puede averiguar qué correos están registrados probándolos uno por uno.</p>
+{% endblock %}

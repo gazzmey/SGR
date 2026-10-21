@@ -1,0 +1,15 @@
+{% comment %}Panel lateral del formulario de rol.{% endcomment %}
+<div class="spec-h">
+  <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.1 7.5 9.5 4.3-1.4 7.5-4.9 7.5-9.5V6z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>
+  <h3>Permiso y alcance</h3>
+</div>
+<p>Son dos cosas distintas. El <b>permiso</b> dice qué acciones habilita el rol; el <b>alcance</b>, sobre qué delegaciones.</p>
+<dl class="datos" style="padding: 0; grid-template-columns: 1fr">
+  <div class="par"><dt>Su delegación</dt><dd>Solo la delegación base del usuario.</dd></div>
+  <div class="par"><dt>Varias delegaciones</dt><dd>Las que se le marquen en su perfil. Habilita el selector de la cabecera.</dd></div>
+  <div class="par"><dt>Todas</dt><dd>El sistema completo. Reservado para administración.</dd></div>
+</dl>
+<div class="divider"></div>
+<p class="small soft">Esconder una opción del menú <b>no es seguridad</b>: cada vista vuelve a comprobar el permiso en el servidor, así que escribir la dirección a mano no sirve de nada.</p>
+<div class="divider"></div>
+<p class="small soft">Quitar una acción surte efecto de inmediato para todos los usuarios que tengan el rol.</p>

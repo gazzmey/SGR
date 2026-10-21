@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block titulo %}Sin permiso{% endblock %}
+{% block ruta %}<span aria-current="page">Sin permiso</span>{% endblock %}
+{% block contenido %}
+<div class="card">
+  <div class="empty">
+    <span class="ic bad">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+    </span>
+    <h3>Esa pantalla no es para tu rol</h3>
+    <p>Tu rol no habilita esta acción. El sistema lo comprueba en el servidor, así que el resultado es el mismo escribas la dirección como la escribas.</p>
+    {% if detalle %}<div class="code">{{ detalle }}</div>{% endif %}
+    <div class="row mt8">
+      <a class="btn btn-primary" href="{% url 'comun:panel' %}">Volver a mi panel</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

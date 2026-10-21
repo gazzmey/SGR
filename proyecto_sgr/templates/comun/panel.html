@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block titulo %}Mi panel{% endblock %}
+{% block ruta %}<span aria-current="page">Mi panel</span>{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Mi panel</h1>
+    <p>
+      {% if sgr_delegacion %}
+        Estás trabajando en <b>{{ sgr_delegacion.nombre }}</b> ({{ sgr_delegacion.codigo }}).
+        Lo que registres queda asociado a esa delegación.
+      {% else %}
+        Tu cuenta todavía no tiene una delegación asignada. Pídele al administrador que te cree el perfil.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+{% if tarjetas %}
+  <div class="kpis" style="margin-bottom: 20px">
+    {% for tarjeta in tarjetas %}
+      <a class="card kpi" href="{{ tarjeta.url }}" style="text-decoration: none; color: inherit">
+        <span class="lbl">{{ tarjeta.titulo }}</span>
+        <div class="val">{{ tarjeta.cuenta }}</div>
+        <div class="meta">{{ tarjeta.pie }}</div>
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="grid g-side">
+  <section class="card">
+    <div class="card-h"><h2>Qué hay en esta entrega</h2></div>
+    <div class="card-b stack" style="gap: 14px">
+      <p class="small soft">
+        Las once pantallas que exige la segunda entrega están construidas sobre Django:
+        el acceso con recuperación de contraseña, los seis mantenedores y el ingreso de
+        atención ciudadana. Cada una guarda en MariaDB.
+      </p>
+      <div class="divider"></div>
+      <p class="small soft">
+        El menú de la izquierda muestra solo los módulos que tu rol habilita. Esconder una
+        opción es cortesía, no seguridad: si escribes la dirección a mano, la vista te
+        rechaza igual.
+      </p>
+    </div>
+  </section>
+
+  <aside class="spec" style="align-self: start">
+    <div class="spec-h">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8h.01"/></svg>
+      <h3>Tu acceso</h3>
+    </div>
+    <dl class="datos" style="padding: 0; grid-template-columns: 1fr">
+      <div class="par"><dt>Cuenta</dt><dd>{{ user.email|default:user.get_username }}</dd></div>
+      {% if sgr_perfil %}
+        <div class="par"><dt>Rol</dt><dd>{{ sgr_perfil.rol.nombre }}</dd></div>
+        <div class="par"><dt>Alcance</dt><dd>{{ sgr_perfil.rol.get_alcance_display }}</dd></div>
+        <div class="par"><dt>Delegaciones a las que accedes</dt><dd>{{ sgr_delegaciones|length }}</dd></div>
+      {% else %}
+        <div class="par"><dt>Rol</dt><dd>Superusuario de Django</dd></div>
+      {% endif %}
+    </dl>
+  </aside>
+</div>
+{% endblock %}

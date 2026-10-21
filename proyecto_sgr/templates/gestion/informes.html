@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block titulo %}Informes{% endblock %}
+{% block ruta %}<span aria-current="page">Informes</span>{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Informes</h1>
+    <p>Consolida la gestión según tu ámbito. Cada informe muestra los filtros aplicados, la regla de cálculo vigente y la fecha en que se generó.</p>
+  </div>
+</div>
+
+{% if sin_datos %}
+  <div class="notice">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>No hay nada que mostrar</b>{{ sin_datos }}</div>
+  </div>
+{% else %}
+
+<div class="grid g-side-l">
+
+  {% comment %}
+    El formulario es un GET a propósito: así el informe queda escrito en la
+    dirección y se puede guardar, pegar en un correo o adjuntar a un acta.
+    Un POST daría la misma pantalla y ningún enlace.
+  {% endcomment %}
+  <section class="card" aria-label="Configurar informe" style="align-self: start">
+    <div class="card-h"><h2>Configurar informe</h2></div>
+    <form method="get" action="{% url 'gestion:informes' %}">
+      <div class="card-b stack" style="gap: 14px">
+
+        <div class="field">
+          <span class="lbl">Tipo de informe</span>
+          <div class="decision decision-2" role="radiogroup" aria-label="Tipo de informe">
+            {% for clave, nombre, detalle in tipos %}
+              <label class="opt{% if clave == tipo %} on{% endif %}">
+                <input type="radio" name="tipo" value="{{ clave }}"{% if clave == tipo %} checked{% endif %}>
+                <span><b>{{ nombre }}</b><span>{{ detalle }}</span></span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="i-per">Período</label>
+          <span class="selw">
+            <select class="input" id="i-per" name="periodo">
+              {% for p in periodos %}
+                <option value="{{ p.pk }}"{% if p.pk == periodo.pk %} selected{% endif %}>{{ p.nombre }}</option>
+              {% endfor %}
+            </select>
+          </span>
+        </div>
+
+        <div class="field">
+          <label for="i-del">Delegación</label>
+          <span class="selw">
+            <select class="input" id="i-del" name="delegacion">
+              <option value="">Todas las autorizadas ({{ delegaciones_posibles|length }})</option>
+              {% for d in delegaciones_posibles %}
+                <option value="{{ d.pk }}"{% if delegacion_elegida and d.pk == delegacion_elegida.pk %} selected{% endif %}>{{ d.nombre }}</option>
+              {% endfor %}
+            </select>
+          </span>
+        </div>
+
+        <div class="field">
+          <label for="i-item">Ítem</label>
+          <span class="selw">
+            <select class="input" id="i-item" name="item">
+              <option value="">Todos los ítems</option>
+              {% for it in items_posibles %}
+                <option value="{{ it.pk }}"{% if item_elegido and it.pk == item_elegido.pk %} selected{% endif %}>{{ it.nombre }}</option>
+              {% endfor %}
+            </select>
+          </span>
+          <span class="help">En «Cumplimiento por funcionario», elegir un ítem cambia la cifra: pasa a ser el avance en ese ítem, no el total de la persona.</span>
+        </div>
+
+        <div class="generar">
+          <p class="small soft sin-generar" hidden>Cambiaste la configuración. El informe de la derecha todavía es el anterior.</p>
+          <button type="submit" class="btn btn-primary btn-block">Generar informe</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" aria-labelledby="t-inf" style="align-self: start">
+    <div class="card-h" style="align-items: flex-start">
+      <div>
+        <span class="eyebrow">Vista previa</span>
+        <h2 id="t-inf" style="font-size: 19px">{{ informe.titulo }}</h2>
+        <p class="small muted mt8">
+          Generado el {{ informe.generado|date:"d-m-Y" }} a las {{ informe.generado|date:"H:i" }}
+          por {{ informe.quien }}{% if informe.regla %} · Regla «{{ informe.regla }}»{% endif %}
+        </p>
+        <div class="row mt12">
+          {% for e in informe.etiquetas %}<span class="tag">{{ e }}</span>{% endfor %}
+        </div>
+      </div>
+      {% if informe.hay_datos %}
+        <div class="end">
+          {% comment %}
+            Se conservan los filtros del informe y solo se agrega el formato.
+            Si el enlace de bajada armara su propia consulta, el archivo
+            podría traer algo distinto de lo que está en pantalla.
+          {% endcomment %}
+          <a class="btn btn-secondary btn-sm" href="?{{ request.GET.urlencode }}{% if request.GET %}&amp;{% endif %}export=excel">Excel</a>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">PDF</button>
+          <a class="btn btn-secondary btn-sm" href="?{{ request.GET.urlencode }}{% if request.GET %}&amp;{% endif %}export=csv">CSV</a>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if informe.hay_datos %}
+      <div class="tabla-wrap">
+        <table class="tabla" id="tabla-informe">
+          <thead>
+            <tr>
+              {% for c in informe.columnas %}<th{% if c.derecha %} class="r"{% endif %}>{{ c.titulo }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in informe.filas %}
+              {% if f.grupo %}
+                <tr class="grp"><td colspan="{{ informe.columnas|length }}">{{ f.grupo }}</td></tr>
+              {% else %}
+                <tr>
+                  {% for celda in f.celdas %}
+                    <td{% if forloop.counter0 in informe.columnas_derecha %} class="r"{% endif %}>
+                      {% if celda.chip %}<span class="chip {{ celda.chip }}">{{ celda.texto }}</span>
+                      {% elif celda.fuerte %}<b>{{ celda.texto }}</b>
+                      {% else %}{{ celda.texto }}{% endif %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+          {% if informe.pie %}
+            <tfoot>
+              <tr>
+                {% for celda in informe.pie %}
+                  <td{% if forloop.counter0 in informe.columnas_derecha %} class="r"{% endif %}>{% if celda.fuerte %}<b>{{ celda.texto }}</b>{% else %}{{ celda.texto }}{% endif %}</td>
+                {% endfor %}
+              </tr>
+            </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    {% else %}
+      <div class="card-b" style="padding: 28px 20px">
+        <p class="small soft">{{ informe.sin_datos }}</p>
+      </div>
+    {% endif %}
+
+    <div class="card-f">
+      <span class="small muted">{{ informe.nota }}</span>
+    </div>
+  </section>
+</div>
+{% endif %}
+
+<script>
+  /* El formulario y el informe pueden quedar diciendo cosas distintas: se
+     elige otro tipo, no se aprieta «Generar informe» y la derecha sigue
+     mostrando el anterior. En una pantalla alta el botón queda fuera de
+     vista y no hay forma de notarlo. Este aviso lo hace visible. */
+  (function () {
+    var form = document.querySelector('.card form[method="get"]');
+    if (!form) return;
+    var aviso = form.querySelector('.sin-generar');
+    if (!aviso) return;
+    form.addEventListener('change', function () { aviso.hidden = false; });
+  })();
+</script>
+{% endblock %}

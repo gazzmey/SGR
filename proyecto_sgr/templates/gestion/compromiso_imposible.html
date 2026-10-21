@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block titulo %}Ingresar compromiso{% endblock %}
+{% block ruta %}
+  <a href="{% url 'gestion:agenda' %}">Agenda de compromisos</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Ingresar</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div><h1>Todavía no se puede ingresar</h1>
+    <p>Falta configuración previa. Mientras no esté, un compromiso quedaría sin período ni delegación a los que pertenecer.</p></div>
+</div>
+
+<section class="card">
+  <div class="card-b stack" style="gap: 14px; padding: 24px">
+    {% if not periodo %}
+      <div class="notice warn">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>No hay ningún período abierto</b>Quien configura períodos tiene que abrir uno. El compromiso pertenece a un período, y sin período abierto no hay a cuál asociarlo.</div>
+      </div>
+    {% endif %}
+    {% if not delegacion %}
+      <div class="notice warn">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>No hay delegación activa</b>El compromiso es de una delegación, y la agenda se consulta por delegación. Elige una en la cabecera.</div>
+      </div>
+    {% endif %}
+    {% if not perfil %}
+      <div class="notice warn">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Tu cuenta no tiene perfil en el SGR</b>Sin perfil no hay delegación desde la que ingresar compromisos.</div>
+      </div>
+    {% endif %}
+    <div class="row">
+      <a class="btn btn-secondary" href="{% url 'gestion:agenda' %}">Volver a la agenda</a>
+      <a class="btn btn-ghost" href="{% url 'comun:panel' %}">Ir al panel</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
