@@ -398,19 +398,23 @@ quien administra— llega a conocerla.
 
 ## 9. Despliegue en AWS
 
-> **Revisar.** Reemplazar por la dirección real de la aplicación desplegada y
-> borrar esta nota.
+**Dirección de la aplicación:** http://35.170.29.164/
 
-**Dirección de la aplicación:**
-
-**Administrador:** la misma dirección seguida de `/admin/`.
+**Administrador:** http://35.170.29.164/admin/
 
 El despliegue usa una instancia EC2 con Amazon Linux 2023 y MariaDB para los
-datos. Gunicorn ejecuta la aplicación bajo systemd, Nginx recibe las
-peticiones del exterior por un socket Unix, y whitenoise sirve los archivos
-estáticos recolectados con `collectstatic`. Las credenciales se definen como
-variables de entorno del servicio, en un archivo fuera del repositorio y
-legible solo por root.
+datos. Python 3.12 en entorno virtual, porque el intérprete del sistema es 3.9
+y Django 5 exige 3.10 o superior. Gunicorn ejecuta la aplicación bajo systemd
+con tres trabajadores, Nginx recibe las peticiones del exterior en el puerto 80
+y las pasa a `127.0.0.1:8000`, y whitenoise sirve los archivos estáticos
+recolectados con `collectstatic`. Las credenciales se definen en un `.env` con
+permisos 600, fuera del repositorio.
+
+La instancia tiene una IP elástica para que la dirección no cambie al
+reiniciarla. El sistema se sirve por HTTP: el endurecimiento de HTTPS
+—redirección forzada, HSTS y cookies seguras— está implementado detrás de la
+variable `SGR_HTTPS`, apagada mientras no haya certificado, porque encenderla
+sobre HTTP impediría iniciar sesión.
 
 Al desplegar los cambios de esta entrega:
 
