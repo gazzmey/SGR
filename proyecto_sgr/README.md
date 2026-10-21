@@ -481,21 +481,43 @@ administrador.
 
 ## 11. Uso de inteligencia artificial y verificación del equipo
 
-> **Revisar.** Esta sección tiene que describir con exactitud cómo trabajó el
-> equipo. Si algo de lo que dice no ocurrió, hay que corregirlo: una
-> declaración que no calza con el trabajo real es peor que no declarar nada.
-> Borrar esta nota al terminar.
+Se utilizó un asistente de inteligencia artificial de forma intensiva en esta
+entrega. Se declara con precisión porque la pauta lo exige y porque una
+declaración que no calce con el trabajo real sería peor que no declarar nada.
 
-Se utilizó un asistente de inteligencia artificial como apoyo durante el
-desarrollo de esta entrega: para proponer la estructura del mantenedor
-reutilizable, redactar el código de las vistas, los formularios y las
-plantillas a partir de la maqueta que el equipo había definido, y para revisar
-las reglas de validación y de seguridad.
+**Qué hizo el asistente.** Escribió la mayor parte del código Python y de las
+plantillas: el motor del mantenedor reutilizable y los seis mantenedores que
+salen de él, las vistas, los formularios, el motor de cálculo, la agenda de
+compromisos, las alertas, la auditoría y los informes. También escribió las
+ocho suites de comprobación automatizada y la mayor parte de este documento.
 
-El equipo definió el alcance, la maqueta de las once pantallas, la tabla de
-permisos y las reglas de negocio; revisó el código resultante, lo ejecutó
-sobre MariaDB y es capaz de explicar cada decisión. En particular, los cuatro
-integrantes pueden explicar:
+**Qué hizo el equipo.** Definió el alcance y las reglas de negocio. Produjo la
+maqueta de las pantallas, que es el documento contra el cual se construyó cada
+vista y la fuente de las cinco reglas de alerta y de los cuatro informes.
+Decidió qué se implementaba, qué quedaba fuera y con qué justificación —los
+ajustes de TAB-04 se declararon fuera porque el caso exige una regla aprobada
+que no existe—. Ejecutó el plan de pruebas sobre MariaDB. Desplegó el sistema
+en AWS.
+
+**La verificación manual encontró lo que las comprobaciones automatizadas no
+podían encontrar.** De los catorce defectos registrados en el plan, seis los
+encontró el equipo probando a mano sobre MariaDB, y dos eran estructuralmente
+invisibles para las suites, que corren sobre SQLite:
+
+- **DEF-11** — un filtro por fecha que MariaDB resuelve a NULL cuando las
+  tablas de zona horaria vienen vacías, como vienen instaladas de fábrica. Una
+  de las cinco alertas no aparecía nunca, sin error y sin aviso. Sobre SQLite
+  funcionaba.
+- **DEF-12** — una ficha que se caía cuando el historial tenía una fila sin
+  autor. Las suites solo dibujaban objetos creados por ellas mismas, siempre
+  completos; los datos de demostración sí tienen huecos.
+
+Esa diferencia es el argumento de esta sección. El código lo escribió en su
+mayor parte una herramienta; la verificación que lo volvió confiable la hizo
+el equipo, y está documentada caso por caso en el plan de pruebas y en la hoja
+de defectos.
+
+Los cuatro integrantes pueden explicar:
 
 - la configuración de `DATABASES` y por qué el backend `mysql` sirve para
   MariaDB;
