@@ -440,6 +440,28 @@ sudo dnf install -y git
 git clone https://github.com/gazzmey/SGR.git ~/SGR
 ```
 
+### Archivos de las evidencias
+
+Los archivos que se adjuntan a las evidencias se guardan en `media/` dentro de
+la aplicación (o en `SGR_MEDIA_ROOT`, si se define), con un nombre que genera
+el sistema. Esa carpeta no tiene dirección pública: Nginx no la sirve y Django
+no define `MEDIA_URL`. Cada archivo se entrega por `/periodo/evidencias/<id>/archivo/`,
+que comprueba que quien lo pide sea el autor de la actividad o un verificador
+de esa delegación. Los formatos y el tamaño máximo se configuran con
+`SGR_EVIDENCIA_FORMATOS` y `SGR_EVIDENCIA_MAX_MB` (por omisión PDF, JPG, JPEG y
+PNG, hasta 5 MB).
+
+Nginx rechaza por omisión cualquier envío de más de 1 MB antes de que llegue a
+Django, así que el servidor necesita este ajuste, una sola vez:
+
+```bash
+echo 'client_max_body_size 20m;' | sudo tee /etc/nginx/conf.d/sgr_subidas.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+El límite de Nginx queda holgado a propósito: el de 5 MB lo aplica Django, que
+es el que puede explicarle a la persona por qué se rechazó su archivo.
+
 ---
 
 ## 10. Limitaciones conocidas
@@ -453,10 +475,13 @@ git clone https://github.com/gazzmey/SGR.git ~/SGR
   aprobada, `registrar_atencion` es del rol Funcionario. No es un error: si se
   quisiera que el Administrador también pudiera, se marca la casilla en el
   mantenedor de Roles, sin tocar código.
-- **El documento de respaldo se registra por referencia, no por archivo.** Se
-  guarda el nombre o número del documento. La subida de archivos requiere
-  `MEDIA_ROOT`, control de tipo y tamaño, y respaldo del directorio; queda para
-  la entrega siguiente.
+- **Los archivos de las evidencias no entran en el respaldo del despliegue.**
+  `desplegar.sh` respalda el código y la base, pero no `media/`: el despliegue
+  no toca esos archivos y el sistema nunca los modifica ni los borra. Para
+  respaldarlos aparte basta con
+  `tar -czf ~/respaldos/archivos_$(date +%F).tar.gz -C ~/proyecto_integrado media`.
+  Las evidencias registradas antes de HU-09 no tienen archivo: conservan solo
+  su referencia y siguen siendo válidas.
 - **Sin bloqueo por intentos fallidos.** La maqueta mostraba ese estado de
   pantalla. Hacerlo bien exige registrar los intentos por cuenta y por origen,
   y no está en esta entrega.
@@ -603,6 +628,7 @@ proyecto_sgr/
   gestion/                          el período y todo lo que se mide dentro
     models.py                       Periodo, Cargo, MetaPeriodo
     modelos_actividad.py            Actividad y Evidencia
+    evidencias.py                   archivos: formatos, tamaño, nombre seguro
     modelos_agenda.py               Compromiso y su historial de cambios
     reglas.py                       ReglaCalculo: los parámetros, como dato
     calculo.py                      el motor; la única aritmética del sistema
@@ -612,7 +638,7 @@ proyecto_sgr/
     forms.py  forms_actividad.py  forms_agenda.py
     views.py  views_actividad.py  views_agenda.py  views_alertas.py
     views_informes.py  views_tablero.py  urls.py  admin.py
-    migrations/0001_initial.py … 0007_umbrales_de_alertas.py
+    migrations/0001_initial.py … 0008_evidencia_archivo.py
   templates/
     base.html                       el marco institucional
     comun/                          listado, formulario, ficha, panel, 403, 404

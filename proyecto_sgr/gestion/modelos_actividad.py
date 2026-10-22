@@ -26,6 +26,10 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 
+from gestion.evidencias import (
+    es_imagen, extension, ruta_evidencia, se_muestra_en_navegador, tamano_texto,
+)
+
 
 class Actividad(models.Model):
     """Algo que una persona hizo y que cuenta para una meta suya."""
@@ -191,10 +195,11 @@ class Evidencia(models.Model):
     """
     El respaldo de una actividad, y la decisión del verificador sobre él.
 
-    Se guarda la **referencia** del documento, no el archivo: esta entrega no
-    implementa carga de archivos, y guardar una ruta inventada sería peor que
-    no guardar nada. Cuando se incorpore la subida, el campo ``archivo`` se
-    agrega al lado sin tocar lo demás.
+    Desde HU-09 la evidencia lleva el **archivo**: un PDF o una foto que se
+    guarda con un nombre que genera el sistema y se entrega solo a quien
+    puede verlo (ver ``gestion/evidencias.py``). La referencia queda como dato
+    opcional —el número del acta, un folio— y las evidencias registradas
+    antes de HU-09 siguen siendo válidas sin archivo.
     """
 
     class Decision(models.TextChoices):
@@ -215,9 +220,18 @@ class Evidencia(models.Model):
         help_text="Qué es el documento y qué acredita.",
     )
     referencia = models.CharField(
-        max_length=120,
-        help_text="Nombre o número del documento: acta, informe, registro fotográfico.",
+        max_length=120, blank=True,
+        help_text="Número del acta, folio u otro dato que identifique el documento.",
     )
+    archivo = models.FileField(
+        upload_to=ruta_evidencia, max_length=200, blank=True,
+        help_text="Se guarda con un nombre que genera el sistema, nunca con el original.",
+    )
+    nombre_original = models.CharField(
+        "nombre original", max_length=160, blank=True,
+        help_text="Cómo se llamaba el archivo en el equipo de quien lo subió. Solo se muestra.",
+    )
+    tamano = models.PositiveIntegerField("tamaño en bytes", null=True, blank=True)
     autor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name="evidencias_cargadas", verbose_name="cargada por",
@@ -262,6 +276,28 @@ class Evidencia(models.Model):
     @property
     def pendiente(self):
         return self.decision == self.Decision.PENDIENTE and not self.anulada
+
+    # --- el archivo, para las plantillas ------------------------------------
+
+    @property
+    def archivo_nombre(self):
+        return self.nombre_original or (self.archivo.name.rsplit("/", 1)[-1] if self.archivo else "")
+
+    @property
+    def archivo_formato(self):
+        return extension(self.archivo.name).upper() if self.archivo else ""
+
+    @property
+    def archivo_tamano(self):
+        return tamano_texto(self.tamano)
+
+    @property
+    def archivo_es_imagen(self):
+        return bool(self.archivo) and es_imagen(self.archivo.name)
+
+    @property
+    def archivo_se_abre(self):
+        return bool(self.archivo) and se_muestra_en_navegador(self.archivo.name)
 
     @property
     def verificador_visible(self):

@@ -1,6 +1,8 @@
 """Django Admin de períodos, cargos y metas."""
 
 from django.contrib import admin
+from django.urls import reverse
+from django.utils.html import format_html
 
 from config.admin_base import SoloActivosEnSelectores, activar, desactivar
 
@@ -89,15 +91,36 @@ class ReglaCalculoAdmin(admin.ModelAdmin):
         return obj.periodo.nombre if obj.periodo_id else "General"
 
 
+def _enlace_archivo(evidencia):
+    """
+    El archivo de la evidencia, abierto por la vista que comprueba permisos.
+
+    El campo ``archivo`` no se edita desde el administrador: reemplazarlo ahí
+    saltaría la validación de formato y tamaño, y el enlace que dibuja Django
+    apuntaría a una dirección pública que a propósito no existe.
+    """
+    if not evidencia.archivo:
+        return "—"
+    return format_html(
+        '<a href="{}" target="_blank" rel="noopener">{} · {}</a> {}',
+        reverse("gestion:evidencia_archivo", args=[evidencia.pk]),
+        evidencia.archivo_formato, evidencia.archivo_nombre, evidencia.archivo_tamano,
+    )
+
+
 class EvidenciaInline(admin.TabularInline):
     """Las evidencias de una actividad, desde la actividad."""
 
     model = Evidencia
-    fields = ("codigo", "descripcion", "referencia", "decision",
+    fields = ("codigo", "descripcion", "referencia", "archivo_enlace", "decision",
               "verificador", "anulada")
-    readonly_fields = ("codigo",)
+    readonly_fields = ("codigo", "archivo_enlace")
     ordering = ("-creada",)
     extra = 0
+
+    @admin.display(description="archivo")
+    def archivo_enlace(self, obj):
+        return _enlace_archivo(obj)
 
 
 @admin.register(Actividad)
@@ -123,7 +146,13 @@ class EvidenciaAdmin(admin.ModelAdmin):
                      "actividad__codigo", "actividad__accion")
     ordering = ("-creada",)
     list_select_related = ("actividad", "autor", "verificador")
-    readonly_fields = ("codigo", "creada", "decidida")
+    exclude = ("archivo",)
+    readonly_fields = ("codigo", "creada", "decidida", "archivo_enlace",
+                       "nombre_original", "tamano")
+
+    @admin.display(description="archivo")
+    def archivo_enlace(self, obj):
+        return _enlace_archivo(obj)
 
 
 # =========================================================================

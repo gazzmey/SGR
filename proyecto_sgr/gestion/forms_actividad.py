@@ -1,9 +1,12 @@
 """Formularios de actividades y evidencias."""
 
+import os
+
 from django import forms
 
 from catalogos.models import Item
 from comun.utilidades import proximo_codigo
+from gestion import evidencias
 from gestion.modelos_actividad import Actividad, Evidencia
 from gestion.models import MetaPeriodo, Periodo
 
@@ -118,22 +121,26 @@ class ActividadForm(forms.ModelForm):
 
 class EvidenciaForm(forms.ModelForm):
     """
-    Carga de la evidencia de una actividad.
+    Carga de la evidencia de una actividad: el archivo y qué acredita.
 
-    Se guarda la referencia del documento, no el archivo: esta entrega no
-    implementa subida. El código se asigna al crearla y no vuelve a cambiar.
+    El archivo es obligatorio al cargar una evidencia nueva, aunque en el
+    modelo no lo sea: las evidencias registradas antes de HU-09 no lo tienen y
+    siguen siendo válidas. Las reglas del archivo están en
+    ``gestion/evidencias.py``. El código se asigna al crearla y no vuelve a
+    cambiar.
     """
 
     class Meta:
         model = Evidencia
-        fields = ["descripcion", "referencia"]
+        fields = ["archivo", "descripcion", "referencia"]
         widgets = {
+            "archivo": forms.FileInput(attrs={"ancho": True}),
             "descripcion": forms.TextInput(attrs={
                 "placeholder": "Por ejemplo: Acta de la mesa de trabajo",
                 "ancho": True,
             }),
             "referencia": forms.TextInput(attrs={
-                "placeholder": "Nombre o número del documento",
+                "placeholder": "Por ejemplo: Acta N° 14/2026",
             }),
         }
 
@@ -141,6 +148,37 @@ class EvidenciaForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.actividad = actividad
         self.autor = autor
+
+        self.formatos_texto = evidencias.formatos_texto()
+        self.maximo_mb = evidencias.maximo_mb()
+        archivo = self.fields["archivo"]
+        archivo.required = True
+        archivo.label = "Archivo"
+        archivo.widget.attrs["accept"] = evidencias.accept()
+        archivo.help_text = (
+            f"{self.formatos_texto}, hasta {self.maximo_mb} MB. Una foto del "
+            f"celular o el PDF escaneado sirven."
+        )
+        archivo.error_messages["required"] = (
+            f"Adjunta el archivo: {self.formatos_texto}, hasta {self.maximo_mb} MB."
+        )
+        # Los mensajes que trae Django dicen «fichero»: se reemplazan por los
+        # del sistema.
+        archivo.error_messages["empty"] = (
+            "El archivo está vacío. Vuelve a elegirlo desde el original."
+        )
+        archivo.error_messages["invalid"] = (
+            "No llegó un archivo. Vuelve a elegirlo y adjunta de nuevo."
+        )
+        # El nombre con que se guarda lo genera el sistema; el largo del
+        # nombre original no importa.
+        archivo.max_length = None
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get("archivo")
+        if archivo:
+            evidencias.validar(archivo)
+        return archivo
 
     def clean_descripcion(self):
         texto = (self.cleaned_data["descripcion"] or "").strip()
@@ -152,6 +190,17 @@ class EvidenciaForm(forms.ModelForm):
         evidencia = super().save(commit=False)
         evidencia.actividad = self.actividad
         evidencia.autor = self.autor
+        archivo = self.cleaned_data.get("archivo")
+        if archivo:
+            # El nombre original solo se muestra y se usa al descargar. Si es
+            # muy largo se corta antes de la extensión, para que el archivo
+            # descargado siga abriéndose con el programa que corresponde.
+            nombre = os.path.basename(archivo.name)
+            if len(nombre) > 160:
+                raiz, ext = os.path.splitext(nombre)
+                nombre = raiz[:160 - len(ext)] + ext
+            evidencia.nombre_original = nombre
+            evidencia.tamano = archivo.size
         if not evidencia.pk:
             evidencia.codigo = proximo_codigo(Evidencia, "EVI", ancho=4)
         if commit:

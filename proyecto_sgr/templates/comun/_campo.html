@@ -8,7 +8,12 @@
   El grupo de casillas va primero a propósito: CheckboxSelectMultiple también
   declara input_type "checkbox", así que si se preguntara antes por el tipo,
   un grupo de permisos se dibujaría como un solo interruptor.
+
+  En el campo normal el control lleva la clase «input», que es la que tiene
+  el estilo de la maqueta en sgr.css. Sin ella el navegador dibuja su cuadro
+  por defecto y el selector muestra dos flechas.
 {% endcomment %}
+{% load sgr %}
 
 {% if campo.field.widget.allow_multiple_selected %}
   <div class="field{% if campo.errors %} err{% endif %}" style="grid-column: 1 / -1">
@@ -45,11 +50,11 @@
     </label>
     {% if campo.field.widget.input_type == "select" %}
       <span class="selw">
-        {{ campo }}
+        {{ campo|campo_clase:"input" }}
         <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
       </span>
     {% else %}
-      {{ campo }}
+      {{ campo|campo_clase:"input" }}
     {% endif %}
     {% if campo.help_text %}<span class="help">{{ campo.help_text }}</span>{% endif %}
     {% for error in campo.errors %}

@@ -60,7 +60,10 @@
             <li>
               <span class="tx">
                 <b>{{ e.descripcion }}</b>
-                <span class="mono">{{ e.codigo }}</span> · {{ e.referencia }}
+                <span><span class="mono">{{ e.codigo }}</span>{% if e.referencia %} · {{ e.referencia }}{% endif %}</span>
+                {% if e.archivo %}
+                  <span><a class="link" href="{% url 'gestion:evidencia_archivo' e.pk %}{% if not e.archivo_se_abre %}?descargar=1{% endif %}"{% if e.archivo_se_abre %} target="_blank" rel="noopener"{% endif %}>{{ e.archivo_formato }} · {{ e.archivo_nombre }}</a>{% if e.archivo_tamano %} · <span style="white-space: nowrap">{{ e.archivo_tamano }}</span>{% endif %}</span>
+                {% endif %}
                 <span>{{ e.creada|date:"d-m-Y H:i" }} · {{ e.autor.get_full_name|default:e.autor.get_username }}</span>
                 {% if e.anulada %}
                   <span>Anulada: {{ e.motivo_anulacion }}</span>

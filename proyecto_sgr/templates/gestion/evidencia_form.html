@@ -17,7 +17,7 @@
   </div>
 </div>
 
-<form class="grid g-side" method="post" novalidate>
+<form class="grid g-side" method="post" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
   <section class="card" style="align-self: start">
     {% if form.errors %}
@@ -27,8 +27,18 @@
       </div>
     {% endif %}
     <div class="form-sec">
-      <h3><span class="num">1</span>El documento</h3>
-      <p>En esta entrega se registra la referencia del documento, no el archivo.</p>
+      <h3><span class="num">1</span>El archivo</h3>
+      <p>El respaldo que va a revisar el verificador: el acta escaneada, la foto de la actividad, el informe.</p>
+      <div class="form-grid">
+        {% include "comun/_campo.html" with campo=form.archivo %}
+        {% if form.errors and not form.archivo.errors %}
+          <p class="small soft ancho" style="grid-column: 1 / -1; margin: 0">Por seguridad, el navegador no conserva el archivo cuando hay otro error: vuelve a elegirlo.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="form-sec">
+      <h3><span class="num">2</span>Qué acredita</h3>
+      <p>Lo que lee el verificador antes de abrir el archivo.</p>
       <div class="form-grid">
         {% include "comun/_campo.html" with campo=form.descripcion %}
         {% include "comun/_campo.html" with campo=form.referencia %}
@@ -53,6 +63,8 @@
       <div class="par"><dt>Ítem</dt><dd>{{ actividad.item.nombre }}</dd></div>
       <div class="par"><dt>Fecha</dt><dd>{{ actividad.fecha|date:"d-m-Y" }}</dd></div>
     </dl>
+    <div class="divider"></div>
+    <p class="small soft">Se aceptan <b>{{ form.formatos_texto }}</b> de hasta <b>{{ form.maximo_mb }} MB</b>. El archivo se guarda con un nombre que genera el sistema y solo lo pueden abrir tú y quienes validan evidencias de tu delegación.</p>
     <div class="divider"></div>
     <p class="small soft">La evidencia recibe un <b>código propio que no cambia nunca</b>. Eso permite identificarla meses después aunque la actividad se haya editado.</p>
   </aside>

@@ -79,6 +79,7 @@ urlpatterns = [
     # --- validación de evidencias ---
     path("validar/", va.ColaValidacion.as_view(), name="validar"),
     path("validar/<int:pk>/", va.evidencia_detalle, name="evidencia_detalle"),
+    path("evidencias/<int:pk>/archivo/", va.evidencia_archivo, name="evidencia_archivo"),
     path("validar/<int:pk>/<str:paso>/", va.DecidirEvidencia.as_view(),
          name="evidencia_decidir"),
 ]

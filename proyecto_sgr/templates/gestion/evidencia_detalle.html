@@ -29,7 +29,21 @@
     </div>
     <dl class="datos">
       <div class="par"><dt>Evidencia</dt><dd class="mono">{{ obj.codigo }}</dd></div>
-      <div class="par"><dt>Referencia</dt><dd>{{ obj.referencia }}</dd></div>
+      <div class="par ancho"><dt>Archivo</dt><dd>
+        {% if obj.archivo %}
+          <div class="archivo">
+            <span class="fmt">{{ obj.archivo_formato }}</span>
+            <span class="nom">{{ obj.archivo_nombre }}{% if obj.archivo_tamano %}<span class="t2">{{ obj.archivo_tamano }}</span>{% endif %}</span>
+            <span class="acc">
+              {% if obj.archivo_se_abre %}<a class="btn btn-sm btn-secondary" href="{% url 'gestion:evidencia_archivo' obj.pk %}" target="_blank" rel="noopener">Abrir</a>{% endif %}
+              <a class="btn btn-sm btn-secondary" href="{% url 'gestion:evidencia_archivo' obj.pk %}?descargar=1">Descargar</a>
+            </span>
+          </div>
+        {% else %}
+          Sin archivo<span class="t2">Se registró solo con su referencia, antes de que el sistema recibiera archivos.</span>
+        {% endif %}
+      </dd></div>
+      <div class="par"><dt>Referencia</dt><dd>{{ obj.referencia|default:"—" }}</dd></div>
       <div class="par"><dt>Cargada</dt><dd>{{ obj.creada|date:"d-m-Y H:i" }}<span class="t2">{{ obj.autor.get_full_name|default:obj.autor.get_username }}</span></dd></div>
       <div class="par"><dt>Actividad</dt><dd>{{ obj.actividad.codigo }}<span class="t2">{{ obj.actividad.fecha|date:"d-m-Y" }}</span></dd></div>
       <div class="par"><dt>Ítem al que sumaría</dt><dd>{{ obj.actividad.item.nombre }}</dd></div>
@@ -38,6 +52,11 @@
       {% if obj.motivo %}<div class="par ancho"><dt>Motivo del rechazo</dt><dd>{{ obj.motivo }}</dd></div>{% endif %}
       {% if obj.motivo_anulacion %}<div class="par ancho"><dt>Motivo de la anulación</dt><dd>{{ obj.motivo_anulacion }}</dd></div>{% endif %}
     </dl>
+    {% if obj.archivo_es_imagen %}
+      <div class="preview">
+        <img src="{% url 'gestion:evidencia_archivo' obj.pk %}" alt="Foto adjunta a la evidencia {{ obj.codigo }}" loading="lazy">
+      </div>
+    {% endif %}
     {% if obj.decidida %}
       <div class="card-f"><span class="small soft">Decidida el {{ obj.decidida|date:"d-m-Y H:i" }} por {{ obj.verificador_visible }}.</span></div>
     {% endif %}

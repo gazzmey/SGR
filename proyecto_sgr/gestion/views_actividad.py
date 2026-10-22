@@ -9,6 +9,7 @@ lo único que decide si la actividad puntúa.
 
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -22,6 +23,7 @@ from comun.mantenedor import Columna, Filtro, ListaMantenedor
 from comun.models import EventoAuditoria
 from comun.permisos import redirect_al_login, tiene_permiso
 from comun.resultado import anunciar
+from gestion import evidencias
 from gestion.forms_actividad import ActividadForm, EvidenciaForm, RechazoForm
 from gestion.modelos_actividad import Actividad, Evidencia
 from gestion.models import Periodo
@@ -223,7 +225,7 @@ def evidencia_nueva(request, pk):
                  icono="warning")
         return redirect("gestion:actividad_detalle", pk=pk)
 
-    formulario = EvidenciaForm(request.POST or None,
+    formulario = EvidenciaForm(request.POST or None, request.FILES or None,
                                actividad=actividad, autor=request.user)
 
     if request.method == "POST" and formulario.is_valid():
@@ -243,6 +245,50 @@ def evidencia_nueva(request, pk):
         "form": formulario,
         "actividad": actividad,
     })
+
+
+def evidencia_archivo(request, pk):
+    """
+    Entrega el archivo de una evidencia a quien puede verlo.
+
+    Los archivos no tienen dirección pública: pasan siempre por acá. Pueden
+    verlo quien registró la actividad, quien cargó la evidencia y quien
+    valida evidencias de esa delegación —la misma regla de la cola de
+    validación—. El tipo de contenido lo fija la extensión aceptada al
+    subirlo, nunca lo que declaró el navegador de quien lo subió, y con
+    ``?descargar=1`` se entrega como descarga en vez de abrirse.
+    """
+    if not request.user.is_authenticated:
+        return redirect_al_login(request)
+
+    evidencia = get_object_or_404(
+        Evidencia.objects.select_related("actividad"), pk=pk,
+    )
+    propia = request.user.id in {evidencia.actividad.funcionario_id, evidencia.autor_id}
+    if not propia:
+        if not tiene_permiso(request.user, P.VALIDAR_EVIDENCIA):
+            raise PermissionDenied("No tienes acceso a esa evidencia.")
+        perfil = P.perfil_de(request.user)
+        if perfil is not None and not perfil.delegaciones_visibles().filter(
+                pk=evidencia.actividad.delegacion_id).exists():
+            raise PermissionDenied("Esa evidencia es de otra delegación.")
+
+    if not evidencia.archivo:
+        raise Http404("Esta evidencia se registró sin archivo.")
+    try:
+        contenido = evidencia.archivo.open("rb")
+    except FileNotFoundError:
+        raise Http404("El archivo no está en el servidor.")
+
+    descargar = request.GET.get("descargar") == "1" or not evidencia.archivo_se_abre
+    nombre = evidencia.archivo_nombre
+    respuesta = FileResponse(
+        contenido, as_attachment=descargar, filename=nombre,
+        content_type=evidencias.tipo_contenido(evidencia.archivo.name),
+    )
+    respuesta["X-Content-Type-Options"] = "nosniff"
+    respuesta["Cache-Control"] = "private, no-store"
+    return respuesta
 
 
 # =========================================================================

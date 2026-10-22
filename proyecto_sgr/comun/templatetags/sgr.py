@@ -40,9 +40,17 @@ def cola(context, **cambios):
 
 @register.filter
 def campo_clase(campo, clases):
-    """Agrega clases al widget de un campo de formulario desde la plantilla."""
-    existentes = campo.field.widget.attrs.get("class", "")
-    campo.field.widget.attrs["class"] = f"{existentes} {clases}".strip()
+    """
+    Agrega clases al widget de un campo de formulario desde la plantilla.
+
+    No repite una clase que ya esté: el mismo campo puede dibujarse dos
+    veces —al volver con errores, por ejemplo— y el atributo no debe crecer.
+    """
+    existentes = campo.field.widget.attrs.get("class", "").split()
+    for clase in clases.split():
+        if clase not in existentes:
+            existentes.append(clase)
+    campo.field.widget.attrs["class"] = " ".join(existentes)
     return campo
 
 

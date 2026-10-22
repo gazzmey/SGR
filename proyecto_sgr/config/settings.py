@@ -160,6 +160,21 @@ STORAGES = {
     },
 }
 
+# --- Archivos de las evidencias ------------------------------------------
+# Se guardan fuera de static/ y no tienen dirección pública: Nginx no los
+# sirve y no se define MEDIA_URL. Los entrega la vista
+# gestion:evidencia_archivo, que comprueba permisos y fija el tipo de
+# contenido. Detalle en gestion/evidencias.py.
+MEDIA_ROOT = Path(texto("SGR_MEDIA_ROOT", "") or BASE_DIR / "media")
+FILE_UPLOAD_PERMISSIONS = 0o640
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o750
+
+# Formatos y tamaño máximo de una evidencia (RNF-017). Se cambian sin tocar
+# código, y el mensaje de rechazo informa los valores vigentes. Si se sube el
+# máximo, Nginx tiene que aceptar ese tamaño (client_max_body_size).
+SGR_EVIDENCIA_FORMATOS = lista("SGR_EVIDENCIA_FORMATOS", "pdf,jpg,jpeg,png")
+SGR_EVIDENCIA_MAX_MB = int(texto("SGR_EVIDENCIA_MAX_MB", "5") or 5)
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- Acceso --------------------------------------------------------------
