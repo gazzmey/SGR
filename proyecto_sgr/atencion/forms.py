@@ -143,7 +143,7 @@ class AtencionForm(forms.ModelForm):
         if len(detalle) < 20:
             raise forms.ValidationError(
                 "Describe el requerimiento con más detalle: este texto es el "
-                "respaldo de la atención."
+                f"respaldo de la atención. Debe tener al menos 20 caracteres (escribiste {len(detalle)})."
             )
         return detalle
 

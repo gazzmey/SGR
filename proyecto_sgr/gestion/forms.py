@@ -85,7 +85,7 @@ class CargoForm(_Base):
         if len(texto) < 20:
             raise forms.ValidationError(
                 "Describe el cargo: es lo que explica por qué se le mide con "
-                "unos ítems y no con otros."
+                f"unos ítems y no con otros. Debe tener al menos 20 caracteres (escribiste {len(texto)})."
             )
         return texto
 

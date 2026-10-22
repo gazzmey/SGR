@@ -448,7 +448,7 @@ class DecidirEvidencia(View):
             if len(motivo) < 15:
                 anunciar(request, "Falta el motivo de la anulación",
                          "Anular quita puntaje ya otorgado: tiene que quedar "
-                         "escrito por qué.", icono="error")
+                         f"escrito por qué. Debe tener al menos 15 caracteres (escribiste {len(motivo)}).", icono="error")
                 return redirect("gestion:evidencia_detalle", pk=pk)
             evidencia.anulada = True
             evidencia.motivo_anulacion = motivo

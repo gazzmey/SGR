@@ -71,7 +71,7 @@ class ItemForm(_Base):
         if len(texto) < 20:
             raise forms.ValidationError(
                 "Explica qué cuenta como registro válido. Es lo que evita "
-                "discusiones al cerrar el período."
+                f"discusiones al cerrar el período. Debe tener al menos 20 caracteres (escribiste {len(texto)})."
             )
         return texto
 
@@ -141,12 +141,20 @@ class TipoAtencionForm(_Base):
             }),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        campo = self.fields["descripcion"]
+        campo.required = True
+        campo.help_text = "Mínimo 20 caracteres: qué requerimientos entran en esta clasificación."
+        campo.error_messages["required"] = (
+            "La descripción es obligatoria y debe tener al menos 20 caracteres."
+        )
+
     def clean_descripcion(self):
         texto = (self.cleaned_data.get("descripcion") or "").strip()
         if len(texto) < 20:
             raise forms.ValidationError(
-                "Describe qué requerimientos entran aquí, para que quien "
-                "registra una atención sepa cuál elegir."
+                f"La descripción debe tener al menos 20 caracteres; la que escribiste tiene {len(texto)}."
             )
         return texto
 
@@ -186,11 +194,16 @@ class SubAtencionForm(_Base):
             consulta = TipoAtencion.objects.filter(Q(activo=True) | Q(pk=actual))
         self.fields["tipo_atencion"].queryset = consulta
         self.fields["tipo_atencion"].empty_label = "Elige el tipo al que pertenece"
+        campo = self.fields["descripcion"]
+        campo.required = True
+        campo.help_text = "Mínimo 20 caracteres: qué incluye, qué requisitos tiene y cómo se resuelve."
+        campo.error_messages["required"] = "La descripción es obligatoria y debe tener al menos 20 caracteres."
 
     def clean_descripcion(self):
         texto = (self.cleaned_data.get("descripcion") or "").strip()
         if len(texto) < 20:
             raise forms.ValidationError(
-                "Describe la subatención: es el texto que ve quien registra."
+                f"La descripción debe tener al menos 20 caracteres; la que escribiste tiene {len(texto)}."
             )
         return texto
+

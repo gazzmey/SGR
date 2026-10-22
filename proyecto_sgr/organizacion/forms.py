@@ -122,7 +122,7 @@ class RolForm(_Base):
         texto = (self.cleaned_data.get("descripcion") or "").strip()
         if len(texto) < 20:
             raise forms.ValidationError(
-                "Describe el rol con un poco más de detalle."
+                f"Describe el rol con un poco más de detalle. Debe tener al menos 20 caracteres (escribiste {len(texto)})."
             )
         return texto
 

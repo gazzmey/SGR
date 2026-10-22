@@ -93,7 +93,7 @@ class ActividadForm(forms.ModelForm):
     def clean_accion(self):
         texto = (self.cleaned_data["accion"] or "").strip()
         if len(texto) < 10:
-            raise forms.ValidationError("Resume la acción en una frase entendible.")
+            raise forms.ValidationError(f"Resume la acción en una frase entendible. Debe tener al menos 10 caracteres (escribiste {len(texto)}).")
         return texto
 
     def clean_detalle(self):
@@ -101,7 +101,7 @@ class ActividadForm(forms.ModelForm):
         if len(texto) < 25:
             raise forms.ValidationError(
                 "El detalle es lo que lee el verificador para decidir. "
-                "Escríbelo con lo que hace falta para entender qué pasó."
+                f"Escríbelo con lo que hace falta para entender qué pasó. Debe tener al menos 25 caracteres (escribiste {len(texto)})."
             )
         return texto
 
@@ -145,7 +145,7 @@ class EvidenciaForm(forms.ModelForm):
     def clean_descripcion(self):
         texto = (self.cleaned_data["descripcion"] or "").strip()
         if len(texto) < 8:
-            raise forms.ValidationError("Di qué es el documento y qué acredita.")
+            raise forms.ValidationError(f"Di qué es el documento y qué acredita. Debe tener al menos 8 caracteres (escribiste {len(texto)}).")
         return texto
 
     def save(self, commit=True):
@@ -175,6 +175,6 @@ class RechazoForm(forms.Form):
         texto = (self.cleaned_data["motivo"] or "").strip()
         if len(texto) < 15:
             raise forms.ValidationError(
-                "Un motivo de una palabra no le sirve a nadie. Explica qué corregir."
+                f"Un motivo de una palabra no le sirve a nadie. Explica qué corregir. Debe tener al menos 15 caracteres (escribiste {len(texto)})."
             )
         return texto

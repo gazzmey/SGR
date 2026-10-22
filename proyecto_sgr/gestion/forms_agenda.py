@@ -101,7 +101,7 @@ class CompromisoForm(forms.ModelForm):
         if len(texto) < 20:
             raise forms.ValidationError(
                 "La descripción es contra lo que se cierra el compromiso. "
-                "Escríbela con lo que hace falta para saber si se cumplió."
+                f"Escríbela con lo que hace falta para saber si se cumplió. Debe tener al menos 20 caracteres (escribiste {len(texto)})."
             )
         return texto
 
@@ -145,7 +145,7 @@ class TransicionForm(forms.Form):
         if self.exige_observacion and len(texto) < 15:
             raise forms.ValidationError(
                 "Explica el motivo. Una palabra no le sirve a quien lea el "
-                "historial dentro de tres meses."
+                f"historial dentro de tres meses. Debe tener al menos 15 caracteres (escribiste {len(texto)})."
             )
         return texto
 
@@ -192,6 +192,6 @@ class ReasignarForm(forms.Form):
         texto = (self.cleaned_data["motivo"] or "").strip()
         if len(texto) < 15:
             raise forms.ValidationError(
-                "Anota el motivo con algo que se entienda después."
+                f"Anota el motivo con algo que se entienda después. Debe tener al menos 15 caracteres (escribiste {len(texto)})."
             )
         return texto
