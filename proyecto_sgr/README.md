@@ -402,7 +402,8 @@ y Django 5 exige 3.10 o superior. Gunicorn ejecuta la aplicación bajo systemd
 con tres trabajadores, Nginx recibe las peticiones del exterior en el puerto 80
 y las pasa a `127.0.0.1:8000`, y whitenoise sirve los archivos estáticos
 recolectados con `collectstatic`. Las credenciales se definen en un `.env` con
-permisos 600, fuera del repositorio.
+permisos 600, fuera del repositorio. Las del correo (`SGR_EMAIL_*`) van aparte,
+en `/etc/systemd/system/sgr.service.d/correo.conf`, también con permisos 600.
 
 La instancia tiene una IP elástica para que la dirección no cambie al
 reiniciarla. El sistema se sirve por HTTP: el endurecimiento de HTTPS
@@ -410,20 +411,34 @@ reiniciarla. El sistema se sirve por HTTP: el endurecimiento de HTTPS
 variable `SGR_HTTPS`, apagada mientras no haya certificado, porque encenderla
 sobre HTTP impediría iniciar sesión.
 
-Al desplegar los cambios de esta entrega:
+### Cómo se publica un cambio
+
+GitHub es la copia oficial del código. En el servidor no se edita nada a mano:
+el cambio se sube a la rama `main` y se publica con `desplegar.sh`, que está en
+la raíz del repositorio. El servidor tiene un clon en `~/SGR` y la aplicación
+corre desde `~/proyecto_integrado`; el script copia a la aplicación solo los
+archivos de `proyecto_sgr/` que cambiaron, sin tocar el entorno virtual, el
+`.env` ni los archivos recolectados.
 
 ```bash
-git pull
-source venv/bin/activate
-pip install -r requirements.txt     # openpyxl es nuevo
-python manage.py migrate
-python manage.py collectstatic --noinput
-sudo systemctl restart sgr
+bash ~/SGR/desplegar.sh revisar   # muestra qué cambiaría, sin tocar la aplicación
+bash ~/SGR/desplegar.sh           # publica la última versión de main
+bash ~/SGR/desplegar.sh volver    # restaura el código del último respaldo
 ```
 
-`collectstatic` es necesario porque esta entrega agrega hojas de estilo,
-JavaScript e imágenes propias; en la entrega anterior solo había los del
-administrador.
+Antes de copiar, el script revisa la versión nueva con `manage.py check` y
+confirma que no falten migraciones; si algo falla, se detiene sin haber copiado
+nada. Después pide confirmación, respalda el código y la base de datos en
+`~/respaldos` (guarda los diez últimos), copia, aplica las migraciones,
+recolecta los estáticos, reinicia el servicio y comprueba que la página
+responda. `requirements.txt` solo se reinstala cuando cambia.
+
+Preparación del servidor, una sola vez:
+
+```bash
+sudo dnf install -y git
+git clone https://github.com/gazzmey/SGR.git ~/SGR
+```
 
 ---
 
