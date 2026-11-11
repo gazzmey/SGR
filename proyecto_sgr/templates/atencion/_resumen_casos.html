@@ -1,0 +1,43 @@
+{% comment %}
+  Los tiempos de respuesta de los casos (la fila «TIEMPOS DE RESPUESTA» de
+  las hojas G SOC de la matriz), sobre el listado de casos.
+{% endcomment %}
+<div class="kpis" style="margin-bottom: 20px">
+  <a class="card kpi" href="?situacion=abiertos" style="text-decoration: none; color: inherit">
+    <span class="lbl">Casos abiertos</span>
+    <div class="val">{{ tiempos.abiertos }}</div>
+    <div class="meta">{% if tiempos.vencidos %}<span class="chip bad">{{ tiempos.vencidos }} con un plazo vencido</span>{% else %}ninguno con plazos vencidos{% endif %}</div>
+  </a>
+  <a class="card kpi" href="?situacion=cerrados" style="text-decoration: none; color: inherit">
+    <span class="lbl">Cerrados a tiempo</span>
+    <div class="val">{{ tiempos.cerrados_a_tiempo }} <small>de {{ tiempos.cerrados }}</small></div>
+    <div class="meta">{% if tiempos.promedio_dias is not None %}en {{ tiempos.promedio_dias|floatformat:1 }} días en promedio{% else %}todavía ninguno cerrado{% endif %}</div>
+  </a>
+  <div class="card kpi">
+    <span class="lbl">Informes devueltos</span>
+    <div class="val">{{ tiempos.con_devolucion }}</div>
+    <div class="meta">casos con al menos un reingreso del informe</div>
+  </div>
+</div>
+{% if tiempos.tramos %}
+<section class="card" style="margin-bottom: 20px" aria-labelledby="t-tiempos">
+  <div class="card-h"><h2 id="t-tiempos">Tiempos de respuesta</h2><span class="sub">Pasos ya terminados que se hicieron dentro del plazo</span></div>
+  <div class="tabla-wrap">
+    <table class="tabla">
+      <thead><tr><th>Paso</th><th class="r">Plazo</th><th class="r">Terminados</th><th class="r">A tiempo</th><th class="r">% a tiempo</th></tr></thead>
+      <tbody>
+        {% for t in tiempos.tramos %}
+          <tr>
+            <td><b>{{ t.nombre }}</b></td>
+            <td class="r">{% if t.plazo == 0 %}sin diferencia{% else %}{{ t.plazo }} día{{ t.plazo|pluralize }}{% endif %}</td>
+            <td class="r">{{ t.terminados }}</td>
+            <td class="r">{{ t.a_tiempo }}</td>
+            <td class="r">{% if t.porcentaje is not None %}{{ t.porcentaje|floatformat:1 }} %{% else %}—{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-f"><span class="small muted">Los plazos son los de la matriz y se cambian en Reglas de cálculo. {{ regla.rotulo }}</span></div>
+</section>
+{% endif %}

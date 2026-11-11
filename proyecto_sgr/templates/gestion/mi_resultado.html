@@ -72,11 +72,14 @@ Tres cosas que valen la pena mirar en el código:
         <div class="row" style="gap: 32px; align-items: flex-end">
           <div>
             <div class="hero-num">{{ res.avance|floatformat:1 }}<small>%</small></div>
-            <p class="soft mt8">Cumplimiento ponderado</p>
+            <p class="soft mt8">{% if res.hay_ajustes %}Cumplimiento total{% else %}Cumplimiento ponderado{% endif %}</p>
           </div>
           <div style="flex: 1 1 280px; min-width: 0">
             <p class="soft" style="max-width: 52ch">
-              A la fecha se espera un <b style="color: var(--tinta)">{{ res.esperado|floatformat:1 }} %</b> del período.
+              {% if res.hay_ajustes %}
+                Tus ítems suman <b style="color: var(--tinta)">{{ res.gestion|floatformat:1 }} %</b>{% if res.felicitaciones %}, más {{ res.puntos_felicitaciones }} por {{ res.felicitaciones_contadas }} felicitaci{{ res.felicitaciones_contadas|pluralize:"ón,ones" }}{% endif %}{% if res.reclamos %}, menos {{ res.puntos_reclamos }} por {{ res.reclamos }} reclamo{{ res.reclamos|pluralize }}{% endif %}.
+              {% endif %}
+              A la fecha se espera un <b style="color: var(--tinta)">{{ res.esperado|floatformat:1 }} %</b> del período{% if res.dias_ausente %}, descontados tus {{ res.dias_ausente }} día{{ res.dias_ausente|pluralize }} de ausencia{% endif %}.
               {% if res.brecha >= 0 %}
                 Vas <b style="color: var(--tinta)">{{ res.brecha|floatformat:1 }} puntos por encima</b> de lo esperado.
               {% else %}
@@ -167,7 +170,7 @@ Tres cosas que valen la pena mirar en el código:
       <div class="item">
         <div class="nm">
           <b>{{ fila.item.nombre }}</b>
-          <span>{{ fila.realizado }} de {{ fila.meta }} {{ fila.item.get_unidad_display|lower }}{% if fila.nota %} · {{ fila.nota }}{% endif %}</span>
+          <span>{{ fila.detalle }}{% if fila.nota %} · {{ fila.nota }}{% endif %}</span>
         </div>
         <div class="pista-wrap">
           <div class="pista">
@@ -192,6 +195,21 @@ Tres cosas que valen la pena mirar en el código:
   {% endif %}
 </section>
 
+{% if perfil.cargo_asignado.lista_funciones %}
+  <details class="card mt20" style="padding: 0">
+    <summary class="card-h" style="cursor: pointer; list-style: none">
+      <h2 style="display: inline">Tus funciones</h2>
+      <span class="sub">{{ perfil.cargo_asignado.nombre }} · según el descriptor de cargos de las delegaciones</span>
+      <div class="end"><span class="link small">Ver las {{ perfil.cargo_asignado.lista_funciones|length }}</span></div>
+    </summary>
+    <div class="card-b">
+      <ol style="margin: 0; padding-left: 20px; display: grid; gap: 6px">
+        {% for funcion in perfil.cargo_asignado.lista_funciones %}<li>{{ funcion }}</li>{% endfor %}
+      </ol>
+    </div>
+  </details>
+{% endif %}
+
 <div class="grid g-2 mt20">
   <section class="card" aria-labelledby="t-res">
     <div class="card-h"><h2 id="t-res">Cómo se calcula</h2><span class="sub">{{ res.regla.resumen }}</span></div>
@@ -208,13 +226,43 @@ Tres cosas que valen la pena mirar en el código:
           {% endif %}{% endfor %}
         </tbody>
         <tfoot>
+          {% if res.definido %}
+            <tr>
+              <td style="padding-left: 0; background: transparent">Cumplimiento ponderado de gestión</td>
+              <td class="r" style="padding-right: 0; background: transparent">{{ res.gestion|floatformat:1 }}</td>
+            </tr>
+            <tr>
+              <td style="padding-left: 0; background: transparent">Felicitaciones
+                <span class="t2">{{ res.felicitaciones }} registrada{{ res.felicitaciones|pluralize }} · cuentan hasta {{ res.regla.max_felicitaciones }} · +{{ res.regla.valor_felicitacion }} cada una</span>
+              </td>
+              <td class="r" style="padding-right: 0; background: transparent">+{{ res.puntos_felicitaciones }}</td>
+            </tr>
+            <tr>
+              <td style="padding-left: 0; background: transparent">Reclamos
+                <span class="t2">{{ res.reclamos }} registrado{{ res.reclamos|pluralize }} · −{{ res.regla.valor_reclamo }} cada uno</span>
+              </td>
+              <td class="r" style="padding-right: 0; background: transparent">−{{ res.puntos_reclamos }}</td>
+            </tr>
+          {% endif %}
           <tr>
-            <td style="padding-left: 0; background: transparent">Cumplimiento ponderado</td>
+            <td style="padding-left: 0; background: transparent">Cumplimiento total{% if res.total_topado %}<span class="t2">Recortado al tope de {{ res.regla.tope_aporte }} %</span>{% endif %}</td>
             <td class="r" style="padding-right: 0; background: transparent; font-size: 18px">{% if res.definido %}{{ res.avance|floatformat:1 }} %{% else %}Indefinido{% endif %}</td>
           </tr>
         </tfoot>
       </table>
-      <p class="formula mt16">aporte = cumplimiento × ponderador ÷ 100 · cumplimiento = mínimo(realizado ÷ meta × 100, {{ res.regla.tope_aporte }})</p>
+      <p class="formula mt16">aporte = cumplimiento × ponderador ÷ 100 · cumplimiento = mínimo(realizado ÷ meta × 100, {{ res.regla.tope_aporte }}) · total = gestión + felicitaciones − reclamos, entre 0 y {{ res.regla.tope_aporte }}</p>
+      {% if res.dias_ausente %}<p class="small soft mt12">Esperado a la fecha: ({{ res.dias_transcurridos }} días transcurridos − {{ res.dias_ausente }} de ausencia) ÷ {{ res.dias_totales }} días del período = {{ res.esperado|floatformat:1 }} %.</p>{% endif %}
+      {% if reconocimientos %}
+        <div class="divider" style="margin: 18px 0 12px"></div>
+        <ul class="list" style="margin: 0">
+          {% for r in reconocimientos %}
+            <li style="padding-left: 0; padding-right: 0">
+              <span class="chip {% if r.es_reclamo %}bad{% else %}ok{% endif %}" style="height: 22px; font-size: 12px">{{ r.get_tipo_display }}</span>
+              <div class="tx"><b>{{ r.situacion|truncatechars:90 }}</b><span>{{ r.fecha|date:"d-m-Y" }} · {{ r.get_medio_display }} · {{ r.presentado_por }}</span></div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
       <p class="small soft mt12">{{ res.regla.rotulo }}</p>
     </div>
   </section>

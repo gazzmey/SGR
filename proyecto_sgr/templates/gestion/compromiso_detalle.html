@@ -54,7 +54,7 @@
     <dl class="datos">
       <div class="par"><dt>Código</dt><dd class="mono">{{ obj.codigo }}</dd></div>
       <div class="par"><dt>Vencimiento</dt><dd>{{ obj.vencimiento|date:"d-m-Y" }}</dd></div>
-      <div class="par"><dt>Solicitante</dt><dd>{{ obj.solicitante }}</dd></div>
+      <div class="par"><dt>Solicitante</dt><dd>{{ obj.solicitante }}<span class="t2">{% if obj.origen == 'interno' %}Interno · lo pidió el municipio{% elif obj.origen == 'externo' %}Externo · lo pidió la comunidad{% else %}Origen sin indicar{% endif %}</span></dd></div>
       <div class="par"><dt>Territorio</dt><dd>{{ obj.territorio }}</dd></div>
       <div class="par"><dt>Responsable</dt><dd>{{ obj.responsable.get_full_name|default:obj.responsable.get_username }}
         {% if obj.responsable_original and obj.responsable_original_id != obj.responsable_id %}

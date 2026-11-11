@@ -111,6 +111,8 @@
         <div class="par"><dt>Avance bajo el umbral</dt><dd>Menos del {{ regla.umbral_ambar }} % de lo esperado<span class="t2">Es el mismo umbral del semáforo, para que no se contradigan</span></dd></div>
         <div class="par"><dt>Sin registros</dt><dd>{{ regla.dias_sin_registrar }} días sin registrar<span class="t2">Avisa al delegado</span></dd></div>
         <div class="par"><dt>Evidencia sin revisar</dt><dd>{{ regla.dias_evidencia_espera }} días en espera<span class="t2">Avisa a quien valida</span></dd></div>
+        <div class="par"><dt>Caso social fuera de plazo</dt><dd>Visita en {{ regla.plazo_programar_visita }} días · informe en {{ regla.plazo_informe }} · beneficio en {{ regla.plazo_beneficio }}<span class="t2">Avisa a quien lleva el caso</span></dd></div>
+        <div class="par"><dt>Reclamos reiterados</dt><dd>Más de {{ regla.periodos_reclamo_rrhh }} períodos seguidos<span class="t2">Pide informar a RRHH, como dice la matriz</span></dd></div>
       </dl>
       <div class="card-f">
         <span class="small soft">Los umbrales se configuran en Período → Reglas de cálculo. Cada cambio queda en la auditoría. {{ regla.rotulo }}</span>

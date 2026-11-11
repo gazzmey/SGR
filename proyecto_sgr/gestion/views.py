@@ -297,6 +297,19 @@ class PeriodoTransicion(View):
 # =========================================================================
 
 
+def _funciones_html(cargo):
+    """Las funciones del cargo como lista numerada, o un aviso si no tiene."""
+    from django.utils.html import format_html_join
+
+    funciones = cargo.lista_funciones
+    if not funciones:
+        return "Sin funciones cargadas."
+    return format_html(
+        '<ol style="margin: 0; padding-left: 20px">{}</ol>',
+        format_html_join("", "<li>{}</li>", ((f,) for f in funciones)),
+    )
+
+
 class CargosLista(ListaMantenedor):
     model = Cargo
     permiso = P.DEFINIR_META
@@ -360,6 +373,9 @@ class CargoNuevo(CrearMantenedor):
     secciones = [
         ("Identificación", "Cómo se llama el cargo.", ["codigo", "nombre"]),
         ("Qué hace", "Con qué se le mide a quien lo ocupa.", ["descripcion"]),
+        ("Funciones del descriptor",
+         "Las del Descriptor de funciones de las Delegaciones Municipales. "
+         "Cada persona las ve en «Mi resultado».", ["funciones"]),
     ]
 
 
@@ -390,6 +406,7 @@ class CargoDetalle(DetalleMantenedor):
         ("Código", "codigo", {"mono": True}),
         ("Nombre", "nombre"),
         ("Qué hace", "descripcion", {"ancho": True}),
+        ("Funciones del descriptor", _funciones_html, {"ancho": True, "html": True}),
         ("Ítems con meta",
          lambda o: ", ".join(
              sorted({m.item.nombre for m in o.metas.filter(activo=True)})
@@ -727,6 +744,16 @@ SECCIONES_REGLA = [
      "el mismo del semáforo: con dos valores distintos, el tablero y la "
      "alerta podrían contradecirse sobre la misma persona.",
      ["dias_aviso_vencimiento", "dias_sin_registrar", "dias_evidencia_espera"]),
+    ("Felicitaciones y reclamos",
+     "Se suman o restan al cumplimiento ponderado, después de los ítems. "
+     "El total nunca pasa del tope ni baja de cero.",
+     ["valor_felicitacion", "max_felicitaciones", "valor_reclamo",
+      "periodos_reclamo_rrhh"]),
+    ("Plazos de los casos sociales",
+     "Los tiempos de respuesta de las hojas G SOC de la matriz. Un caso que "
+     "se pasa de uno aparece en las alertas.",
+     ["plazo_programar_visita", "tolerancia_visita", "plazo_informe",
+      "plazo_beneficio", "plazo_total_caso"]),
     ("Respaldo",
      "Una regla aprobada tiene que decir quién la aprobó.",
      ["aprobada", "aprobada_por", "observacion"]),
@@ -784,6 +811,16 @@ class ReglaDetalle(DetalleMantenedor):
          lambda o: f"a los {o.dias_sin_registrar} días sin registrar"),
         ("Avisa por evidencia en espera",
          lambda o: f"a los {o.dias_evidencia_espera} días esperando decisión"),
+        ("Felicitaciones",
+         lambda o: f"+{o.valor_felicitacion} puntos cada una, hasta {o.max_felicitaciones}"),
+        ("Reclamos", lambda o: f"−{o.valor_reclamo} puntos cada uno"),
+        ("Avisa a RRHH",
+         lambda o: f"con reclamos en más de {o.periodos_reclamo_rrhh} períodos seguidos"),
+        ("Plazos de un caso social",
+         lambda o: (f"visita programada en {o.plazo_programar_visita} días · "
+                    f"±{o.tolerancia_visita} en la visita · informe en "
+                    f"{o.plazo_informe} · beneficio en {o.plazo_beneficio} · "
+                    f"cierre en {o.plazo_total_caso}")),
         ("Situación", lambda o: "Aprobada" if o.aprobada else
          "Propuesta, pendiente de aprobación formal"),
         ("Aprobada por", lambda o: o.aprobada_por or "Todavía nadie"),

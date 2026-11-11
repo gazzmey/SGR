@@ -66,9 +66,13 @@ recorrido cortado a la mitad.
 | Agenda de compromisos | `/periodo/agenda/` | La agenda colectiva, con plazos, estados, reasignación e historial. |
 | Mi resultado | `/periodo/mi-resultado/` | Cumplimiento por ítem, aporte ponderado, avance esperado y semáforo. |
 | Tablero de delegación | `/periodo/tablero/` | El resultado de cada persona de la delegación y el indicador de la agenda. |
-| Alertas | `/periodo/alertas/` | Las cinco condiciones que requieren atención, con sus umbrales a la vista. |
+| Alertas | `/periodo/alertas/` | Las siete condiciones que requieren atención, con sus umbrales a la vista. |
+| Felicitaciones y reclamos | `/periodo/reconocimientos/` | Lo que la comunidad escribió sobre cada funcionario; suma o resta al resultado (hoja RECLAMOS de la matriz). |
+| Ausencias | `/periodo/ausencias/` | Licencias, vacaciones, emergencias y compensatorios, que bajan el avance esperado (hoja SEMAFORO). |
+| Casos sociales | `/atencion/casos/` | El seguimiento de una atención social —visita, informe, beneficio— con el plazo de cada paso (hojas G SOC). |
+| Tubo de cartas | `/periodo/cartas/` | Las cartas de oficina de partes, con su encargado, su estado y lo que se respondió (hoja TUBO CARTAS). |
 | Auditoría | `/periodo/auditoria/` | Historial de operaciones críticas. Solo listado: no hay creación, edición ni borrado. |
-| Informes | `/periodo/informes/` | Cuatro informes consolidados con filtros, y exportación a Excel, CSV y PDF. |
+| Informes | `/periodo/informes/` | Cinco informes consolidados con filtros, y exportación a Excel, CSV y PDF. |
 
 La cadena que forman, y que es la razón del orden en que se construyeron:
 
@@ -142,14 +146,46 @@ colación, esa búsqueda no encontraría nada.
 | `organizacion` | `Delegacion` | Unidad territorial: código, nombre, zona, dirección, teléfono, horario, estado. |
 | `organizacion` | `Rol` | Función: código, nombre, descripción, alcance y **lista de permisos**. |
 | `organizacion` | `PerfilUsuario` | Datos del SGR de una persona: código, cargo, rol, delegación base y delegaciones autorizadas. |
-| `catalogos` | `Item` | Elemento medible: área, unidad de medida, y la meta y el ponderador **sugeridos** que se proponen al crear una meta. |
+| `gestion` | `Cargo` | La función de una persona, con su descripción y **las funciones del descriptor de cargos**, una por línea. |
+| `catalogos` | `Item` | Elemento medible: área, unidad de medida, **cómo se mide**, y la meta y el ponderador **sugeridos** que se proponen al crear una meta. |
 | `catalogos` | `TipoAtencion` | Clasificación general de una atención, con su área. |
 | `catalogos` | `SubAtencion` | Detalle de un tipo, y si **exige documento de respaldo**. |
 | `atencion` | `Solicitante` | Persona que acude: RUT validado, nombre, teléfono, territorio. |
 | `atencion` | `Atencion` | La atención entregada: solicitante, subatención, delegación, funcionario, detalle y respaldo. |
+| `atencion` | `CasoSocial` | El seguimiento de una atención social: fechas de visita, informe y beneficio, y devoluciones del informe. |
 | `cuenta` | `CodigoRecuperacion` | Código de seis dígitos de un solo uso, con vigencia e intentos. |
 
 La meta y el ponderador que usa el cálculo están en `MetaPeriodo`, por período, cargo e ítem; ahí se aplica la regla de que los ítems de cada cargo sumen 100 %. Los del ítem son solo sugeridos: se proponen al elegir el ítem en *Nueva meta* y no se suman entre sí, así que el catálogo no exige ningún total.
+
+### Lo que viene de la matriz SGR de las delegaciones
+
+La planilla con que las delegaciones miden hoy su gestión (*Matriz SGR*, una
+hoja por cargo) se contrastó con el sistema. Lo que la matriz hace y el
+sistema no hacía se implementó así:
+
+| En la matriz | En el sistema |
+|---|---|
+| Felicitaciones +10 % (máximo 3) y reclamos −20 %, por escrito | `Reconocimiento`, en *Supervisión → Felicitaciones y reclamos*. Se aplican sobre el cumplimiento ponderado; los valores están en la regla de cálculo. |
+| «El sobrecumplimiento no puede ser mayor a 150 %» | El total, con ajustes, queda entre 0 y el tope de la regla. |
+| Reclamos «no más de 2 trimestres seguidos (informar a RRHH)» | Sexta alerta, configurable en la regla. |
+| Licencias, vacaciones, emergencias y compensatorios en la hoja SEMAFORO | `Ausencia`, de una persona o de toda la delegación. El esperado de la persona es (días transcurridos − días ausente) ÷ días del período. |
+| «Soluciones de ingresos al tubo»: % de compromisos realizados del colaborador, meta 80 % | `Item.medicion = agenda`: el ítem se mide con los compromisos del responsable, sin actividades. |
+| «Emergencia», con meta igual a lo realizado | `Item.medicion = presencia`: se cumple entero con una actividad aprobada y queda en cero sin ninguna. |
+| Columna INT/EXT del tubo | `Compromiso.origen`: interno si lo pidió el municipio, externo si la comunidad. Filtro en la agenda y columna en el informe. |
+| Resumen por colaborador del tubo (ingresado, pendiente, en proceso, realizado, % realizado) | Cuadro sobre el listado de la agenda e informe *Compromisos por colaborador* (HU-14). El % es el mismo que mide el ítem del tubo. |
+| Una hoja por cargo, con sus ítems, ponderadores y metas, y el *Descriptor de funciones* | `Cargo.funciones`, visibles en la ficha del cargo y en *Mi resultado*; el comando `cargar_estructura_municipal` carga cargos, ítems, metas y catálogo social sin datos personales. |
+| Hojas G SOC: primera, segunda y tercera gestión con «hasta 10 días», «sin diferencia», «hasta 4 días», «hasta 4 días» y «hasta 20 días» | `CasoSocial`, en *Comunidad → Casos sociales*. Cada paso se mide contra su plazo, que vive en la regla de cálculo; el listado muestra los tiempos de respuesta y un caso vencido aparece en las alertas. Las devoluciones del informe se registran pero no descuentan: la matriz no les da fórmula. |
+| Hoja TUBO CARTAS: cartas de oficina de partes con estado En proceso / Aprobada / Finalizada / No aplica | `Carta`, en *Comunidad → Tubo de cartas*, con recuento por estado. Aprobarla o finalizarla exige escribir qué se respondió. |
+
+Al revisar el cálculo apareció además una promesa que no se cumplía: al
+cerrar un compromiso con ítem, la agenda decía «ya alimenta la meta», pero el
+motor solo contaba actividades. Ahora el compromiso realizado —y validado, si
+lo exige— suma una unidad a su ítem, salvo que haya nacido de una actividad
+aprobada del mismo ítem, que ya se contó.
+
+La matriz no es pareja en un punto: la hoja RECLAMOS dice −20 % por reclamo y
+varias hojas de cargo usan −30 %. Por eso el valor es un parámetro de la regla
+y no está escrito en el código.
 
 Activar un registro aplica las mismas reglas que guardarlo desde su formulario: no se puede reactivar una meta que deje a su cargo sobre 100 % ni una de un período cerrado, un período que se cruce con otro abierto, ni una segunda regla de cálculo activa para el mismo alcance.
 
@@ -287,6 +323,21 @@ migrar y hay que revisarlo antes de seguir.
 El sistema queda en **http://127.0.0.1:8000/** y el administrador de Django,
 en `/admin/`.
 
+**La estructura real de las delegaciones.** `cargar_estructura_municipal`
+carga los ocho cargos del *Descriptor de funciones* 2026 con sus funciones,
+los 28 ítems de la *Matriz SGR* con su forma de medirse, y los tipos y
+subatenciones sociales de su hoja LISTA. Con `--periodo` crea además las
+metas y ponderadores de cada cargo en ese período, y con `--regla` una regla
+propia del período con el tope de 150 % de la matriz. No carga ningún dato
+personal: de la matriz solo toma qué se mide, cuánto pesa y cuánto se pide.
+
+```bash
+python manage.py cargar_estructura_municipal --periodo PER-02 --regla
+```
+
+Avisa de lo que la matriz no deja cuadrado: la hoja de Gestión y
+Planificación suma 85 % y no 100 %, y se carga tal cual.
+
 ### 5.5 Sobre la base de la entrega anterior
 
 Si se parte de una copia de la base de la Unidad 2, `migrate` aplica solo las
@@ -337,14 +388,18 @@ veces sin duplicar nada.
 | Delegaciones | 18 (16 activas; `DEL-17` y `DEL-18` inactivas) |
 | Roles | 6 (`ROL-06` inactivo) |
 | Usuarios con perfil | 15 (`USR-08` inactivo) |
-| Ítems | 10, con su meta y ponderador sugeridos |
+| Ítems | 12, con su meta y ponderador sugeridos; `ITM-11` se mide por la agenda y `ITM-12` sin meta fija |
 | Tipos de atención | 8 |
 | Subatenciones | 24 (22 activas; 11 exigen documento de respaldo) |
 | Solicitantes | 5, con RUT ficticio de dígito verificador válido |
 | Atenciones | 6 repartidas en cuatro delegaciones |
 | Cargos | 6 |
 | Períodos | 1 abierto, con fechas que contienen el día de hoy |
-| Metas y ponderadores | 13, y los de cada cargo suman 100 % |
+| Metas y ponderadores | 15, y los de cada cargo suman 100 % |
+| Felicitaciones y reclamos | 2: una felicitación a `marcela.rios` y un reclamo a `jorge.salinas` |
+| Ausencias | 2: vacaciones de `camila.otarola` y una emergencia de dos días de toda `DEL-01` |
+| Cartas de oficina de partes | 4 en `DEL-01`, una en cada estado |
+| Casos sociales | 3: uno cerrado con dos pasos fuera de plazo, uno con la visita vencida y uno al día |
 | Reglas de cálculo | 1 general, **sin aprobar**: el sistema la aplica y la rotula como propuesta |
 | Actividades y evidencias | 111 cada una: 108 aprobadas, 2 por validar y 1 rechazada con su motivo |
 | Compromisos de la agenda | 17; los 10 vigentes de `DEL-01` reproducen el lote CAL-C del plan: 8 realizados, 1 pendiente y 1 en proceso, o sea 80 % realizado |
@@ -491,14 +546,12 @@ es el que puede explicarle a la persona por qué se rechazó su archivo.
   y no está en esta entrega.
 - **Los territorios son una lista fija** en el formulario de atención, a falta
   de un mantenedor de territorios.
-- **Los ajustes —bonificaciones y penalizaciones— no están implementados.**
-  No es falta de tiempo: el caso TAB-04 del plan exige una «regla de ajuste
-  aprobada y parametrizada», y esa regla no existe. Nadie definió qué causales
-  bonifican, cuánto ni con qué tope. Implementarlo obligaría a inventar la
-  norma en vez de implementarla, y el resultado sería incomprobable: no habría
-  fórmula aprobada contra la cual comparar. El permiso `registrar_ajuste` y la
-  acción de auditoría ya existen, de modo que el día que la regla se apruebe la
-  funcionalidad se enchufa sin rehacer nada.
+- **Los ajustes siguen la matriz, no una regla aprobada.** Las felicitaciones
+  y los reclamos se calculan como dice la hoja RECLAMOS de la matriz SGR, que
+  es la norma que las delegaciones usan hoy. Mientras la regla de cálculo no
+  esté marcada como aprobada, el resultado se rotula como propuesta, igual que
+  el resto del cálculo. Falta confirmar con la municipalidad si el reclamo
+  descuenta 20 o 30 puntos: la matriz usa los dos.
 - **Las observaciones compartidas sobre un registro** (RF-035) tampoco. Hay
   observaciones dentro del historial del compromiso y motivos en las
   evidencias, pero no un comentario general sobre un registro que otra cuenta
@@ -623,9 +676,11 @@ proyecto_sgr/
   catalogos/                        Item, TipoAtencion, SubAtencion
     models.py  forms.py  views.py  urls.py  admin.py
     migrations/0001_initial.py  0002_entrega2.py  0003_codigos_de_ejemplo.py
-  atencion/                         Solicitante, Atencion
+  atencion/                         Solicitante, Atencion, CasoSocial
     models.py  forms.py  views.py  urls.py  admin.py
-    migrations/0001_initial.py
+    plazos.py                       los tiempos de respuesta de un caso, tramo por tramo
+    views_casos.py                  listado, apertura y ficha de los casos sociales
+    migrations/0001_initial.py  0002_casos_sociales.py
   cuenta/                           CodigoRecuperacion y el acceso
     models.py  forms.py  views.py  urls.py  admin.py
     migrations/0001_initial.py
@@ -637,12 +692,17 @@ proyecto_sgr/
     reglas.py                       ReglaCalculo: los parámetros, como dato
     calculo.py                      el motor; la única aritmética del sistema
     tablero.py                      los recuentos que acompañan al resultado
-    alertas.py                      las cinco condiciones, calculadas al vuelo
-    informes.py                     los cuatro informes consolidados
-    forms.py  forms_actividad.py  forms_agenda.py
-    views.py  views_actividad.py  views_agenda.py  views_alertas.py
+    modelos_ajustes.py              Reconocimiento (felicitación o reclamo) y Ausencia
+    modelos_cartas.py               Carta: el tubo de cartas de oficina de partes
+    alertas.py                      las siete condiciones, calculadas al vuelo
+    informes.py                     los cinco informes consolidados
+    forms.py  forms_actividad.py  forms_agenda.py  forms_ajustes.py  forms_cartas.py
+    views.py  views_actividad.py  views_agenda.py  views_ajustes.py  views_cartas.py
+    views_alertas.py
     views_informes.py  views_tablero.py  urls.py  admin.py
-    migrations/0001_initial.py … 0008_evidencia_archivo.py
+    management/commands/cargar_estructura_municipal.py
+                                    cargos del descriptor y estructura de la matriz
+    migrations/0001_initial.py … 0012_funciones_del_cargo.py
   templates/
     base.html                       el marco institucional
     comun/                          listado, formulario, ficha, panel, 403, 404

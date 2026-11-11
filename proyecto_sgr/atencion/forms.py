@@ -15,7 +15,7 @@ from django import forms
 from django.db import transaction
 from django.urls import reverse_lazy
 
-from atencion.models import Atencion, Solicitante, limpiar_rut, rut_valido
+from atencion.models import Atencion, CasoSocial, Solicitante, limpiar_rut, rut_valido
 from catalogos.models import SubAtencion, TipoAtencion
 
 # Lista fija en esta entrega. Cuando exista el mantenedor de territorios
@@ -231,3 +231,42 @@ class AtencionForm(forms.ModelForm):
         if cambios:
             solicitante.save(update_fields=cambios)
         return solicitante
+
+
+class CasoSocialForm(forms.ModelForm):
+    """Las fechas de un caso social y lo que pasó con su informe."""
+
+    class Meta:
+        model = CasoSocial
+        fields = [
+            "responsable", "ingreso", "requiere_visita", "visita_programada",
+            "visita_realizada", "informe_entregado", "devoluciones",
+            "lleva_beneficio", "beneficio_entregado", "observacion",
+        ]
+        widgets = {
+            campo: forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+            for campo in ("ingreso", "visita_programada", "visita_realizada",
+                          "informe_entregado", "beneficio_entregado")
+        }
+        widgets["devoluciones"] = forms.NumberInput(attrs={"min": 0, "max": 9, "step": 1})
+        widgets["observacion"] = forms.Textarea(attrs={
+            "rows": 3, "ancho": True,
+            "placeholder": "Lo que haga falta para entender el caso. Sin datos de salud.",
+        })
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.contrib.auth.models import User
+
+        for nombre, campo in self.fields.items():
+            if isinstance(campo, forms.DateField):
+                campo.input_formats = ["%Y-%m-%d"]
+        delegacion_id = self.instance.atencion.delegacion_id
+        self.fields["responsable"].queryset = (
+            User.objects
+            .filter(is_active=True, perfil__activo=True, perfil__delegacion_id=delegacion_id)
+            .order_by("first_name", "last_name")
+        )
+        self.fields["responsable"].label_from_instance = (
+            lambda u: u.get_full_name() or u.get_username()
+        )

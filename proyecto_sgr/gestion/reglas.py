@@ -119,6 +119,61 @@ class ReglaCalculo(models.Model):
         ),
     )
 
+    # --- felicitaciones y reclamos (hoja RECLAMOS de la matriz) -----------
+    # Se suman o restan al cumplimiento ponderado de la persona, después de
+    # los ítems. Están aquí y no fijos porque la matriz misma no es pareja:
+    # la hoja RECLAMOS dice −20 % por reclamo y varias hojas de cargo usan
+    # −30 %. Cuál vale lo decide la municipalidad, no el código.
+
+    valor_felicitacion = models.PositiveSmallIntegerField(
+        "puntos por felicitación", default=10,
+        help_text="Cuánto suma cada felicitación al cumplimiento. La matriz usa 10.",
+    )
+    max_felicitaciones = models.PositiveSmallIntegerField(
+        "felicitaciones que cuentan", default=3,
+        help_text="Desde cuántas dejan de sumar. La matriz dice «máximo 3».",
+    )
+    valor_reclamo = models.PositiveSmallIntegerField(
+        "puntos por reclamo", default=20,
+        help_text=(
+            "Cuánto resta cada reclamo. La hoja RECLAMOS dice 20; algunas "
+            "hojas de cargo usan 30."
+        ),
+    )
+    periodos_reclamo_rrhh = models.PositiveSmallIntegerField(
+        "períodos seguidos con reclamos", default=2,
+        help_text=(
+            "La matriz dice que los reclamos no pueden exceder más de 2 "
+            "trimestres seguidos. Si se pasan, la alerta pide informar a RRHH."
+        ),
+    )
+
+    # --- plazos de los casos sociales (hojas G SOC de la matriz) ----------
+    # La matriz los deja escritos sobre las columnas de diferencia de
+    # fechas: «hasta 10 días», «sin diferencia», «hasta 4 días», «hasta 4
+    # días» y «hasta 20 días».
+
+    plazo_programar_visita = models.PositiveSmallIntegerField(
+        "días para programar la visita", default=10,
+        help_text="Del ingreso del caso a la fecha programada de la visita.",
+    )
+    tolerancia_visita = models.PositiveSmallIntegerField(
+        "días de diferencia admitidos en la visita", default=0,
+        help_text="Entre la fecha programada y la real. La matriz dice «sin diferencia».",
+    )
+    plazo_informe = models.PositiveSmallIntegerField(
+        "días para entregar el informe", default=4,
+        help_text="De la visita (o del ingreso, si no hubo visita) al informe.",
+    )
+    plazo_beneficio = models.PositiveSmallIntegerField(
+        "días para entregar el beneficio", default=4,
+        help_text="Del informe a la entrega del beneficio.",
+    )
+    plazo_total_caso = models.PositiveSmallIntegerField(
+        "días para cerrar el caso", default=20,
+        help_text="Del ingreso al cierre: el beneficio, o el informe si no lleva beneficio.",
+    )
+
     aprobada = models.BooleanField(
         "aprobada formalmente", default=False,
         help_text=(
@@ -207,6 +262,16 @@ class ReglaCalculo(models.Model):
                     "Es un porcentaje: tiene que estar entre 1 y 100."
                 )
 
+        if self.valor_felicitacion is not None and self.valor_felicitacion > 50:
+            errores["valor_felicitacion"] = (
+                "Más de 50 puntos por felicitación pesaría más que la mitad de "
+                "los ítems juntos. La matriz usa 10."
+            )
+        if self.valor_reclamo is not None and self.valor_reclamo > 100:
+            errores["valor_reclamo"] = "Un reclamo no puede restar más de 100 puntos."
+        if self.periodos_reclamo_rrhh is not None and self.periodos_reclamo_rrhh < 1:
+            errores["periodos_reclamo_rrhh"] = "Tiene que ser al menos 1 período."
+
         if self.aprobada and not self.aprobada_por.strip():
             errores["aprobada_por"] = (
                 "Si la regla está aprobada, anota quién la aprobó y en qué "
@@ -259,6 +324,13 @@ class ReglaCalculo(models.Model):
             f"de lo esperado · {self.get_convencion_dias_display().lower()}"
         )
 
+    def resumen_ajustes(self):
+        """Felicitaciones y reclamos en una línea."""
+        return (
+            f"+{self.valor_felicitacion} por felicitación (hasta "
+            f"{self.max_felicitaciones}) · −{self.valor_reclamo} por reclamo"
+        )
+
 
 # --- la regla que corresponde aplicar -------------------------------------
 
@@ -290,6 +362,15 @@ PROPUESTA_DEL_PLAN = {
     "dias_aviso_vencimiento": 7,
     "dias_sin_registrar": 10,
     "dias_evidencia_espera": 5,
+    "valor_felicitacion": 10,
+    "max_felicitaciones": 3,
+    "valor_reclamo": 20,
+    "periodos_reclamo_rrhh": 2,
+    "plazo_programar_visita": 10,
+    "tolerancia_visita": 0,
+    "plazo_informe": 4,
+    "plazo_beneficio": 4,
+    "plazo_total_caso": 20,
     "aprobada": False,
 }
 

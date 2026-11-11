@@ -38,6 +38,7 @@
       <p>Quién pidió el compromiso y en qué territorio se cumple.</p>
       <div class="form-grid">
         {% include "comun/_campo.html" with campo=form.solicitante %}
+        {% include "comun/_campo.html" with campo=form.origen %}
         {% include "comun/_campo.html" with campo=form.territorio %}
         {% include "comun/_campo.html" with campo=form.descripcion %}
       </div>

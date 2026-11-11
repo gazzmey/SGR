@@ -71,8 +71,12 @@ class CargoForm(_Base):
 
     class Meta:
         model = Cargo
-        fields = ["codigo", "nombre", "descripcion"]
+        fields = ["codigo", "nombre", "descripcion", "funciones"]
         widgets = {
+            "funciones": forms.Textarea(attrs={
+                "rows": 8, "ancho": True,
+                "placeholder": "Una función por línea, como en el descriptor de cargos",
+            }),
             "nombre": forms.TextInput(attrs={"placeholder": "Por ejemplo: Encargado territorial"}),
             "descripcion": forms.Textarea(attrs={
                 "rows": 3, "ancho": True,
@@ -215,6 +219,10 @@ class ReglaCalculoForm(forms.ModelForm):
             "umbral_ambar", "convencion_dias",
             "dias_aviso_vencimiento", "dias_sin_registrar",
             "dias_evidencia_espera",
+            "valor_felicitacion", "max_felicitaciones", "valor_reclamo",
+            "periodos_reclamo_rrhh",
+            "plazo_programar_visita", "tolerancia_visita", "plazo_informe",
+            "plazo_beneficio", "plazo_total_caso",
             "aprobada", "aprobada_por", "observacion",
         ]
         widgets = {

@@ -1,0 +1,49 @@
+{% load l10n %}
+{% comment %}
+  El resumen por colaborador de la hoja TUBO de la matriz SGR (HU-14). Se
+  incluye sobre el listado de la agenda. El % realizado es el mismo número
+  que alimenta el ítem «Soluciones de ingresos al tubo» de cada persona.
+{% endcomment %}
+{% if tubo_periodo %}
+<section class="card" aria-labelledby="t-tubo" style="margin-bottom: 20px">
+  <div class="card-h">
+    <h2 id="t-tubo">Resumen por colaborador</h2>
+    <span class="sub">{{ tubo_delegacion.nombre }} · {{ tubo_periodo.nombre }}</span>
+  </div>
+  {% if tubo %}
+    <div class="tabla-wrap">
+      <table class="tabla">
+        <thead><tr>
+          <th>Colaborador</th>
+          <th class="r">Ingresado</th><th class="r">Pendiente</th><th class="r">En proceso</th><th class="r">Realizado</th>
+          <th>% realizado</th>
+        </tr></thead>
+        <tbody>
+          {% for fila in tubo %}
+            <tr>
+              <td><b>{{ fila.nombre }}</b>{% if fila.anulados %}<span class="t2">{{ fila.anulados }} anulado{{ fila.anulados|pluralize }} fuera del cálculo</span>{% endif %}</td>
+              <td class="r">{{ fila.ingresados }}</td>
+              <td class="r">{{ fila.pendientes }}</td>
+              <td class="r">{{ fila.en_proceso }}</td>
+              <td class="r">{{ fila.realizados }}</td>
+              <td>
+                {% if fila.realizado is not None %}
+                  <div class="mini-pista">
+                    <div class="pista"><div class="fill {% if fila.realizado >= tubo_umbral %}ok{% else %}warn{% endif %}" style="width: {{ fila.barra|unlocalize }}%"></div></div>
+                    <b>{{ fila.realizado|floatformat:1 }} %</b>
+                  </div>
+                {% else %}
+                  <span class="soft small">sin compromisos vigentes</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-f"><span class="small muted">Los anulados no cuentan: dejaron de ser una deuda. Este % es el que mide el ítem «Soluciones de ingresos al tubo» de cada persona. En verde desde el {{ tubo_umbral }} %, el umbral de realizado de la regla vigente.</span></div>
+  {% else %}
+    <div class="card-b"><p class="soft">Todavía no hay compromisos en este período para la delegación.</p></div>
+  {% endif %}
+</section>
+{% endif %}

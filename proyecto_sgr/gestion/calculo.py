@@ -35,8 +35,20 @@ Para cada ítem con meta en el período, y contando solo sus actividades
 
 Y para la persona completa::
 
-    avance = suma de los aportes de sus ítems
-    esperado = días transcurridos / días totales × 100
+    gestión = suma de los aportes de sus ítems
+    avance = gestión + felicitaciones − reclamos, entre 0 y el tope
+    esperado = (días transcurridos − días de ausencia) / días totales × 100
+
+Las dos últimas líneas vienen de la matriz SGR de las delegaciones: la hoja
+RECLAMOS suma y resta sobre el cumplimiento ponderado («el sobrecumplimiento
+de cada colaborador no puede ser mayor a 150 %»), y la hoja SEMAFORO
+descuenta licencias, vacaciones, emergencias y compensatorios del objetivo al
+día de hoy de cada persona.
+
+No todos los ítems cuentan actividades. «Soluciones de ingresos al tubo» es
+el porcentaje de compromisos realizados del responsable, y los ítems sin meta
+fija —«Emergencia»— se cumplen enteros con una sola actividad aprobada. El
+ítem dice cuál es el suyo en ``Item.medicion``.
 
 El semáforo compara esas dos últimas cifras **sin redondearlas**: redondear
 antes de comparar movería la frontera, y el caso CAL-05 prueba justo los
@@ -46,7 +58,7 @@ valores de frontera.
 from dataclasses import dataclass
 from datetime import date
 
-from django.db.models import Sum
+from django.db.models import F, Sum
 
 from gestion import reglas as R
 from gestion.modelos_actividad import Actividad
@@ -172,6 +184,33 @@ class ResultadoItem:
     formula_pendiente: bool
     regla: object = None
     esperado: float | None = None
+    #: De dónde sale el avance: «actividades», «agenda» o «presencia».
+    medicion: str = "actividades"
+    #: Para los ítems de la agenda: (realizados, vigentes) del responsable.
+    compromisos: tuple | None = None
+
+    @property
+    def cuenta_actividades(self):
+        """True si ``realizado`` es una cantidad de actividades."""
+        return self.medicion != "agenda"
+
+    @property
+    def detalle(self):
+        """De dónde sale el número, en palabras: «8 de 10 cantidad»."""
+        if self.medicion == "agenda":
+            hechos, total = self.compromisos or (0, 0)
+            if not total:
+                return "Sin compromisos a su cargo en el período · meta %d %%" % self.meta
+            return "%d de %d compromisos realizados (%s %%) · meta %d %%" % (
+                hechos, total, ("%.1f" % self.realizado).replace(".", ","), self.meta,
+            )
+        if self.medicion == "presencia":
+            if self.realizado:
+                return "%d registrada%s · basta una para cumplirlo" % (
+                    self.realizado, "" if self.realizado == 1 else "s")
+            return "Ninguna registrada · basta una para cumplirlo"
+        return "%s de %s %s" % (self.realizado, self.meta,
+                                self.item.get_unidad_display().lower())
 
     # --- lo que la pantalla dibuja --------------------------------------
 
@@ -216,6 +255,11 @@ class ResultadoItem:
                 "Meta inválida: con meta cero el cumplimiento sería una "
                 "división por cero. El ítem no entra en el resultado."
             )
+        if self.medicion == "agenda" and not (self.compromisos or (0, 0))[1]:
+            return (
+                "No tiene compromisos a su cargo en el período, así que el "
+                "ítem queda en cero. Es lo que hace la matriz."
+            )
         if self.formula_pendiente:
             return (
                 "El ítem se mide en %s y su fórmula no está aprobada. "
@@ -230,14 +274,28 @@ class ResultadoItem:
         return ""
 
 
-def resultado_item(meta_periodo, realizado, regla, esperado=None):
-    """Aplica las tres fórmulas a un ítem. No consulta la base."""
+def resultado_item(meta_periodo, realizado, regla, esperado=None, compromisos=None):
+    """
+    Aplica las tres fórmulas a un ítem. No consulta la base.
+
+    ``realizado`` es la cantidad de actividades aprobadas, salvo en los
+    ítems medidos por la agenda: ahí lo que se pasa es ``compromisos``, el
+    par (realizados, vigentes) del responsable, y el realizado es su
+    porcentaje.
+    """
     from catalogos.models import Item
 
     meta = meta_periodo.meta or 0
     ponderador = meta_periodo.ponderador or 0
     item = meta_periodo.item
-    pendiente = item.unidad != Item.Unidad.CANTIDAD
+    medicion = getattr(item, "medicion", Item.Medicion.ACTIVIDADES)
+    pendiente = (medicion == Item.Medicion.ACTIVIDADES
+                 and item.unidad != Item.Unidad.CANTIDAD)
+
+    if medicion == Item.Medicion.AGENDA:
+        hechos, total = compromisos or (0, 0)
+        realizado = hechos * 100 / total if total else 0.0
+        compromisos = (hechos, total)
 
     # CAL-06: la meta cero no se calcula, se declara inválida. El modelo ya
     # la rechaza al guardar, pero una fila escrita directamente en la base
@@ -248,9 +306,15 @@ def resultado_item(meta_periodo, realizado, regla, esperado=None):
             cumplimiento_bruto=None, cumplimiento=None, aporte=0.0,
             alcanzado=False, meta_invalida=True, formula_pendiente=pendiente,
             regla=regla, esperado=esperado,
+            medicion=medicion, compromisos=compromisos,
         )
 
-    bruto = realizado * 100 / meta
+    if medicion == Item.Medicion.PRESENCIA:
+        # Sin meta fija: la matriz pone como meta lo mismo que se hizo, así
+        # que con una atención se cumple entero y sin ninguna queda en cero.
+        bruto = 100.0 if realizado else 0.0
+    else:
+        bruto = realizado * 100 / meta
     computable = min(bruto, float(regla.tope_aporte))
     return ResultadoItem(
         item=item, meta=meta, ponderador=ponderador, realizado=realizado,
@@ -261,6 +325,7 @@ def resultado_item(meta_periodo, realizado, regla, esperado=None):
         meta_invalida=False,
         formula_pendiente=pendiente,
         regla=regla, esperado=esperado,
+        medicion=medicion, compromisos=compromisos,
     )
 
 
@@ -283,8 +348,30 @@ class Resultado:
     dias_totales: int
     dias_transcurridos: int
     motivo_indefinido: str
+    #: El cumplimiento ponderado de los ítems, antes de felicitaciones y
+    #: reclamos. ``avance`` es el total, que es lo que mide el semáforo.
+    gestion: float | None = None
+    felicitaciones: int = 0
+    felicitaciones_contadas: int = 0
+    reclamos: int = 0
+    ajuste: float = 0.0
+    total_topado: bool = False
+    dias_ausente: int = 0
+    esperado_sin_ausencias: float | None = None
 
     # --- totales ---------------------------------------------------------
+
+    @property
+    def puntos_felicitaciones(self):
+        return self.felicitaciones_contadas * self.regla.valor_felicitacion
+
+    @property
+    def puntos_reclamos(self):
+        return self.reclamos * self.regla.valor_reclamo
+
+    @property
+    def hay_ajustes(self):
+        return bool(self.felicitaciones or self.reclamos)
 
     @property
     def definido(self):
@@ -408,6 +495,185 @@ def _aprobadas_por_item(periodo, funcionario=None, delegacion=None, al_dia=None)
     return {fila["item_id"]: (fila["acredita"] or 0) for fila in filas}
 
 
+def _compromisos_que_aportan(periodo, funcionario, al_dia=None):
+    """
+    Cuántos compromisos realizados alimentan, por ítem, la meta del responsable.
+
+    La agenda ya lo prometía en pantalla —«Ya alimenta la meta de…»— al
+    cerrar un compromiso con ítem, y el cálculo no lo contaba. Cuenta el que
+    está realizado, tiene ítem y, si exige validación, está validado: es la
+    misma condición de ``Compromiso.aporta``.
+
+    Se deja fuera el compromiso que nació de una actividad aprobada del mismo
+    ítem: esa actividad ya se contó, y contar las dos sería acreditar dos
+    veces el mismo trabajo.
+    """
+    from django.db.models import Count, Q
+
+    from gestion.modelos_agenda import Compromiso
+
+    consulta = (
+        Compromiso.objects
+        .filter(periodo=periodo, responsable=funcionario,
+                estado=Compromiso.Estado.REALIZADO, item__isnull=False)
+        .filter(Q(validado=True) | Q(requiere_validacion=False))
+        .exclude(actividad__estado=Actividad.Estado.APROBADA,
+                 actividad__item_id=F("item_id"))
+    )
+    if al_dia is not None:
+        consulta = consulta.filter(Q(cerrado_el__isnull=True) | Q(cerrado_el__lte=al_dia))
+    filas = consulta.values("item_id").annotate(cuantos=Count("pk"))
+    return {fila["item_id"]: fila["cuantos"] for fila in filas}
+
+
+def compromisos_de(periodo, funcionario):
+    """
+    Los compromisos del responsable: (realizados, vigentes).
+
+    Es el «% realizado» por colaborador de la hoja TUBO, el que alimenta el
+    ítem «Soluciones de ingresos al tubo». Igual que el indicador colectivo,
+    los anulados salen del denominador: dejaron de ser una deuda.
+    """
+    from gestion.modelos_agenda import Compromiso
+
+    consulta = Compromiso.objects.filter(periodo=periodo, responsable=funcionario)
+    realizados = consulta.filter(estado=Compromiso.Estado.REALIZADO).count()
+    abiertos = consulta.filter(estado__in=Compromiso.ABIERTOS).count()
+    return realizados, realizados + abiertos
+
+
+@dataclass(frozen=True)
+class TuboDeResponsable:
+    """Una fila del resumen por colaborador de la hoja TUBO."""
+
+    responsable: object
+    delegacion: object
+    ingresados: int
+    pendientes: int
+    en_proceso: int
+    realizados: int
+    anulados: int
+
+    @property
+    def vigentes(self):
+        """El denominador: todo menos los anulados, igual que el ítem."""
+        return self.ingresados + self.pendientes + self.en_proceso + self.realizados
+
+    @property
+    def abiertos(self):
+        return self.ingresados + self.pendientes + self.en_proceso
+
+    @property
+    def realizado(self):
+        """El % realizado, o None si no tiene compromisos vigentes."""
+        if not self.vigentes:
+            return None
+        return self.realizados * 100 / self.vigentes
+
+    @property
+    def nombre(self):
+        return self.responsable.get_full_name() or self.responsable.get_username()
+
+    @property
+    def barra(self):
+        return _barra(self.realizado)
+
+
+def resumen_por_responsable(periodo, delegaciones=None):
+    """
+    Los compromisos de cada responsable, por estado (HU-14).
+
+    Es el cuadro «Colaborador · Ingresado · Pendiente · En proceso ·
+    Realizado · % realizado» de la hoja TUBO de la matriz. El porcentaje se
+    calcula igual que el del ítem «Soluciones de ingresos al tubo»
+    —``compromisos_de``—, para que el resumen y el resultado de la persona
+    digan siempre lo mismo.
+
+    ``delegaciones`` es una lista de identificadores, o None para todas. Se
+    agrupa por responsable *y* delegación: alguien que cambió de delegación a
+    mitad de período tiene sus compromisos de cada una por separado.
+    """
+    from django.contrib.auth import get_user_model
+    from django.db.models import Count
+
+    from gestion.modelos_agenda import Compromiso
+    from organizacion.models import Delegacion
+
+    consulta = Compromiso.objects.filter(periodo=periodo)
+    if delegaciones is not None:
+        consulta = consulta.filter(delegacion_id__in=delegaciones)
+    filas = (
+        consulta.values("responsable_id", "delegacion_id", "estado")
+        .annotate(cuantos=Count("pk"))
+    )
+
+    cuentas = {}
+    for fila in filas:
+        clave = (fila["responsable_id"], fila["delegacion_id"])
+        cuentas.setdefault(clave, {})[fila["estado"]] = fila["cuantos"]
+
+    usuarios = get_user_model().objects.in_bulk({r for r, _ in cuentas})
+    oficinas = Delegacion.objects.in_bulk({d for _, d in cuentas})
+    E = Compromiso.Estado
+    salida = [
+        TuboDeResponsable(
+            responsable=usuarios[r], delegacion=oficinas[d],
+            ingresados=c.get(E.INGRESADO, 0), pendientes=c.get(E.PENDIENTE, 0),
+            en_proceso=c.get(E.EN_PROCESO, 0), realizados=c.get(E.REALIZADO, 0),
+            anulados=c.get(E.ANULADO, 0),
+        )
+        for (r, d), c in cuentas.items()
+    ]
+    salida.sort(key=lambda t: (t.delegacion.nombre, t.nombre.lower()))
+    return salida
+
+
+def dias_de_ausencia(perfil, periodo, regla, al_dia=None):
+    """
+    Cuántos días del período, hasta la fecha, estuvo ausente la persona.
+
+    Suma sus ausencias propias y las de toda su delegación, pero cada día
+    una sola vez: si una emergencia de la delegación cae encima de sus
+    vacaciones, esos días no se descuentan dos veces. Se cuentan con la
+    misma convención que el período —con «solo hábiles», los fines de
+    semana no se descuentan, porque tampoco se esperaban—.
+    """
+    from django.db.models import Q
+
+    from gestion.modelos_ajustes import Ausencia
+
+    hoy = al_dia or date.today()
+    if not periodo.inicio or not periodo.termino or hoy < periodo.inicio:
+        return 0
+    corte = min(hoy, periodo.termino)
+
+    ausencias = Ausencia.objects.filter(
+        activo=True, desde__lte=corte, hasta__gte=periodo.inicio,
+    ).filter(
+        Q(funcionario_id=perfil.usuario_id)
+        | Q(funcionario__isnull=True, delegacion_id=perfil.delegacion_id)
+    )
+    habiles = regla.convencion_dias == R.ReglaCalculo.Dias.HABILES
+    dias = set()
+    for ausencia in ausencias:
+        for dia in ausencia.dias():
+            if periodo.inicio <= dia <= corte and (not habiles or dia.weekday() < 5):
+                dias.add(dia)
+    return len(dias)
+
+
+def reconocimientos_de(perfil, periodo):
+    """Cuántas felicitaciones y cuántos reclamos vigentes tiene en el período."""
+    from gestion.modelos_ajustes import Reconocimiento
+
+    consulta = Reconocimiento.objects.filter(
+        periodo=periodo, funcionario_id=perfil.usuario_id, activo=True,
+    )
+    felicitaciones = consulta.filter(tipo=Reconocimiento.Tipo.FELICITACION).count()
+    reclamos = consulta.filter(tipo=Reconocimiento.Tipo.RECLAMO).count()
+    return felicitaciones, reclamos
+
+
 def de_perfil(perfil, periodo, al_dia=None, regla=None):
     """
     El resultado de una persona en un período.
@@ -421,11 +687,22 @@ def de_perfil(perfil, periodo, al_dia=None, regla=None):
     regla = regla or R.vigente(periodo)
     hoy = al_dia or date.today()
 
+    # El esperado de la persona descuenta sus ausencias (hoja SEMAFORO de la
+    # matriz): días transcurridos menos días ausente, sobre los días totales.
+    # El denominador no cambia, igual que en la matriz.
+    total = dias_del_periodo(periodo, regla)
+    corridos = dias_corridos(periodo, regla, hoy)
+    ausente = dias_de_ausencia(perfil, periodo, regla, hoy) if perfil else 0
+    ausente = min(ausente, corridos)
+    esperado = (corridos - ausente) * 100 / total if total else None
+
     base = dict(
         periodo=periodo, cargo=None, regla=regla, al_dia=hoy, items=(),
-        avance=None, esperado=avance_esperado(periodo, regla, hoy),
-        dias_totales=dias_del_periodo(periodo, regla),
-        dias_transcurridos=dias_corridos(periodo, regla, hoy),
+        avance=None, esperado=esperado,
+        dias_totales=total,
+        dias_transcurridos=corridos,
+        dias_ausente=ausente,
+        esperado_sin_ausencias=avance_esperado(periodo, regla, hoy),
     )
 
     cargo = getattr(perfil, "cargo_asignado", None)
@@ -450,12 +727,26 @@ def de_perfil(perfil, periodo, al_dia=None, regla=None):
             "indefinido." % (cargo.nombre, periodo.nombre)
         ))
 
+    from catalogos.models import Item
+
     aprobadas = _aprobadas_por_item(
         periodo, funcionario=perfil.usuario, al_dia=al_dia,
     )
+    for item_id, cuantos in _compromisos_que_aportan(
+            periodo, perfil.usuario, al_dia=al_dia).items():
+        aprobadas[item_id] = aprobadas.get(item_id, 0) + cuantos
+
+    de_la_agenda = None
+    if any(m.item.medicion == Item.Medicion.AGENDA for m in metas):
+        de_la_agenda = compromisos_de(periodo, perfil.usuario)
+
     filas = tuple(
-        resultado_item(meta, aprobadas.get(meta.item_id, 0), regla,
-                       esperado=base["esperado"])
+        resultado_item(
+            meta, aprobadas.get(meta.item_id, 0), regla,
+            esperado=base["esperado"],
+            compromisos=(de_la_agenda
+                         if meta.item.medicion == Item.Medicion.AGENDA else None),
+        )
         for meta in metas
     )
 
@@ -468,7 +759,24 @@ def de_perfil(perfil, periodo, al_dia=None, regla=None):
         ))
 
     base["items"] = filas
-    base["avance"] = sum(f.aporte for f in validas)
+    gestion = sum(f.aporte for f in validas)
+
+    # Felicitaciones y reclamos (hoja RECLAMOS): se aplican sobre el
+    # cumplimiento ponderado, y el total queda entre cero y el tope. «El
+    # sobrecumplimiento de cada colaborador no puede ser mayor a 150 %».
+    felicitaciones, reclamos = reconocimientos_de(perfil, periodo)
+    contadas = min(felicitaciones, regla.max_felicitaciones)
+    ajuste = float(contadas * regla.valor_felicitacion
+                   - reclamos * regla.valor_reclamo)
+    bruto = gestion + ajuste
+    total_final = max(0.0, min(bruto, float(regla.tope_aporte)))
+
+    base.update(
+        gestion=gestion, avance=total_final,
+        felicitaciones=felicitaciones, felicitaciones_contadas=contadas,
+        reclamos=reclamos, ajuste=ajuste,
+        total_topado=bruto > float(regla.tope_aporte) + 1e-9,
+    )
     return Resultado(**base, motivo_indefinido="")
 
 
@@ -553,8 +861,11 @@ class ResultadoDelegacion:
 
     @property
     def actividades_aprobadas(self):
+        # Los ítems de la agenda traen un porcentaje en ``realizado``, no
+        # una cantidad: sumarlos mezclaría peras con manzanas.
         return sum(
-            sum(f.realizado for f in r.items) for _, r in self.personas
+            sum(f.realizado for f in r.items if f.cuenta_actividades)
+            for _, r in self.personas
         )
 
 

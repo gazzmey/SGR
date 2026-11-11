@@ -49,11 +49,13 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from atencion.models import Atencion, Solicitante
+from atencion.models import Atencion, CasoSocial, Solicitante
 from catalogos.models import Item, SubAtencion, TipoAtencion
 from gestion.models import Cargo, MetaPeriodo, Periodo
 from gestion.modelos_actividad import Actividad, Evidencia
 from gestion.modelos_agenda import CambioCompromiso, Compromiso
+from gestion.modelos_ajustes import Ausencia, Reconocimiento
+from gestion.modelos_cartas import Carta
 from gestion.reglas import PROPUESTA_DEL_PLAN, ReglaCalculo
 from organizacion.models import Delegacion, PerfilUsuario, Rol
 
@@ -586,7 +588,32 @@ ITEMS = [{'codigo': 'ITM-01',
   'ponderador': 0,
   'activo': False,
   'creada': '2026-09-01',
-  'desactivada': '2026-09-01'}]
+  'desactivada': '2026-09-01'},
+ {'codigo': 'ITM-11',
+  'nombre': 'Soluciones de ingresos al tubo',
+  'descripcion': 'Porcentaje de los compromisos de la agenda a cargo de la '
+                 'persona que quedaron realizados. Es el ítem de la matriz '
+                 'SGR que mide el tubo de trabajo.',
+  'area': 'Transversal',
+  'unidad': 'Porcentaje',
+  'medicion': 'agenda',
+  'meta': 80,
+  'ponderador': 15,
+  'activo': True,
+  'creada': '2026-11-11',
+  'desactivada': None},
+ {'codigo': 'ITM-12',
+  'nombre': 'Emergencias atendidas',
+  'descripcion': 'Sin meta fija: se cumple con al menos una emergencia '
+                 'atendida y registrada en el período, como en la matriz.',
+  'area': 'Territorial',
+  'unidad': 'Cantidad',
+  'medicion': 'presencia',
+  'meta': 1,
+  'ponderador': 5,
+  'activo': True,
+  'creada': '2026-11-11',
+  'desactivada': None}]
 
 TIPOS = [{'codigo': 'TAT-01',
   'nombre': 'Asistencia social',
@@ -941,14 +968,18 @@ PERIODO = ("PER-01", "Período de demostración")
 
 # cargo, ítem, meta, ponderador · cada cargo suma 100 %
 METAS = [
-    ("CAR-01", "ITM-01", 120, 35),
+    ("CAR-01", "ITM-01", 120, 20),
     ("CAR-01", "ITM-02", 40, 25),
     ("CAR-01", "ITM-05", 8, 20),
     ("CAR-01", "ITM-06", 85, 20),
+    # El ítem de la matriz que mide el tubo: % de compromisos realizados.
+    ("CAR-01", "ITM-11", 80, 15),
 
-    ("CAR-02", "ITM-04", 60, 50),
+    ("CAR-02", "ITM-04", 60, 45),
     ("CAR-02", "ITM-02", 40, 30),
     ("CAR-02", "ITM-06", 85, 20),
+    # Sin meta fija: basta una emergencia atendida.
+    ("CAR-02", "ITM-12", 1, 5),
 
     ("CAR-03", "ITM-03", 25, 45),
     ("CAR-03", "ITM-01", 120, 30),
@@ -1050,7 +1081,8 @@ COMPROMISOS_DEMO = [
     # Este queda realizado pero **sin validar**: es la distinción del caso
     # AGE-05 entre cerrado y puntuado, a la vista en la demostración.
     {"delegacion": "DEL-01", "responsable": "jorge.salinas@ejemplo.cl",
-     "solicitante": "Junta de vecinos Los Nogales", "item": "ITM-02",
+     "solicitante": "Dirección de Aseo y Ornato", "origen": "interno",
+     "item": "ITM-02",
      "territorio": "Unidad vecinal 1 · El Mirador", "vence_en": -3,
      "descripcion": "Catastrar los puntos de acopio irregular detectados en "
                     "el recorrido del sector alto.",
@@ -1146,6 +1178,78 @@ ACCIONES_DEMO = [
 ]
 
 # Qué cargo le toca a cada usuario, por el texto que ya traía su perfil.
+# Felicitaciones y reclamos de ejemplo (hoja RECLAMOS de la matriz). Quien
+# escribió va solo con un nombre genérico: la demostración no inventa RUT ni
+# teléfonos, y el sistema tampoco los pide.
+RECONOCIMIENTOS_DEMO = [
+    {"codigo": "FEL-D01", "tipo": "felicitacion",
+     "funcionario": "marcela.rios@ejemplo.cl", "dia": 6, "medio": "correo",
+     "presentado_por": "Directiva de la junta de vecinos de la UV 3",
+     "situacion": "Agradecen el acompañamiento en la postulación al fondo "
+                  "de mejoramiento de la sede.",
+     "respaldo": "Correo al delegado, asunto «Agradecimiento sede UV 3»"},
+    {"codigo": "REC-D01", "tipo": "reclamo",
+     "funcionario": "jorge.salinas@ejemplo.cl", "dia": 9, "medio": "libro",
+     "presentado_por": "Vecina del sector San Juan",
+     "situacion": "Reclama que no se le informó el resultado de la "
+                  "inspección que pidió, después de tres visitas a la oficina.",
+     "respaldo": "Libro de observaciones de la oficina, página 14",
+     "informado_a": "Delegada municipal"},
+]
+
+# Ausencias de ejemplo (hoja SEMAFORO). La emergencia va sin funcionario:
+# se le descuenta a toda la delegación, como los diez días de la matriz.
+AUSENCIAS_DEMO = [
+    {"codigo": "AUS-D01", "delegacion": "DEL-01",
+     "funcionario": "camila.otarola@ejemplo.cl", "tipo": "vacaciones",
+     "dia": 10, "dias": 5},
+    {"codigo": "AUS-D02", "delegacion": "DEL-01", "funcionario": None,
+     "tipo": "emergencia", "dia": 20, "dias": 2,
+     "observacion": "Sistema frontal: el equipo apoyó en terreno"},
+]
+
+# Cartas de oficina de partes (hoja TUBO CARTAS). Remitentes genéricos y sin
+# teléfono: la matriz lo anota, el sistema no lo pide.
+CARTAS_DEMO = [
+    {"codigo": "CTA-D01", "delegacion": "DEL-01", "hace": 30, "numero": "4512",
+     "dirigida_a": "Alcaldesa", "remitente": "Productora de eventos del sector",
+     "tema": "Solicita extensión del permiso de un evento en la plaza por un fin de semana.",
+     "responsable": "marcela.rios@ejemplo.cl", "estado": "no_aplica",
+     "derivada_a": "Patentes",
+     "pronunciamiento": "Solo para conocimiento: lo resuelve Patentes."},
+    {"codigo": "CTA-D02", "delegacion": "DEL-01", "hace": 21, "numero": "4630",
+     "dirigida_a": "Delegado municipal", "remitente": "Junta de vecinos Las Acacias",
+     "tema": "Pide apoyo con buses para la actividad de aniversario de la junta.",
+     "responsable": "marcela.rios@ejemplo.cl", "estado": "aprobada",
+     "pronunciamiento": "Se aprobó un bus para el sábado; coordinado con transporte."},
+    {"codigo": "CTA-D03", "delegacion": "DEL-01", "hace": 12, "numero": "4711",
+     "dirigida_a": "Delegado municipal", "remitente": "Club deportivo El Olivo",
+     "tema": "Solicita reparación del cierre perimetral de la multicancha.",
+     "responsable": "jorge.salinas@ejemplo.cl", "estado": "en_proceso",
+     "derivada_a": "Operaciones"},
+    {"codigo": "CTA-D04", "delegacion": "DEL-01", "hace": 5, "numero": "",
+     "dirigida_a": "Delegado municipal", "remitente": "Centro de madres Flor de Añañuca",
+     "tema": "Agradece y cierra la gestión del taller de manualidades del mes.",
+     "responsable": "camila.otarola@ejemplo.cl", "estado": "finalizada",
+     "pronunciamiento": "Se respondió por correo agradeciendo la participación."},
+]
+
+# Casos sociales (hojas G SOC). Los días son relativos a hoy: así el caso con
+# la visita vencida siempre está vencido, se cargue el día que se cargue.
+CASOS_DEMO = [
+    # Cerrado: la visita se hizo dos días tarde y el beneficio tardó seis.
+    {"codigo": "CSO-D01", "subatencion": "SAT-05", "delegacion": "DEL-01",
+     "ingreso": -25, "visita": True, "programada": -20, "realizada": -18,
+     "informe": -15, "beneficio": -9, "devoluciones": 1,
+     "observacion": "El informe volvió una vez por falta de un certificado."},
+    # Abierto: la visita estaba programada para ayer y no se hizo.
+    {"codigo": "CSO-D02", "subatencion": "SAT-01", "delegacion": "DEL-01",
+     "ingreso": -6, "visita": True, "programada": -1},
+    # Abierto y al día: sin visita, el informe todavía está en plazo.
+    {"codigo": "CSO-D03", "subatencion": "SAT-04", "delegacion": "DEL-02",
+     "ingreso": -2, "visita": False},
+]
+
 CARGO_POR_TEXTO = {
     "Encargado territorial": "CAR-01",
     "Inspector municipal": "CAR-02",
@@ -1191,9 +1295,13 @@ class Command(BaseCommand):
         self._regla()
         self._actividades(periodo)
         self._compromisos(periodo)
+        self._reconocimientos(periodo)
+        self._ausencias(periodo)
+        self._cartas()
 
         if not opciones["sin_atenciones"]:
             self._atenciones(subatenciones, usuarios, delegaciones)
+            self._casos()
 
         if not opciones["sin_superusuario"]:
             self._superusuario()
@@ -1335,6 +1443,7 @@ class Command(BaseCommand):
                     "descripcion": fila["descripcion"],
                     "area": fila["area"],
                     "unidad": fila["unidad"],
+                    "medicion": fila.get("medicion", Item.Medicion.ACTIVIDADES),
                     "meta": fila["meta"],
                     "ponderador": fila["ponderador"],
                     "activo": fila["activo"],
@@ -1415,6 +1524,47 @@ class Command(BaseCommand):
                     "  Atención: %s — %s (creada)"
                     % (persona.nombre, subatenciones[sub].nombre)
                 )
+
+    def _casos(self):
+        """
+        Tres casos sociales, uno en cada situación de plazos.
+
+        Se arman sobre las atenciones sociales de ejemplo, con fechas
+        relativas a hoy para que los plazos siempre se vean igual: uno
+        cerrado con dos pasos fuera de plazo, uno con la visita vencida y uno
+        sin visita, todavía en plazo para el informe.
+        """
+        hoy = timezone.localdate()
+        for fila in CASOS_DEMO:
+            atencion = (
+                Atencion.objects
+                .filter(subatencion__codigo=fila["subatencion"],
+                        delegacion__codigo=fila["delegacion"])
+                .select_related("funcionario").first()
+            )
+            if atencion is None:
+                continue
+
+            def dia(desfase):
+                return None if desfase is None else hoy + timedelta(days=desfase)
+
+            registro, nuevo = CasoSocial.objects.update_or_create(
+                codigo=fila["codigo"],
+                defaults={
+                    "atencion": atencion,
+                    "responsable": atencion.funcionario,
+                    "ingreso": dia(fila["ingreso"]),
+                    "requiere_visita": fila["visita"],
+                    "visita_programada": dia(fila.get("programada")),
+                    "visita_realizada": dia(fila.get("realizada")),
+                    "informe_entregado": dia(fila.get("informe")),
+                    "lleva_beneficio": True,
+                    "beneficio_entregado": dia(fila.get("beneficio")),
+                    "devoluciones": fila.get("devoluciones", 0),
+                    "observacion": fila.get("observacion", ""),
+                },
+            )
+            self._informar("Caso social", registro, nuevo)
 
     # ------------------------------------------------- período y metas
 
@@ -1511,6 +1661,87 @@ class Command(BaseCommand):
         self._informar("Regla de cálculo", registro, nuevo)
         return registro
 
+    # --------------------------------- felicitaciones, reclamos y ausencias
+
+    def _reconocimientos(self, periodo):
+        """
+        Una felicitación y un reclamo de ejemplo, para que se vea el ajuste.
+
+        Los dos son para personas de DEL-01, la delegación con que se entra
+        a revisar, y quedan fechados al comienzo del período para que caigan
+        dentro aunque las fechas se recalculen al cargar.
+        """
+        usuarios = {u.email: u for u in User.objects.all() if u.email}
+        quien_registra = usuarios.get("soledad.guerrero@ejemplo.cl")
+        for fila in RECONOCIMIENTOS_DEMO:
+            persona = usuarios.get(fila["funcionario"])
+            if persona is None or not hasattr(persona, "perfil"):
+                continue
+            registro, nuevo = Reconocimiento.objects.update_or_create(
+                codigo=fila["codigo"],
+                defaults={
+                    "tipo": fila["tipo"],
+                    "funcionario": persona,
+                    "delegacion": persona.perfil.delegacion,
+                    "periodo": periodo,
+                    "fecha": periodo.inicio + timedelta(days=fila["dia"]),
+                    "medio": fila["medio"],
+                    "presentado_por": fila["presentado_por"],
+                    "situacion": fila["situacion"],
+                    "respaldo": fila["respaldo"],
+                    "informado_a": fila.get("informado_a", ""),
+                    "registrado_por": quien_registra,
+                },
+            )
+            self._informar("Felicitación o reclamo", registro, nuevo)
+
+    def _cartas(self):
+        """Cartas de oficina de partes de DEL-01, una por estado."""
+        usuarios = {u.email: u for u in User.objects.all() if u.email}
+        quien_registra = usuarios.get("soledad.guerrero@ejemplo.cl")
+        delegaciones = {d.codigo: d for d in Delegacion.objects.all()}
+        hoy = timezone.localdate()
+        for fila in CARTAS_DEMO:
+            registro, nuevo = Carta.objects.update_or_create(
+                codigo=fila["codigo"],
+                defaults={
+                    "delegacion": delegaciones[fila["delegacion"]],
+                    "fecha": hoy - timedelta(days=fila["hace"]),
+                    "numero": fila["numero"],
+                    "dirigida_a": fila["dirigida_a"],
+                    "remitente": fila["remitente"],
+                    "tema": fila["tema"],
+                    "responsable": usuarios[fila["responsable"]],
+                    "estado": fila["estado"],
+                    "derivada_a": fila.get("derivada_a", ""),
+                    "pronunciamiento": fila.get("pronunciamiento", ""),
+                    "registrada_por": quien_registra,
+                },
+            )
+            self._informar("Carta", registro, nuevo)
+
+    def _ausencias(self, periodo):
+        """Unas vacaciones de una persona y una emergencia de toda DEL-01."""
+        usuarios = {u.email: u for u in User.objects.all() if u.email}
+        quien_registra = usuarios.get("soledad.guerrero@ejemplo.cl")
+        delegaciones = {d.codigo: d for d in Delegacion.objects.all()}
+        for fila in AUSENCIAS_DEMO:
+            persona = usuarios.get(fila["funcionario"]) if fila["funcionario"] else None
+            desde = periodo.inicio + timedelta(days=fila["dia"])
+            registro, nuevo = Ausencia.objects.update_or_create(
+                codigo=fila["codigo"],
+                defaults={
+                    "delegacion": delegaciones[fila["delegacion"]],
+                    "funcionario": persona,
+                    "tipo": fila["tipo"],
+                    "desde": desde,
+                    "hasta": desde + timedelta(days=fila["dias"] - 1),
+                    "observacion": fila.get("observacion", ""),
+                    "registrado_por": quien_registra,
+                },
+            )
+            self._informar("Ausencia", registro, nuevo)
+
     # ------------------------------------------------- actividades de demo
 
     @staticmethod
@@ -1567,6 +1798,10 @@ class Command(BaseCommand):
             verificador = usuarios.get(correo_verificador)
 
             for meta in metas:
+                # El ítem del tubo no se alimenta con actividades: sale de
+                # los compromisos de la agenda, que se siembran aparte.
+                if meta.item.medicion == Item.Medicion.AGENDA:
+                    continue
                 objetivo = max(1, round(meta.meta * fraccion))
                 for cantidad in self._repartir(objetivo, 3):
                     numero += 1
@@ -1756,6 +1991,9 @@ class Command(BaseCommand):
                     "periodo": periodo,
                     "item": items.get(fila.get("item", "")),
                     "solicitante": fila["solicitante"],
+                    # La columna INT/EXT del tubo. Los que pide una unidad
+                    # municipal son internos; el resto viene de la comunidad.
+                    "origen": fila.get("origen", Compromiso.Origen.EXTERNO),
                     "territorio": fila["territorio"],
                     "descripcion": fila["descripcion"],
                     "responsable": responsable,

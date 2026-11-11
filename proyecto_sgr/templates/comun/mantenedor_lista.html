@@ -43,6 +43,12 @@
   </div>
 </div>
 
+{% comment %}
+  Un listado puede traer un cuadro propio encima, como el resumen por
+  colaborador de la agenda. Lo declara la vista con ``antes_del_listado``.
+{% endcomment %}
+{% if antes_del_listado %}{% include antes_del_listado %}{% endif %}
+
 <section class="card">
   <div class="card-h">
     <h2>Listado de {{ plural }}</h2>

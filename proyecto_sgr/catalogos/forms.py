@@ -54,7 +54,7 @@ class ItemForm(_Base):
         model = Item
         fields = [
             "codigo", "nombre", "area", "descripcion",
-            "unidad", "meta", "ponderador",
+            "medicion", "unidad", "meta", "ponderador",
         ]
         widgets = {
             "nombre": forms.TextInput(attrs={

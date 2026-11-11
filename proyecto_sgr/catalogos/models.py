@@ -14,6 +14,7 @@ de atención, y si una subatención exige documento de respaldo.
 """
 
 from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -34,6 +35,26 @@ class Item(models.Model):
         PORCENTAJE = "Porcentaje", "Porcentaje"
         HORAS = "Horas", "Horas"
 
+    class Medicion(models.TextChoices):
+        """
+        De dónde sale el avance del ítem.
+
+        La matriz SGR de las delegaciones tiene tres clases de ítem, y las
+        tres aparecen en todas las hojas de cargo:
+
+        · los que se cuentan contra una meta —«Atención de usuario: 240»—;
+        · «Soluciones de ingresos al tubo», que es el porcentaje de
+          compromisos que la persona tiene realizados, contra una meta de
+          80 %;
+        · «Emergencia», que no tiene meta fija: la matriz pone como meta lo
+          mismo que se hizo, así que se cumple entero con una sola atención y
+          queda en cero si no hubo ninguna.
+        """
+
+        ACTIVIDADES = "actividades", "Actividades aprobadas contra la meta"
+        AGENDA = "agenda", "Porcentaje de compromisos realizados (tubo)"
+        PRESENCIA = "presencia", "Cumplido con al menos una actividad aprobada"
+
     codigo = models.CharField(
         "código", max_length=10, unique=True,
         help_text="Identificador corto e irrepetible, por ejemplo ITM-01.",
@@ -49,6 +70,15 @@ class Item(models.Model):
     unidad = models.CharField(
         "unidad de medida", max_length=12,
         choices=Unidad.choices, default=Unidad.CANTIDAD,
+    )
+    medicion = models.CharField(
+        "cómo se mide", max_length=12,
+        choices=Medicion.choices, default=Medicion.ACTIVIDADES,
+        help_text=(
+            "Contando actividades contra la meta; como porcentaje de "
+            "compromisos realizados, con la meta en %; o cumplido con una "
+            "sola actividad, para ítems sin meta fija como Emergencia."
+        ),
     )
     # La meta y el ponderador del ítem son los que se proponen al asignarlo a
     # un cargo. Los que usa el cálculo están en gestion.MetaPeriodo, por
@@ -81,6 +111,29 @@ class Item(models.Model):
 
     def __str__(self):
         return f"{self.codigo} — {self.nombre}"
+
+    def clean(self):
+        """El ítem medido por la agenda es un porcentaje, y su meta también."""
+        super().clean()
+        if self.medicion == self.Medicion.AGENDA:
+            errores = {}
+            if self.unidad != self.Unidad.PORCENTAJE:
+                errores["unidad"] = (
+                    "Un ítem medido por la agenda se expresa en porcentaje: "
+                    "es la parte de los compromisos que quedó realizada."
+                )
+            if self.meta is not None and self.meta > 100:
+                errores["meta"] = (
+                    "Es un porcentaje de compromisos realizados: no puede "
+                    "pasar de 100. La matriz usa 80."
+                )
+            if errores:
+                raise ValidationError(errores)
+
+    @property
+    def cuenta_actividades(self):
+        """True si el avance del ítem sale de actividades aprobadas."""
+        return self.medicion != self.Medicion.AGENDA
 
     def motivo_bloqueo(self):
         """

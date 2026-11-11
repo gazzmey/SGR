@@ -8,12 +8,15 @@ from config.admin_base import SoloActivosEnSelectores, activar, desactivar
 
 from .models import (
     Actividad,
+    Ausencia,
     CambioCompromiso,
+    Carta,
     Cargo,
     Compromiso,
     Evidencia,
     MetaPeriodo,
     Periodo,
+    Reconocimiento,
     ReglaCalculo,
 )
 
@@ -229,3 +232,44 @@ class CambioCompromisoAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Reconocimiento)
+class ReconocimientoAdmin(admin.ModelAdmin):
+    """Felicitaciones y reclamos. Se registran desde Supervisión."""
+
+    list_display = ("codigo", "tipo", "funcionario", "delegacion", "periodo",
+                    "fecha", "medio", "activo")
+    list_filter = ("tipo", "medio", "activo", "periodo")
+    search_fields = ("codigo", "funcionario__first_name", "funcionario__last_name",
+                     "presentado_por", "situacion")
+    list_select_related = ("funcionario", "delegacion", "periodo")
+    readonly_fields = ("codigo", "registrado_por", "creada")
+    actions = [activar, desactivar]
+
+
+@admin.register(Ausencia)
+class AusenciaAdmin(admin.ModelAdmin):
+    """Ausencias que descuentan días del avance esperado."""
+
+    list_display = ("codigo", "tipo", "funcionario", "delegacion", "desde",
+                    "hasta", "activo")
+    list_filter = ("tipo", "activo", "delegacion")
+    search_fields = ("codigo", "funcionario__first_name", "funcionario__last_name",
+                     "observacion")
+    list_select_related = ("funcionario", "delegacion")
+    readonly_fields = ("codigo", "registrado_por", "creada")
+    actions = [activar, desactivar]
+
+
+@admin.register(Carta)
+class CartaAdmin(admin.ModelAdmin):
+    """El tubo de cartas de oficina de partes."""
+
+    list_display = ("codigo", "fecha", "remitente", "dirigida_a", "responsable",
+                    "estado", "delegacion", "activo")
+    list_filter = ("estado", "activo", "delegacion")
+    search_fields = ("codigo", "numero", "remitente", "tema", "derivada_a")
+    list_select_related = ("responsable", "delegacion")
+    readonly_fields = ("codigo", "registrada_por", "creada")
+    actions = [activar, desactivar]

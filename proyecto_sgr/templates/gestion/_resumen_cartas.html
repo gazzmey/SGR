@@ -1,0 +1,10 @@
+{% comment %}El recuento por estado de la hoja TUBO CARTAS, sobre el listado.{% endcomment %}
+<div class="kpis" style="margin-bottom: 20px">
+  {% for valor, texto, chip, cuantas in cartas_por_estado %}
+    <a class="card kpi" href="?situacion={{ valor }}" style="text-decoration: none; color: inherit">
+      <span class="lbl">{{ texto }}</span>
+      <div class="val">{{ cuantas }}</div>
+      <div class="meta"><span class="chip {{ chip }}">{% if cartas_total %}{% widthratio cuantas cartas_total 100 %} % del total{% else %}sin cartas{% endif %}</span></div>
+    </a>
+  {% endfor %}
+</div>

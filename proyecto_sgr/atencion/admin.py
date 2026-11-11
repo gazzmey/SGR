@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from .models import Atencion, Solicitante
+from .models import Atencion, CasoSocial, Solicitante
 
 
 class AtencionInline(admin.TabularInline):
@@ -65,3 +65,14 @@ class AtencionAdmin(admin.ModelAdmin):
 
             kwargs["queryset"] = Delegacion.objects.filter(activo=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(CasoSocial)
+class CasoSocialAdmin(admin.ModelAdmin):
+    """El seguimiento de una atención social, con sus fechas."""
+
+    list_display = ("codigo", "atencion", "responsable", "ingreso",
+                    "visita_realizada", "informe_entregado", "beneficio_entregado")
+    search_fields = ("codigo", "atencion__solicitante__nombre", "observacion")
+    list_select_related = ("atencion__solicitante", "atencion__subatencion", "responsable")
+    readonly_fields = ("codigo", "atencion", "creado", "actualizado")

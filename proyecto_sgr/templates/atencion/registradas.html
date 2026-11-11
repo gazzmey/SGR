@@ -55,6 +55,7 @@
             <th>Qué se atendió</th>
             <th class="w">Detalle</th>
             <th>Quien atendió</th>
+            <th>Seguimiento</th>
           </tr>
         </thead>
         <tbody>
@@ -68,6 +69,15 @@
                 {% if atencion.documento %}<span class="t2">Respaldo: {{ atencion.documento }}</span>{% endif %}
               </td>
               <td>{{ atencion.funcionario.get_full_name|default:atencion.funcionario.get_username }}</td>
+              <td>
+                {% if atencion.caso %}
+                  <a class="link" href="{% url 'atencion:caso' atencion.caso.pk %}">{{ atencion.caso.codigo }}</a><span class="t2">{{ atencion.caso.siguiente_paso }}</span>
+                {% elif atencion.subatencion.tipo_atencion.area == 'Social' %}
+                  <form method="post" action="{% url 'atencion:caso_abrir' atencion.pk %}">{% csrf_token %}
+                    <button class="btn btn-secondary" type="submit" style="min-height: 32px; padding: 0 10px; font-size: 13px">Abrir caso</button>
+                  </form>
+                {% else %}<span class="soft">—</span>{% endif %}
+              </td>
             </tr>
           {% endfor %}
         </tbody>

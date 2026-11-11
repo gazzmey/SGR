@@ -175,15 +175,19 @@ class Agenda(ListaMantenedor):
                [("vencidos", "Vencidos"), ("semana", "Vencen en 7 días")],
                consulta=lambda v: Q(),      # idem: depende de la fecha de hoy
                vacio="Cualquier plazo"),
+        Filtro("origen", "Origen",
+               [("interno", "Internos"), ("externo", "Externos")],
+               vacio="Internos y externos"),
     ]
 
     columnas = [
         Columna("codigo", "Código", clase="mono"),
         Columna("solicitante", "Compromiso", orden="solicitante", clase="w",
                 celda=lambda o: format_html(
-                    '<a class="link" href="{}">{}</a><span class="t2">{}</span>',
+                    '<a class="link" href="{}">{}</a><span class="t2">{}{}</span>',
                     reverse("gestion:compromiso_detalle", args=[o.pk]),
                     o.solicitante, o.territorio,
+                    {"interno": " · interno", "externo": " · externo"}.get(o.origen, ""),
                 ),
                 valor=lambda o: o.solicitante),
         Columna("responsable", "Responsable", orden="responsable__first_name",
@@ -236,11 +240,30 @@ class Agenda(ListaMantenedor):
         return consulta
 
     def get_context_data(self, **kwargs):
+        from gestion import calculo as C
+        from gestion import reglas as R
+
         contexto = super().get_context_data(**kwargs)
         contexto["puede_ingresar"] = tiene_permiso(
             self.request.user, P.REGISTRAR_ACTIVIDAD)
         if not contexto["puede_ingresar"]:
             contexto["url_nueva"] = ""
+
+        # El resumen por colaborador (HU-14, hoja TUBO de la matriz): del
+        # período abierto y de la delegación activa, que es la que la
+        # persona está mirando. La delegación activa ya está comprobada
+        # contra las que su perfil autoriza.
+        periodo = periodo_abierto()
+        delegacion = delegacion_activa(self.request)
+        if periodo is not None and delegacion is not None:
+            regla = R.vigente(periodo)
+            contexto.update({
+                "antes_del_listado": "gestion/_resumen_tubo.html",
+                "tubo": C.resumen_por_responsable(periodo, [delegacion.pk]),
+                "tubo_periodo": periodo,
+                "tubo_delegacion": delegacion,
+                "tubo_umbral": regla.umbral_realizado,
+            })
         return contexto
 
 

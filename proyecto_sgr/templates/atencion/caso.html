@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% comment %}
+  La ficha de un caso social: a la izquierda sus fechas, que se corrigen
+  aquí mismo; a la derecha, cada tramo contra su plazo. Quien solo consulta
+  ve las fechas sin poder cambiarlas.
+{% endcomment %}
+
+{% block titulo %}{{ caso.codigo }}{% endblock %}
+{% block ruta %}
+  <a href="{% url 'atencion:casos' %}">Casos sociales</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">{{ caso.codigo }}</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>{{ caso.atencion.solicitante.nombre }}</h1>
+    <p>{{ caso.codigo }} · {{ caso.atencion.subatencion.nombre }} · {{ caso.atencion.delegacion.nombre }} · ingresó el {{ caso.ingreso|date:"d-m-Y" }}</p>
+  </div>
+  <div class="actions">
+    <span class="chip {{ situacion.2 }}">{{ situacion.1 }}</span>
+    <a class="btn btn-ghost" href="{% url 'atencion:casos' %}">Volver</a>
+  </div>
+</div>
+
+<div class="grid g-side">
+  <form class="card" method="post" novalidate style="align-self: start">
+    {% csrf_token %}
+    {% if form.errors %}
+      <div class="notice bad" role="alert" style="margin: 20px 24px 0">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Revisa las fechas antes de guardar</b>
+          <ul>
+            {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
+            {% for c in form %}{% for e in c.errors %}<li>{{ c.label }}: {{ e }}</li>{% endfor %}{% endfor %}
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+    <fieldset {% if not puede_editar %}disabled{% endif %} style="border: 0; margin: 0; padding: 0; min-width: 0">
+      <div class="form-sec">
+        <h3><span class="num">1</span>Ingreso y visita</h3>
+        <p>Primera y segunda gestión de la matriz. La visita se programa dentro de {{ regla.plazo_programar_visita }} días y se hace en la fecha programada.</p>
+        <div class="form-grid">
+          {% include "comun/_campo.html" with campo=form.responsable %}
+          {% include "comun/_campo.html" with campo=form.ingreso %}
+          {% include "comun/_campo.html" with campo=form.requiere_visita %}
+          {% include "comun/_campo.html" with campo=form.visita_programada %}
+          {% include "comun/_campo.html" with campo=form.visita_realizada %}
+        </div>
+      </div>
+      <div class="form-sec">
+        <h3><span class="num">2</span>Informe y beneficio</h3>
+        <p>Tercera gestión. El informe va dentro de {{ regla.plazo_informe }} días desde la visita y el beneficio dentro de {{ regla.plazo_beneficio }} desde el informe.</p>
+        <div class="form-grid">
+          {% include "comun/_campo.html" with campo=form.informe_entregado %}
+          {% include "comun/_campo.html" with campo=form.devoluciones %}
+          {% include "comun/_campo.html" with campo=form.lleva_beneficio %}
+          {% include "comun/_campo.html" with campo=form.beneficio_entregado %}
+          {% include "comun/_campo.html" with campo=form.observacion %}
+        </div>
+      </div>
+    </fieldset>
+    {% if puede_editar %}
+      <div class="form-foot">
+        <span class="small soft">Las fechas se pueden completar de a una, a medida que ocurren.</span>
+        <div class="end"><button type="submit" class="btn btn-primary">Guardar fechas</button></div>
+      </div>
+    {% endif %}
+  </form>
+
+  <aside class="spec" style="align-self: start">
+    <div class="spec-h">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+      <h3>Tiempos de respuesta</h3>
+    </div>
+    <ul class="list" style="margin: 0">
+      {% for t in tramos %}
+        <li style="padding-left: 0; padding-right: 0">
+          <div class="tx"><b>{{ t.nombre }}</b><span>{{ t.detalle }}</span></div>
+          <span class="chip {{ t.chip }}" style="height: 22px; font-size: 12px">{% if t.chip == 'off' %}<span class="t">{{ t.texto }}</span>{% else %}{{ t.texto }}{% endif %}</span>
+        </li>
+      {% endfor %}
+    </ul>
+    <div class="divider"></div>
+    <dl class="datos" style="padding: 0; grid-template-columns: 1fr">
+      <div class="par"><dt>Atención</dt><dd>Nº {{ caso.atencion.pk }} · {{ caso.atencion.subatencion.tipo_atencion.nombre }}<span class="t2">Registrada por {{ caso.atencion.funcionario.get_full_name|default:caso.atencion.funcionario.get_username }} el {{ caso.atencion.registrada|date:"d-m-Y" }}</span></dd></div>
+      <div class="par"><dt>Qué pidió</dt><dd>{{ caso.atencion.detalle|truncatechars:180 }}</dd></div>
+    </dl>
+    <div class="divider"></div>
+    <p class="small soft">La visita, el informe y la entrega del beneficio se registran además en <b>Mis actividades</b>, con su evidencia: eso es lo que cuenta para la meta. Aquí se mide el tiempo.</p>
+    {% if caso.devoluciones %}
+      <div class="divider"></div>
+      <p class="small soft">El informe volvió {{ caso.devoluciones }} vez{{ caso.devoluciones|pluralize:",es" }} para corregir. La matriz lo registra como «reingreso de informe».</p>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

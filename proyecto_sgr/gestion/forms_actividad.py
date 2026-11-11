@@ -86,12 +86,15 @@ class ActividadForm(forms.ModelForm):
         cargo = self.perfil.cargo_asignado
         if cargo is None:
             return Item.objects.none()
+        # El ítem del tubo no se alimenta con actividades: sale de los
+        # compromisos de la agenda. Ofrecerlo aquí sería dejar registrar algo
+        # que después no cuenta.
         return Item.objects.filter(
             activo=True,
             metas__periodo=self.periodo,
             metas__cargo=cargo,
             metas__activo=True,
-        ).distinct()
+        ).exclude(medicion=Item.Medicion.AGENDA).distinct()
 
     def clean_accion(self):
         texto = (self.cleaned_data["accion"] or "").strip()

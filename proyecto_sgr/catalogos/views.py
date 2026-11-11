@@ -64,6 +64,7 @@ class ItemsLista(ListaMantenedor):
     filtros = [
         filtro_area(),
         Filtro("unidad", "Unidad", Item.Unidad.choices, vacio="Todas"),
+        Filtro("medicion", "Cómo se mide", Item.Medicion.choices, vacio="Todas"),
         filtro_estado(),
     ]
 
@@ -73,7 +74,11 @@ class ItemsLista(ListaMantenedor):
             "nombre", "Ítem", orden="nombre", clase="w",
             celda=lambda o: enlace_nombre(
                 o, "catalogos:item_detalle",
-                extra=format_html('<span class="t2">{}</span>', o.get_area_display()),
+                extra=format_html(
+                    '<span class="t2">{}{}</span>', o.get_area_display(),
+                    "" if o.medicion == Item.Medicion.ACTIVIDADES
+                    else " · " + o.get_medicion_display().lower(),
+                ),
             ),
         ),
         Columna("unidad", "Unidad", valor=lambda o: o.get_unidad_display()),
@@ -114,8 +119,8 @@ class ItemNuevo(CrearMantenedor):
          ["codigo", "nombre", "area"]),
         ("Qué se considera", "El criterio que se aplica al revisar los registros.",
          ["descripcion"]),
-        ("Medición", "En qué unidad se mide y qué meta y peso se proponen al asignarlo a un cargo.",
-         ["unidad", "meta", "ponderador"]),
+        ("Medición", "Cómo se mide, en qué unidad, y qué meta y peso se proponen al asignarlo a un cargo.",
+         ["medicion", "unidad", "meta", "ponderador"]),
     ]
 
 
@@ -147,6 +152,7 @@ class ItemDetalle(DetalleMantenedor):
         ("Código", "codigo", {"mono": True}),
         ("Nombre", "nombre"),
         ("Área", "area"),
+        ("Cómo se mide", "medicion"),
         ("Unidad de medida", "unidad"),
         ("Meta sugerida", lambda o: f"{o.meta} {o.get_unidad_display().lower()}"),
         ("Ponderador sugerido", lambda o: f"{o.ponderador} %"),

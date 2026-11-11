@@ -30,7 +30,7 @@
 <div class="grid g-side">
   <section class="card" style="align-self: start">
     <div class="card-h">
-      <h2>Datos {{ genero }} {{ singular }}</h2>
+      <h2>Datos {% if genero == "la" %}de la{% else %}del{% endif %} {{ singular }}</h2>
       <div class="end">
         {% if obj.activo %}
           <span class="chip ok">Activ{% if genero == 'la' %}a{% else %}o{% endif %}</span>

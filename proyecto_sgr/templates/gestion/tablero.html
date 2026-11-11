@@ -142,7 +142,7 @@ eso el pie no se calcula aparte en la plantilla, viene del objeto.
                 <div><b>{{ perfil.nombre }}</b><span>{{ perfil.cargo_asignado.nombre|default:"Sin cargo" }}{% if propio.definido %} · {{ propio.items_medidos }} {% if propio.items_medidos == 1 %}meta{% else %}metas{% endif %}{% endif %}</span></div>
               </div>
             </td>
-            <td>
+            <td class="w">
               {% if propio.definido %}
                 <div class="mini-pista">
                   <div class="pista">
@@ -151,11 +151,12 @@ eso el pie no se calcula aparte en la plantilla, viene del objeto.
                   </div>
                   <b>{{ propio.avance|floatformat:1 }} %</b>
                 </div>
+                {% if propio.hay_ajustes %}<span class="t2">Gestión {{ propio.gestion|floatformat:1 }} %{% if propio.felicitaciones %} · +{{ propio.puntos_felicitaciones }} felicitaci{{ propio.felicitaciones_contadas|pluralize:"ón,ones" }}{% endif %}{% if propio.reclamos %} · −{{ propio.puntos_reclamos }} reclamo{{ propio.reclamos|pluralize }}{% endif %}</span>{% endif %}
               {% else %}
                 <span class="small soft">{{ propio.motivo_indefinido }}</span>
               {% endif %}
             </td>
-            <td><span class="chip {{ propio.clase_chip }}">{{ propio.semaforo_texto }}</span></td>
+            <td><span class="chip {{ propio.clase_chip }}">{{ propio.semaforo_texto }}</span>{% if propio.definido and propio.dias_ausente %}<span class="t2">Esperado {{ propio.esperado|floatformat:1 }} % · {{ propio.dias_ausente }} día{{ propio.dias_ausente|pluralize }} de ausencia</span>{% endif %}</td>
             <td class="r">{% if propio.definido %}{{ propio.items_alcanzados }} de {{ propio.items_medidos }}{% else %}—{% endif %}</td>
           </tr>
         {% empty %}

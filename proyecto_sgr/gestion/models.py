@@ -206,6 +206,16 @@ class Cargo(models.Model):
         "descripción", blank=True,
         help_text="Qué hace quien ocupa el cargo y con qué se le mide.",
     )
+    # Las funciones del cargo según el Descriptor de funciones de las
+    # Delegaciones Municipales (2026). Una por línea: así se leen como lista
+    # en la ficha y en «Mi resultado», y se editan sin un formulario propio.
+    funciones = models.TextField(
+        "funciones", blank=True,
+        help_text=(
+            "Las funciones del descriptor de cargos, una por línea. Las ve "
+            "cada persona en «Mi resultado»."
+        ),
+    )
     activo = models.BooleanField(default=True)
     creada = models.DateField("creado el", auto_now_add=True)
     desactivada = models.DateField("desactivado el", null=True, blank=True)
@@ -217,6 +227,18 @@ class Cargo(models.Model):
 
     def __str__(self):
         return f"{self.codigo} — {self.nombre}"
+
+    @property
+    def lista_funciones(self):
+        """Las funciones como lista, sin líneas vacías ni la numeración escrita."""
+        import re
+
+        salida = []
+        for linea in (self.funciones or "").splitlines():
+            limpia = re.sub(r"^\s*(\d+[.)-]|[a-zA-Z][.)]|[-•·])\s*", "", linea).strip()
+            if limpia:
+                salida.append(limpia)
+        return salida
 
     def motivo_bloqueo(self):
         cuantos = self.perfiles.filter(activo=True).count()
@@ -292,6 +314,15 @@ class MetaPeriodo(models.Model):
                     "del cumplimiento."
                 ),
             })
+        if (self.item_id and self.meta is not None and self.meta > 100
+                and self.item.medicion == self.item.Medicion.AGENDA):
+            raise ValidationError({
+                "meta": (
+                    "«%s» se mide como porcentaje de compromisos realizados: "
+                    "la meta no puede pasar de 100. La matriz usa 80."
+                    % self.item.nombre
+                ),
+            })
 
         if self.periodo_id and self.cargo_id and self.ponderador is not None:
             otros = (
@@ -351,3 +382,20 @@ from gestion.reglas import ReglaCalculo  # noqa: E402,F401
 # de sus integrantes puede tener que tomar si el responsable se ausenta.
 
 from gestion.modelos_agenda import CambioCompromiso, Compromiso  # noqa: E402,F401
+
+# =========================================================================
+# Ajustes del resultado
+# =========================================================================
+# Felicitaciones, reclamos y ausencias: lo que la matriz SGR aplica sobre el
+# cumplimiento ponderado sin que salga de contar actividades. Van aparte por
+# la misma razón que la agenda: son otro asunto, con su propio registro.
+
+from gestion.modelos_ajustes import Ausencia, Reconocimiento  # noqa: E402,F401
+
+# =========================================================================
+# Tubo de cartas
+# =========================================================================
+# Lo que llega por oficina de partes y su seguimiento (hoja TUBO CARTAS de
+# la matriz). No es un compromiso: muchas cartas son solo para conocimiento.
+
+from gestion.modelos_cartas import Carta  # noqa: E402,F401

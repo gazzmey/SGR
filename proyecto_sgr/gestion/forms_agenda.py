@@ -25,7 +25,7 @@ class CompromisoForm(forms.ModelForm):
     class Meta:
         model = Compromiso
         fields = [
-            "solicitante", "territorio", "descripcion",
+            "solicitante", "origen", "territorio", "descripcion",
             "responsable", "apoyo", "vencimiento",
             "item", "requiere_validacion",
         ]
@@ -64,12 +64,18 @@ class CompromisoForm(forms.ModelForm):
             self.instance.delegacion = self.delegacion
 
         self.fields["vencimiento"].input_formats = ["%Y-%m-%d"]
+        self.fields["origen"].required = True
+        self.fields["origen"].choices = (
+            [("", "¿Quién lo pidió?")] + list(Compromiso.Origen.choices))
         self.fields["responsable"].queryset = self._gente_de_la_delegacion()
         self.fields["responsable"].empty_label = "Elige al responsable"
         self.fields["responsable"].label_from_instance = (
             lambda u: u.get_full_name() or u.get_username()
         )
-        self.fields["item"].queryset = Item.objects.filter(activo=True)
+        # El ítem del tubo ya se mide con los compromisos: hacer que un
+        # compromiso «alimente» ese ítem lo contaría dos veces.
+        self.fields["item"].queryset = Item.objects.filter(activo=True).exclude(
+            medicion=Item.Medicion.AGENDA)
         self.fields["item"].empty_label = "No alimenta ninguna meta"
         self.fields["item"].required = False
 

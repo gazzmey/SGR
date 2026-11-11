@@ -79,12 +79,22 @@ def mi_resultado(request):
             ),
         })
 
+    from gestion.modelos_ajustes import Reconocimiento
+
     resultado = C.de_perfil(perfil, periodo)
     return render(request, "gestion/mi_resultado.html", {
         "menu": "mi_resultado",
         **datos,
         "perfil": perfil,
         "res": resultado,
+        # Quien es medido tiene que poder ver qué le sumó o le restó, y de
+        # dónde salió: un reclamo que descuenta puntos sin que la persona
+        # sepa cuál es no se puede discutir.
+        "reconocimientos": list(
+            Reconocimiento.objects
+            .filter(periodo=periodo, funcionario=request.user, activo=True)
+            .order_by("-fecha")
+        ),
         "resumen": T.resumen_actividades(perfil, periodo),
         "pendientes": T.pendientes_de(perfil, periodo),
         "recientes": T.recientes_de(perfil, periodo),
@@ -188,8 +198,13 @@ def _excel(resultado):
                                     if p.cargo_asignado else "Sin cargo"), ancho=26),
         _Col("Ítems medidos", lambda p, r: r.items_medidos, ancho=14),
         _Col("Ítems al umbral", lambda p, r: r.items_alcanzados, ancho=14),
+        _Col("Gestión %", lambda p, r: (round(r.gestion, 2) if r.definido
+                                        else ""), ancho=12),
+        _Col("Felicitaciones", lambda p, r: r.felicitaciones, ancho=14),
+        _Col("Reclamos", lambda p, r: r.reclamos, ancho=11),
         _Col("Avance %", lambda p, r: (round(r.avance, 2) if r.definido
                                        else "Indefinido"), ancho=12),
+        _Col("Días de ausencia", lambda p, r: r.dias_ausente, ancho=16),
         _Col("Esperado %", lambda p, r: (round(r.esperado, 2)
                                          if r.esperado is not None else ""), ancho=12),
         _Col("Semáforo", lambda p, r: r.semaforo_texto, ancho=14),

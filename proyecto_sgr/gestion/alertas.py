@@ -1,14 +1,17 @@
 """
 Las alertas de la delegación: qué requiere atención hoy.
 
-Las cinco reglas vienen de la maqueta aprobada, que las deja escritas en su
-panel de «reglas vigentes»:
+Las cinco primeras reglas vienen de la maqueta aprobada, que las deja
+escritas en su panel de «reglas vigentes»; las dos últimas, de la matriz SGR
+(hojas RECLAMOS y G SOC):
 
     compromiso por vencer     7 días antes        avisa al responsable
     compromiso vencido        al vencer           avisa al delegado
     avance bajo el umbral     bajo el 60 % de lo esperado
     sin registros             10 días sin registrar
     evidencia sin revisar     5 días en espera    avisa al verificador
+    reclamos reiterados       más de 2 períodos   pide informar a RRHH
+    caso social vencido       según los plazos de las hojas G SOC
 
 Los cuatro umbrales viven en ``ReglaCalculo`` y se configuran desde pantalla.
 El del avance bajo **no es un umbral propio**: es el mismo del semáforo, de
@@ -148,10 +151,12 @@ def _avance_bajo(resultado, regla):
     si alguien cambia la regla, el tablero y la alerta se mueven juntos.
     """
     salida = []
-    esperado = resultado.esperado
     for perfil, r in resultado.personas:
         if not r.definido or r.semaforo_clase != "rojo":
             continue
+        # El esperado es el de la persona, que descuenta sus ausencias: es el
+        # mismo contra el que su semáforo se puso en rojo.
+        esperado = r.esperado
         proporcion = (r.avance * 100 / esperado) if esperado else 0
         salida.append(Alerta(
             tipo="avance_bajo",
@@ -276,6 +281,127 @@ def _evidencias(periodo, delegacion, regla, hoy):
     )]
 
 
+def reclamos_seguidos(usuario_ids, periodo):
+    """
+    Cuántos períodos seguidos, terminando en ``periodo``, tiene cada persona
+    con al menos un reclamo vigente.
+
+    «Seguidos» es en el orden de los períodos por fecha de inicio: el
+    trimestre anterior al actual es el período activo que empezó justo
+    antes. Devuelve ``{usuario_id: cantidad}`` solo para quien tiene alguno.
+    """
+    from gestion.modelos_ajustes import Reconocimiento
+    from gestion.models import Periodo
+
+    anteriores = list(
+        Periodo.objects
+        .filter(activo=True, inicio__lte=periodo.inicio)
+        .order_by("-inicio")
+        .values_list("pk", flat=True)
+    )
+    if periodo.pk not in anteriores:
+        anteriores.insert(0, periodo.pk)
+
+    con_reclamo = set(
+        Reconocimiento.objects
+        .filter(tipo=Reconocimiento.Tipo.RECLAMO, activo=True,
+                funcionario_id__in=usuario_ids, periodo_id__in=anteriores)
+        .values_list("funcionario_id", "periodo_id")
+        .distinct()
+    )
+    salida = {}
+    for usuario_id in usuario_ids:
+        seguidos = 0
+        for periodo_id in anteriores:
+            if (usuario_id, periodo_id) not in con_reclamo:
+                break
+            seguidos += 1
+        if seguidos:
+            salida[usuario_id] = seguidos
+    return salida
+
+
+def _reclamos_reiterados(resultado, regla):
+    """
+    Personas con reclamos en más períodos seguidos de los que la regla admite.
+
+    La hoja RECLAMOS de la matriz lo deja escrito: «los reclamos no pueden
+    exceder más de 2 trimestres seguidos (informar a RRHH)». La alerta no
+    informa a nadie por su cuenta: le dice al delegado que corresponde
+    hacerlo.
+    """
+    personas = {perfil.usuario_id: perfil for perfil, _ in resultado.personas}
+    if not personas:
+        return []
+    seguidos = reclamos_seguidos(list(personas), resultado.periodo)
+    salida = []
+    for usuario_id, cuantos in seguidos.items():
+        if cuantos <= regla.periodos_reclamo_rrhh:
+            continue
+        perfil = personas[usuario_id]
+        salida.append(Alerta(
+            tipo="reclamos_reiterados",
+            clave=f"reclamos_reiterados:{perfil.pk}:{resultado.periodo.pk}",
+            titulo="Reclamos en períodos seguidos: informar a RRHH",
+            detalle=(
+                "%s tiene reclamos en %d períodos seguidos, hasta «%s». La "
+                "matriz admite hasta %d y pide informar a Recursos Humanos "
+                "cuando se pasan."
+                % (perfil.nombre, cuantos, resultado.periodo.nombre,
+                   regla.periodos_reclamo_rrhh)
+            ),
+            responsable=perfil.nombre, desde=resultado.periodo.inicio,
+            url=reverse("gestion:reconocimientos") + "?tipo=reclamo",
+            rotulo_enlace="Ver reclamos",
+            gravedad="alta",
+        ))
+    return salida
+
+
+def _casos_vencidos(delegacion, regla, hoy):
+    """
+    Casos sociales abiertos con un paso que ya se pasó de su plazo.
+
+    Los plazos son los de las hojas G SOC de la matriz. La clave lleva el
+    paso: cuando el caso avanza y se le vence el siguiente, es otra alerta,
+    no la misma ya revisada.
+    """
+    from atencion import plazos
+    from atencion.models import CasoSocial
+
+    salida = []
+    casos = (
+        CasoSocial.objects
+        .filter(atencion__delegacion=delegacion)
+        .select_related("atencion__solicitante", "responsable")
+    )
+    for caso in casos:
+        if caso.cerrado:
+            continue
+        vencidos = [t for t in plazos.tramos(caso, regla, hoy)
+                    if t.estado == "vencido" and t.clave != "total"]
+        if not vencidos:
+            continue
+        tramo = vencidos[0]
+        atraso = tramo.dias - tramo.plazo
+        salida.append(Alerta(
+            tipo="caso_vencido",
+            clave=f"caso_vencido:{caso.pk}:{tramo.clave}",
+            titulo="Caso social fuera de plazo",
+            detalle=(
+                "%s · %s · «%s» lleva %s de atraso sobre su plazo."
+                % (caso.codigo, caso.atencion.solicitante.nombre,
+                   tramo.nombre.lower(), dias(atraso))
+            ),
+            responsable=caso.responsable.get_full_name() or caso.responsable.get_username(),
+            desde=tramo.inicio,
+            url=reverse("atencion:caso", args=[caso.pk]),
+            rotulo_enlace="Ver caso",
+            gravedad="media",
+        ))
+    return salida
+
+
 # =========================================================================
 # La consulta que usa la pantalla
 # =========================================================================
@@ -307,6 +433,8 @@ def de_delegacion(delegacion, periodo, al_dia=None, regla=None):
     todas += _avance_bajo(resultado, regla)
     todas += _sin_registros(resultado, uso, regla, hoy)
     todas += _evidencias(periodo, delegacion, regla, hoy)
+    todas += _reclamos_reiterados(resultado, regla)
+    todas += _casos_vencidos(delegacion, regla, hoy)
 
     revisadas = {
         r.clave: r for r in AlertaRevisada.objects

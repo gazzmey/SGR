@@ -46,6 +46,12 @@ class Compromiso(models.Model):
         REALIZADO = "realizado", "Realizado"
         ANULADO = "anulado", "Anulado"
 
+    class Origen(models.TextChoices):
+        """La columna INT/EXT del tubo de la matriz SGR."""
+
+        INTERNO = "interno", "Interno: lo pidió el municipio"
+        EXTERNO = "externo", "Externo: lo pidió la comunidad"
+
     #: La matriz de transiciones permitidas.
     #:
     #: **Es la propuesta del equipo, no una matriz aprobada.** El plan de
@@ -105,6 +111,16 @@ class Compromiso(models.Model):
     solicitante = models.CharField(
         max_length=120,
         help_text="Quién lo pidió: una junta de vecinos, una persona, otra unidad.",
+    )
+    # Vacío solo en los compromisos ingresados antes de que existiera el
+    # campo: no se les inventa un origen. Los nuevos lo exigen en el
+    # formulario.
+    origen = models.CharField(
+        "origen", max_length=8, choices=Origen.choices, blank=True, default="",
+        help_text=(
+            "Interno si lo pidió el municipio —gabinete, otra dirección, la "
+            "propia delegación—; externo si lo pidió la comunidad."
+        ),
     )
     territorio = models.CharField(
         max_length=120,

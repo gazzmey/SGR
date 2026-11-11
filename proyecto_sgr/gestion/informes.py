@@ -1,12 +1,14 @@
 """
 Los informes consolidados: la gestión de un período mirada desde arriba.
 
-Los cuatro informes vienen de la maqueta aprobada, que los deja escritos en
-su panel de configuración:
+Los cuatro primeros informes vienen de la maqueta aprobada, que los deja
+escritos en su panel de configuración; el quinto, de la hoja TUBO de la
+matriz SGR (HU-14):
 
     Cumplimiento por funcionario   metas, avance y semáforo
     Cumplimiento por delegación    promedios frente al umbral colectivo
     Compromisos de la agenda       pendientes, vencidos y realizados
+    Compromisos por colaborador    cuántos tiene cada uno en cada estado
     Tendencia histórica            compara períodos cerrados
 
 Por qué este módulo no calcula nada
@@ -23,12 +25,11 @@ les da formato de lectura.
 
 Dos diferencias con la maqueta, y por qué
 -----------------------------------------
-1. **No está la columna «Ajustes».** La maqueta la dibuja con 0,0 en todas
-   las filas porque los ajustes —bonificaciones y penalizaciones— no se
-   implementaron en esta entrega: no hay una regla aprobada que
-   parametrizar. Una columna que siempre dice cero no informa de nada y sí
-   promete una función que no existe. En su lugar, el pie del informe dice
-   en una línea que los ajustes no forman parte de este incremento.
+1. **La columna «Ajustes» llegó con la matriz.** La maqueta la dibujaba con
+   0,0 en todas las filas porque no había regla de ajuste. La hoja RECLAMOS
+   de la matriz SGR la dio —+10 por felicitación, −20 por reclamo—, y desde
+   entonces la columna dice cuánto sumaron y restaron, ya incluido en el
+   cumplimiento.
 
 2. **En pantalla las delegaciones son filas de grupo; en el archivo son una
    columna.** Son dos medios distintos. En pantalla, agrupar se lee mejor y
@@ -136,7 +137,7 @@ class Informe:
 
 
 # =========================================================================
-# Los cuatro informes
+# Los cinco informes
 # =========================================================================
 
 
@@ -147,6 +148,8 @@ TIPOS = (
      "Promedios frente al umbral colectivo"),
     ("compromisos", "Compromisos de la agenda",
      "Pendientes, vencidos y realizados"),
+    ("responsables", "Compromisos por colaborador",
+     "Cuántos tiene cada uno en cada estado"),
     ("tendencia", "Tendencia histórica",
      "Compara los períodos ya cerrados"),
 )
@@ -155,8 +158,9 @@ TIPOS_VALIDOS = {clave for clave, _, _ in TIPOS}
 POR_OMISION = "funcionario"
 
 NOTA_AJUSTES = (
-    "Los ajustes —bonificaciones y penalizaciones— no forman parte de este "
-    "incremento, así que ninguna cifra de este informe los incluye."
+    "El cumplimiento incluye las felicitaciones (suman) y los reclamos "
+    "(restan) registrados en el período, según la regla de cálculo, y nunca "
+    "pasa del tope ni baja de cero."
 )
 
 
@@ -178,6 +182,7 @@ def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
         Columna("Funcionario", ancho=26),
         Columna("Cargo", ancho=26),
         Columna("Ítems", derecha=True, ancho=10),
+        Columna("Ajustes", derecha=True, ancho=10),
         Columna("Cumplimiento", derecha=True, ancho=15),
         Columna("Semáforo", ancho=20),
     )
@@ -201,11 +206,13 @@ def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
                     continue
                 propio = suyos[0]
                 valor = propio.cumplimiento
+                ajuste = ""
                 cuantos_items = 1
                 clase = propio.semaforo_clase
                 texto = propio.semaforo_texto
             else:
                 valor = r.avance
+                ajuste = ("%+.0f" % r.ajuste).replace("-", "−") if r.ajuste else "0"
                 cuantos_items = len(r.items)
                 clase = r.semaforo_clase
                 texto = r.semaforo_texto
@@ -218,6 +225,7 @@ def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
                     Celda(perfil.nombre, fuerte=True),
                     Celda(_nombre_cargo(r, perfil)),
                     Celda(str(cuantos_items)),
+                    Celda(ajuste or "—"),
                     Celda(pct(valor), fuerte=True),
                     Celda(texto, chip=_chip_de(clase)),
                 ),
@@ -246,7 +254,7 @@ def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
         pie = (
             Celda("Total del informe · %d funcionario%s"
                   % (cuantos, "" if cuantos == 1 else "s")),
-            Celda(""), Celda(""),
+            Celda(""), Celda(""), Celda(""),
             Celda(pct(suma / cuantos), fuerte=True),
             Celda(""),
         )
@@ -325,6 +333,7 @@ def _compromisos(periodo, delegaciones, item, regla, al_dia):
     columnas = (
         Columna("Código", ancho=12),
         Columna("Solicitante", ancho=26),
+        Columna("Origen", ancho=10),
         Columna("Responsable", ancho=24),
         Columna("Vence", ancho=12),
         Columna("Estado", ancho=14),
@@ -377,6 +386,7 @@ def _compromisos(periodo, delegaciones, item, regla, al_dia):
             filas.append(Fila(celdas=(
                 Celda(c.codigo, fuerte=True),
                 Celda(c.solicitante),
+                Celda({"interno": "INT", "externo": "EXT"}.get(c.origen, "—")),
                 Celda(c.responsable.get_full_name() or c.responsable.get_username()),
                 Celda(c.vencimiento.strftime("%d-%m-%Y")),
                 Celda(rotulo, chip=chip),
@@ -391,7 +401,7 @@ def _compromisos(periodo, delegaciones, item, regla, al_dia):
                   % (abiertos, "" if abiertos == 1 else "s",
                      vencidos, "" if vencidos == 1 else "s",
                      realizados, "" if realizados == 1 else "s")),
-            Celda(""), Celda(""), Celda(""), Celda(""),
+            Celda(""), Celda(""), Celda(""), Celda(""), Celda(""),
             Celda("%d" % total),
         )
 
@@ -400,6 +410,68 @@ def _compromisos(periodo, delegaciones, item, regla, al_dia):
         "y no cambia aunque después se modifique la regla de fechas. Los "
         "anulados salen del denominador de la agenda.",
     )[0], "No hay compromisos registrados en este período para las delegaciones elegidas."
+
+
+def _por_responsable(periodo, delegaciones, item, regla, al_dia):
+    """
+    Cuántos compromisos tiene cada colaborador en cada estado (HU-14).
+
+    Es el cuadro resumen de la hoja TUBO. El % realizado sale de
+    ``calculo.resumen_por_responsable``, el mismo que alimenta el ítem
+    «Soluciones de ingresos al tubo»: el informe y el resultado de la persona
+    no pueden decir cosas distintas.
+    """
+    columnas = (
+        Columna("Colaborador", ancho=26),
+        Columna("Ingresado", derecha=True, ancho=11),
+        Columna("Pendiente", derecha=True, ancho=11),
+        Columna("En proceso", derecha=True, ancho=11),
+        Columna("Realizado", derecha=True, ancho=11),
+        Columna("% realizado", derecha=True, ancho=13),
+    )
+    resumen = C.resumen_por_responsable(periodo, [d.pk for d in delegaciones])
+
+    filas, actual = [], None
+    total = {"i": 0, "p": 0, "e": 0, "r": 0}
+    for t in resumen:
+        if t.delegacion.nombre != actual:
+            actual = t.delegacion.nombre
+            suyos = [x for x in resumen if x.delegacion.pk == t.delegacion.pk]
+            filas.append(Fila(grupo="%s · %d colaborador%s" % (
+                actual, len(suyos), "" if len(suyos) == 1 else "es")))
+        # El color dice si llega al umbral de realizado de la regla.
+        if t.realizado is None:
+            chip = "line"
+        elif t.realizado >= regla.umbral_realizado:
+            chip = "ok"
+        else:
+            chip = "warn"
+        filas.append(Fila(celdas=(
+            Celda(t.nombre, fuerte=True),
+            Celda(str(t.ingresados)), Celda(str(t.pendientes)),
+            Celda(str(t.en_proceso)), Celda(str(t.realizados)),
+            Celda(pct(t.realizado), chip=chip),
+        ), delegacion=t.delegacion.nombre))
+        total["i"] += t.ingresados
+        total["p"] += t.pendientes
+        total["e"] += t.en_proceso
+        total["r"] += t.realizados
+
+    pie = ()
+    vigentes = sum(total.values())
+    if resumen:
+        pie = (
+            Celda("Total del informe"),
+            Celda(str(total["i"])), Celda(str(total["p"])),
+            Celda(str(total["e"])), Celda(str(total["r"])),
+            Celda(pct(total["r"] * 100 / vigentes) if vigentes else "—", fuerte=True),
+        )
+    return columnas, tuple(filas), pie, (
+        "%% realizado = realizados ÷ (ingresados + pendientes + en proceso + "
+        "realizados). Los anulados quedan fuera. En verde, desde el %d %%: el "
+        "umbral de realizado de la regla. Es el número que mide el ítem "
+        "«Soluciones de ingresos al tubo» de cada persona." % regla.umbral_realizado
+    ), "No hay compromisos en este período para las delegaciones elegidas."
 
 
 def _tendencia(periodo, delegaciones, item, regla, al_dia):
@@ -464,6 +536,7 @@ CONSTRUCTORES = {
     "funcionario": _por_funcionario,
     "delegacion": _por_delegacion,
     "compromisos": _compromisos,
+    "responsables": _por_responsable,
     "tendencia": _tendencia,
 }
 

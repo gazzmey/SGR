@@ -6,6 +6,8 @@ from gestion import (
     views,
     views_actividad as va,
     views_agenda as ag,
+    views_ajustes as aj,
+    views_cartas as ct,
     views_alertas as al,
     views_informes as inf,
     views_tablero as vt,
@@ -75,6 +77,29 @@ urlpatterns = [
     # resuelve antes y no la captura este patrón.
     path("agenda/<int:pk>/<str:paso>/", ag.CompromisoTransicion.as_view(),
          name="compromiso_paso"),
+
+    # --- felicitaciones, reclamos y ausencias ---
+    path("reconocimientos/", aj.ReconocimientosLista.as_view(), name="reconocimientos"),
+    path("reconocimientos/nuevo/", aj.ReconocimientoNuevo.as_view(),
+         name="reconocimiento_nuevo"),
+    path("reconocimientos/<int:pk>/", aj.ReconocimientoDetalle.as_view(),
+         name="reconocimiento_detalle"),
+    path("reconocimientos/<int:pk>/editar/", aj.ReconocimientoEditar.as_view(),
+         name="reconocimiento_editar"),
+    path("reconocimientos/<int:pk>/estado/", aj.ReconocimientoEstado.as_view(),
+         name="reconocimiento_estado"),
+    path("ausencias/", aj.AusenciasLista.as_view(), name="ausencias"),
+    path("ausencias/nueva/", aj.AusenciaNueva.as_view(), name="ausencia_nueva"),
+    path("ausencias/<int:pk>/", aj.AusenciaDetalle.as_view(), name="ausencia_detalle"),
+    path("ausencias/<int:pk>/editar/", aj.AusenciaEditar.as_view(), name="ausencia_editar"),
+    path("ausencias/<int:pk>/estado/", aj.AusenciaEstado.as_view(), name="ausencia_estado"),
+
+    # --- tubo de cartas de oficina de partes ---
+    path("cartas/", ct.CartasLista.as_view(), name="cartas"),
+    path("cartas/nueva/", ct.CartaNueva.as_view(), name="carta_nueva"),
+    path("cartas/<int:pk>/", ct.CartaDetalle.as_view(), name="carta_detalle"),
+    path("cartas/<int:pk>/editar/", ct.CartaEditar.as_view(), name="carta_editar"),
+    path("cartas/<int:pk>/estado/", ct.CartaEstado.as_view(), name="carta_estado"),
 
     # --- validación de evidencias ---
     path("validar/", va.ColaValidacion.as_view(), name="validar"),

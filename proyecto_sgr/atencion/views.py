@@ -128,7 +128,8 @@ def registradas(request):
     atenciones = (
         Atencion.objects
         .filter(delegacion=activa)
-        .select_related("solicitante", "subatencion", "subatencion__tipo_atencion", "funcionario")
+        .select_related("solicitante", "subatencion", "subatencion__tipo_atencion",
+                        "funcionario", "caso")
         if activa else Atencion.objects.none()
     )
 
