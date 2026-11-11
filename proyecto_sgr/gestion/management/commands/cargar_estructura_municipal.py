@@ -45,7 +45,11 @@ from django.db import transaction
 from catalogos.models import Area, Item, SubAtencion, TipoAtencion
 from comun.utilidades import proximo_codigo
 from gestion.models import Cargo, MetaPeriodo, Periodo
+from gestion.modelos_versiones import VersionParametro
 from gestion.reglas import PROPUESTA_DEL_PLAN, ReglaCalculo
+from gestion.versiones import versionar
+
+COMANDO = VersionParametro.Origen.COMANDO
 
 ORIGEN = "Matriz SGR de las delegaciones, trimestre 2026"
 
@@ -350,8 +354,10 @@ class Command(BaseCommand):
                 item.descripcion = f"{descripcion} ({ORIGEN})."
             item.activo = True
             item.desactivada = None
+            antes = None if nuevo else Item.objects.get(pk=item.pk).datos_version()
             item.full_clean()
             item.save()
+            versionar(item, antes=antes, origen=COMANDO)
             creados[codigo] = item
             self._informar("Ítem", item, nuevo)
         return creados
@@ -393,10 +399,14 @@ class Command(BaseCommand):
     def _metas(self, periodo, cargos, items):
         for nombre, _, _, metas in CARGOS:
             for codigo_item, meta, ponderador in metas:
+                previa = MetaPeriodo.objects.filter(
+                    periodo=periodo, cargo=cargos[nombre], item=items[codigo_item]).first()
+                antes = previa.datos_version() if previa else None
                 registro, nuevo = MetaPeriodo.objects.update_or_create(
                     periodo=periodo, cargo=cargos[nombre], item=items[codigo_item],
                     defaults={"meta": meta, "ponderador": ponderador, "activo": True},
                 )
+                versionar(registro, antes=antes, origen=COMANDO)
                 if nuevo:
                     self.stdout.write(f"  Meta: {registro} ({ponderador} %) (creada)")
 
@@ -418,6 +428,7 @@ class Command(BaseCommand):
         })
         regla = ReglaCalculo.objects.filter(periodo=periodo, activo=True).first()
         nuevo = regla is None
+        antes = None if nuevo else regla.datos_version()
         if nuevo:
             regla = ReglaCalculo(nombre=f"Matriz SGR · {periodo.nombre}"[:80])
         for campo, valor in valores.items():
@@ -425,6 +436,7 @@ class Command(BaseCommand):
         regla.activo = True
         regla.full_clean()
         regla.save()
+        versionar(regla, antes=antes, origen=COMANDO)
         self._informar("Regla de cálculo", regla, nuevo)
 
     def _informar(self, etiqueta, registro, nuevo):

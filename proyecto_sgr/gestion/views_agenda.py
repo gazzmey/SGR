@@ -351,9 +351,12 @@ def compromiso_detalle(request, pk):
                     "peligroso": clave == "anulado",
                 })
 
+    from comun.observaciones import hilo
+
     return render(request, "gestion/compromiso_detalle.html", {
         "menu": "agenda",
         "obj": compromiso,
+        "hilo": hilo(request, "compromiso", compromiso),
         "cambios": compromiso.cambios.select_related(
             "quien", "responsable_anterior", "responsable_nuevo"),
         "pasos": pasos,

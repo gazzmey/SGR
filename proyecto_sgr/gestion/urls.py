@@ -8,6 +8,7 @@ from gestion import (
     views_agenda as ag,
     views_ajustes as aj,
     views_cartas as ct,
+    views_versiones as vv,
     views_alertas as al,
     views_informes as inf,
     views_tablero as vt,
@@ -51,6 +52,9 @@ urlpatterns = [
     path("metas/<int:pk>/", views.MetaDetalle.as_view(), name="meta_detalle"),
     path("metas/<int:pk>/editar/", views.MetaEditar.as_view(), name="meta_editar"),
     path("metas/<int:pk>/estado/", views.MetaEstado.as_view(), name="meta_estado"),
+
+    # --- historial de parámetros (HU-38) ---
+    path("historial/", vv.HistorialParametros.as_view(), name="historial"),
 
     # --- reglas de cálculo ---
     path("reglas/", views.ReglasLista.as_view(), name="reglas"),

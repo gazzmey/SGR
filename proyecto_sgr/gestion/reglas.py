@@ -299,6 +299,47 @@ class ReglaCalculo(models.Model):
             )
         return ""
 
+    # --- versiones (HU-25 y HU-38) ----------------------------------------
+
+    TIPO_VERSION = "regla"
+
+    def datos_version(self):
+        return {
+            "Nombre": self.nombre,
+            "Alcance": self.periodo.nombre if self.periodo_id else "General",
+            "Tope del cumplimiento": f"{self.tope_aporte} %",
+            "Ítem realizado desde": f"{self.umbral_realizado} %",
+            "Ámbar hasta": f"{self.umbral_ambar} % de lo esperado",
+            "Días": self.get_convencion_dias_display(),
+            "Aviso de vencimiento": f"{self.dias_aviso_vencimiento} días",
+            "Días sin registrar": f"{self.dias_sin_registrar} días",
+            "Espera de evidencia": f"{self.dias_evidencia_espera} días",
+            "Felicitación": f"+{self.valor_felicitacion} (hasta {self.max_felicitaciones})",
+            "Reclamo": f"−{self.valor_reclamo}",
+            "Reclamos antes de RRHH": f"{self.periodos_reclamo_rrhh} períodos",
+            "Plazos de casos sociales": (
+                f"{self.plazo_programar_visita} / {self.tolerancia_visita} / "
+                f"{self.plazo_informe} / {self.plazo_beneficio} / {self.plazo_total_caso} días"),
+            "Aprobada": f"Sí, por {self.aprobada_por}" if self.aprobada else "No",
+            "Estado": "Activa" if self.activo else "Inactiva",
+        }
+
+    def vigencia_version(self):
+        from datetime import date
+
+        if self.periodo_id:
+            return (f"{self.periodo.nombre} · del {self.periodo.inicio:%d-%m-%Y} "
+                    f"al {self.periodo.termino:%d-%m-%Y}")
+        return (f"General desde el {date.today():%d-%m-%Y}: los períodos sin "
+                "regla propia")
+
+    @property
+    def version(self):
+        """El número de la versión vigente, o None si no está guardada."""
+        from gestion.versiones import version_de
+
+        return version_de(self)
+
     # --- lo que el motor le pregunta -------------------------------------
 
     @property
@@ -308,12 +349,18 @@ class ReglaCalculo(models.Model):
 
     @property
     def rotulo(self):
-        """El texto que acompaña a todo resultado calculado con esta regla."""
+        """
+        El texto que acompaña a todo resultado calculado con esta regla.
+
+        Lleva el número de versión: es lo que permite decir, de un resultado
+        cerrado, con qué versión de las reglas se calculó (HU-38).
+        """
+        version = f", versión {self.version}" if self.pk else ""
         if self.aprobada:
-            return f"Reglas aprobadas: {self.nombre}"
+            return f"Reglas aprobadas: {self.nombre}{version}."
         return (
-            f"Propuesta de cálculo «{self.nombre}», pendiente de aprobación "
-            "formal (plan de pruebas, sección B3)."
+            f"Propuesta de cálculo «{self.nombre}»{version}, pendiente de "
+            "aprobación formal (plan de pruebas, sección B3)."
         )
 
     def resumen(self):

@@ -73,6 +73,8 @@ recorrido cortado a la mitad.
 | Regalos para niños | `/atencion/regalos/` | Inscripción por RUT del niño en una campaña, sin duplicados entre delegaciones, con entrega y resumen por tramo de edad (hoja REGALOS NIÑOS). |
 | Campañas de regalos | `/atencion/campanas/` | Navidad, Día del Niño y Aniversario de cada año, con su cierre de inscripciones y fecha de entrega. |
 | Tubo de cartas | `/periodo/cartas/` | Las cartas de oficina de partes, con su encargado, su estado y lo que se respondió (hoja TUBO CARTAS). |
+| Historial de parámetros | `/periodo/historial/` | Cada versión de un ítem, una meta o una regla de cálculo: qué cambió, la vigencia, el autor y la versión anterior (HU-25 y HU-38). Solo consulta. |
+| Observaciones | `/observaciones/` | Las consultas y comentarios recientes en compromisos, casos sociales y cartas que la persona puede abrir. Se escriben al pie de la ficha de cada registro (HU-24). |
 | Auditoría | `/periodo/auditoria/` | Historial de operaciones críticas. Solo listado: no hay creación, edición ni borrado. |
 | Informes | `/periodo/informes/` | Cinco informes consolidados con filtros, y exportación a Excel, CSV y PDF. |
 
@@ -156,6 +158,8 @@ colación, esa búsqueda no encontraría nada.
 | `atencion` | `Atencion` | La atención entregada: solicitante, subatención, delegación, funcionario, detalle y respaldo. |
 | `atencion` | `CampanaRegalos` · `InscripcionRegalo` | La campaña de regalos y cada niño inscrito: solo su RUT y su tramo de edad, más el adulto que lo inscribe. |
 | `atencion` | `CasoSocial` | El seguimiento de una atención social: fechas de visita, informe y beneficio, y devoluciones del informe. |
+| `gestion` | `VersionParametro` | Una versión de un ítem, una meta o una regla: la foto de sus campos, lo que cambió respecto de la anterior, la vigencia, el origen y el autor. No se edita ni se borra. |
+| `comun` | `Observacion` | Una consulta o comentario sobre un compromiso, un caso social o una carta, con autor y hora. No se edita ni se borra. |
 | `cuenta` | `CodigoRecuperacion` | Código de seis dígitos de un solo uso, con vigencia e intentos. |
 
 La meta y el ponderador que usa el cálculo están en `MetaPeriodo`, por período, cargo e ítem; ahí se aplica la regla de que los ítems de cada cargo sumen 100 %. Los del ítem son solo sugeridos: se proponen al elegir el ítem en *Nueva meta* y no se suman entre sí, así que el catálogo no exige ningún total.
@@ -379,6 +383,13 @@ cortesía, no seguridad. Cada vista lleva el mixin `RequierePermiso`, que
 rechaza la petición antes de entrar en la vista; escribir la dirección a mano
 devuelve 403.
 
+**Dos pantallas sin permiso propio.** El *Historial de parámetros* usa
+`configurar períodos`, el mismo de quien cambia los parámetros (Coordinador y
+Administrador). Las *Observaciones* no tienen permiso propio: ve y escribe en
+la conversación de un registro quien puede abrir ese registro, con la misma
+comprobación de su ficha. Así una observación nunca muestra algo que la ficha
+no mostraría.
+
 ---
 
 ## 7. Datos de prueba
@@ -557,14 +568,22 @@ es el que puede explicarle a la persona por qué se rechazó su archivo.
   esté marcada como aprobada, el resultado se rotula como propuesta, igual que
   el resto del cálculo. Falta confirmar con la municipalidad si el reclamo
   descuenta 20 o 30 puntos: la matriz usa los dos.
-- **Las observaciones compartidas sobre un registro** (RF-035) tampoco. Hay
-  observaciones dentro del historial del compromiso y motivos en las
-  evidencias, pero no un comentario general sobre un registro que otra cuenta
-  autorizada pueda consultar.
-- **Sin control de versión optimista.** Si dos personas abren el mismo registro
-  y ambas guardan, gana la última y la primera pierde su cambio sin aviso.
-  Resolverlo exige un campo de versión en cada formulario y una comprobación al
-  guardar; queda registrado como defecto abierto.
+- **Las ediciones simultáneas se detectan al guardar, no al abrir** (HU-23).
+  Cada formulario lleva una huella del registro; si otra persona guardó
+  entretanto, no se guarda nada y se muestran las diferencias. No hay aviso
+  mientras se escribe ni bloqueo del registro: un bloqueo que nadie libera
+  —una pestaña cerrada, un corte de luz— dejaría el registro tomado. Cubre los
+  formularios de los mantenedores y la ficha del caso social; los formularios
+  de un solo paso (validar, reasignar, cambiar de estado) ya comprueban el
+  estado del registro antes de actuar.
+- **Las observaciones son de tres registros** (HU-24): compromisos, casos
+  sociales y cartas, que son donde hay seguimiento entre personas. No llegan
+  por correo: se ven en la ficha y en *Observaciones*.
+- **El historial de parámetros empieza con esta versión** (HU-25). Lo que
+  cambió antes no se puede reconstruir; la primera vez que se edita un
+  parámetro se guarda cómo estaba como «estado previo al historial». Los
+  períodos cerrados antes de esta versión recibieron, al migrar, una copia de
+  la regla general como regla propia, para que editarla ya no los altere.
 - **La alerta no llega a quien debe actuar.** Ningún rol puede a la vez ver las
   alertas y cerrar el compromiso que las origina: mover el estado exige
   `registrar_actividad`, que solo tiene el rol Funcionario, y Funcionario es el
@@ -664,8 +683,11 @@ proyecto_sgr/
     admin_base.py                   mixin de selectores y acciones del administrador
     wsgi.py  asgi.py
   comun/                            lo transversal
-    models.py                       auditoría y marcas de alerta revisada
+    models.py                       auditoría, marcas de alerta revisada y observaciones
     auditoria.py                    la única forma de escribir en la auditoría
+    concurrencia.py                 la huella que detecta ediciones simultáneas (HU-23)
+    observaciones.py                qué registros admiten observaciones y quién las ve
+    views_observaciones.py          escribir una observación y las recientes (HU-24)
     mantenedor.py                   el patrón de mantenedor, una sola vez
     permisos.py                     la tabla de permisos y cómo se comprueba
     contexto.py                     delegación activa en la sesión
@@ -701,15 +723,17 @@ proyecto_sgr/
     tablero.py                      los recuentos que acompañan al resultado
     modelos_ajustes.py              Reconocimiento (felicitación o reclamo) y Ausencia
     modelos_cartas.py               Carta: el tubo de cartas de oficina de partes
+    modelos_versiones.py            VersionParametro: el historial de parámetros
+    versiones.py                    cómo se escribe una versión y cómo se congela la regla
     alertas.py                      las siete condiciones, calculadas al vuelo
     informes.py                     los cinco informes consolidados
     forms.py  forms_actividad.py  forms_agenda.py  forms_ajustes.py  forms_cartas.py
     views.py  views_actividad.py  views_agenda.py  views_ajustes.py  views_cartas.py
-    views_alertas.py
+    views_alertas.py  views_versiones.py
     views_informes.py  views_tablero.py  urls.py  admin.py
     management/commands/cargar_estructura_municipal.py
                                     cargos del descriptor y estructura de la matriz
-    migrations/0001_initial.py … 0012_funciones_del_cargo.py
+    migrations/0001_initial.py … 0014_congelar_reglas_de_periodos_cerrados.py
   templates/
     base.html                       el marco institucional
     comun/                          listado, formulario, ficha, panel, 403, 404

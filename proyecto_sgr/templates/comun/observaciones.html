@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% comment %}
+  Las observaciones recientes de los registros que la persona puede abrir.
+  Es la vista de coordinación de la HU-24: lo que se preguntó y respondió en
+  compromisos, casos sociales y cartas, de la más nueva a la más antigua.
+{% endcomment %}
+
+{% block titulo %}Observaciones{% endblock %}
+{% block ruta %}<span aria-current="page">Observaciones</span>{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Observaciones</h1>
+    <p>Las consultas y comentarios recientes en compromisos, casos sociales y cartas que puedes abrir. Se responden en el mismo registro.</p>
+  </div>
+  <div class="actions">
+    <form method="get" class="row" style="gap: 8px">
+      <span class="selw">
+        <select class="input" name="tipo" aria-label="Tipo de registro" onchange="this.form.submit()">
+          <option value="">Todos los registros</option>
+          {% for valor, texto in tipos %}<option value="{{ valor }}"{% if valor == tipo %} selected{% endif %}>{{ texto }}</option>{% endfor %}
+        </select>
+        <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+      </span>
+      <noscript><button class="btn btn-secondary" type="submit">Ver</button></noscript>
+    </form>
+  </div>
+</div>
+
+<section class="card">
+  {% if filas %}
+    <ul class="list">
+      {% for f in filas %}
+        <li>
+          <span class="chip line" style="height: 22px; font-size: 12px">{{ f.obs.get_tipo_display }}</span>
+          <div class="tx">
+            <b>{{ f.obs.objeto_texto }}</b>
+            <span>{{ f.obs.autor_nombre }} · {{ f.obs.creada|date:"d-m-Y H:i" }}{% if f.obs.delegacion %} · {{ f.obs.delegacion.nombre }}{% endif %}</span>
+            <span style="color: var(--tinta); white-space: pre-line">{{ f.obs.texto|truncatechars:220 }}</span>
+          </div>
+          <a class="go" href="{{ f.url }}" aria-label="Abrir {{ f.obs.objeto_texto }}">
+            <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3>Todavía no hay observaciones</h3>
+      <p>Se escriben al final de la ficha de un compromiso, un caso social o una carta.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

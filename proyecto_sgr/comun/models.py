@@ -195,3 +195,58 @@ class AlertaRevisada(models.Model):
         if self.quien_id:
             return self.quien.get_full_name() or self.quien.get_username()
         return "el sistema"
+
+
+class Observacion(models.Model):
+    """
+    Una observación o consulta dejada sobre un registro (HU-24, CU-63).
+
+    Es lo que permite que el coordinador pregunte por un compromiso de otra
+    delegación, o que el delegado deje contexto en un caso social, sin salir
+    del sistema: la pregunta queda pegada al registro, con autor y fecha, y
+    la conversación se lee en orden.
+
+    Una observación **no se edita ni se borra**. Es una conversación: si se
+    pudiera cambiar lo dicho, la respuesta de otra persona quedaría
+    respondiendo a algo que ya no está.
+
+    Se asocia al registro por tipo y número en vez de con una relación
+    genérica de Django: los tipos son pocos y fijos —están en
+    ``comun/observaciones.py`` junto con quién puede ver cada uno—, y así la
+    tabla se lee sin conocer el mecanismo de ``contenttypes``.
+    """
+
+    class Tipo(models.TextChoices):
+        COMPROMISO = "compromiso", "Compromiso"
+        CASO = "caso", "Caso social"
+        CARTA = "carta", "Carta"
+
+    tipo = models.CharField(max_length=12, choices=Tipo.choices)
+    objeto_id = models.PositiveIntegerField("registro")
+    objeto_texto = models.CharField(
+        "registro", max_length=200,
+        help_text="Cómo se llamaba el registro al escribir la observación.",
+    )
+    delegacion = models.ForeignKey(
+        "organizacion.Delegacion", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="observaciones", verbose_name="delegación del registro",
+    )
+    autor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="observaciones", verbose_name="autor",
+    )
+    texto = models.TextField()
+    creada = models.DateTimeField("escrita el", auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "observación"
+        verbose_name_plural = "observaciones"
+        ordering = ["creada", "pk"]
+        indexes = [models.Index(fields=["tipo", "objeto_id"], name="observacion_registro")]
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} {self.objeto_texto} · {self.autor_nombre}"
+
+    @property
+    def autor_nombre(self):
+        return self.autor.get_full_name() or self.autor.get_username()

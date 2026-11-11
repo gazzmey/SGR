@@ -17,7 +17,7 @@
 <div class="page-head">
   <div>
     <h1>{{ obj.nombre }}</h1>
-    <p>Ficha de consulta de {{ obj.codigo }}. Todos los datos en modo lectura.</p>
+    <p>Ficha de consulta{% if obj.codigo %} de {{ obj.codigo }}{% endif %}. Todos los datos en modo lectura.</p>
   </div>
   <div class="actions">
     <a class="btn btn-ghost" href="{% url url_lista %}">Volver al listado</a>
@@ -114,4 +114,5 @@
     {% endblock %}
   </aside>
 </div>
+{% block despues %}{% endblock %}
 {% endblock %}

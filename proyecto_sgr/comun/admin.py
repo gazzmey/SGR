@@ -9,7 +9,7 @@ abierta por detrás la puerta que se cerró por delante.
 
 from django.contrib import admin
 
-from .models import AlertaRevisada, EventoAuditoria
+from .models import AlertaRevisada, EventoAuditoria, Observacion
 
 
 @admin.register(EventoAuditoria)
@@ -51,4 +51,31 @@ class AlertaRevisadaAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Observacion)
+class ObservacionAdmin(admin.ModelAdmin):
+    """
+    Las observaciones de los registros (HU-24), de solo lectura: una
+    conversación que se pudiera reescribir por detrás dejaría de servir como
+    constancia de lo que se dijo.
+    """
+
+    list_display = ("creada", "tipo", "objeto_texto", "autor", "delegacion")
+    list_filter = ("tipo", "delegacion")
+    search_fields = ("objeto_texto", "texto")
+    ordering = ("-creada",)
+    list_select_related = ("autor", "delegacion")
+
+    def get_readonly_fields(self, request, obj=None):
+        return [campo.name for campo in self.model._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False

@@ -40,6 +40,7 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from comun.excel import libro_de_listado
 from comun.navegacion import desde_formulario
 from comun.permisos import RequierePermiso, perfil_de, tiene_permiso
+from comun import concurrencia
 from comun.resultado import anunciar
 
 TAMANOS = [10, 25, 50]
@@ -61,6 +62,20 @@ def auditar(request, accion, obj, *, entidad, antes="", despues="", detalle=""):
 
     return registrar(request, accion, entidad=entidad, objeto=obj,
                      antes=antes, despues=despues, detalle=detalle)
+
+
+def _versionar(request, obj, antes=None):
+    """
+    Guarda la versión del parámetro, si el modelo es de los versionados.
+
+    Ítems, metas y reglas declaran ``datos_version``; el resto de los
+    mantenedores no, y para ellos esto no hace nada (HU-25).
+    """
+    if not hasattr(obj, "datos_version"):
+        return
+    from gestion.versiones import versionar
+
+    versionar(obj, request.user, antes)
 
 
 def _resumen_auditoria(form, iniciales=False):
@@ -522,6 +537,7 @@ class CrearMantenedor(_FormMantenedor, CreateView):
         # El aviso se prepara DESPUÉS de super(), que es quien guarda: si
         # guardar fallara, no habría nada que anunciar.
         respuesta = super().form_valid(form)
+        _versionar(self.request, self.object)
 
         # La auditoría se escribe desde el motor y no desde cada vista: así
         # los seis mantenedores quedan cubiertos de una vez, y ninguno se
@@ -547,12 +563,62 @@ class CrearMantenedor(_FormMantenedor, CreateView):
 
 
 class EditarMantenedor(_FormMantenedor, UpdateView):
+    """
+    Edición con control de ediciones simultáneas (HU-23).
+
+    El formulario lleva oculta la huella del registro tal como estaba al
+    abrirlo. Si al guardar ya no coincide con la de la base, otra persona
+    guardó entretanto: no se pisa su cambio, se muestra qué cambió y se deja
+    decidir. Está en el motor para que los catorce formularios de edición
+    queden cubiertos de una vez. El detalle está en ``comun/concurrencia.py``.
+    """
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["campo_huella"] = concurrencia.CAMPO
+        # En un conflicto la huella nueva ya viene puesta; si no, es la del
+        # registro tal como se leyó al abrir el formulario.
+        ctx.setdefault("huella", getattr(self, "_huella", None)
+                       or concurrencia.huella(self.object))
+        return ctx
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self._huella = concurrencia.huella(self.object)
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self._huella = concurrencia.huella(self.object)
+        self._antes = (self.object.datos_version()
+                       if hasattr(self.object, "datos_version") else None)
+        if concurrencia.hay_conflicto(request, self.object):
+            # Se arma el formulario con lo que la persona escribió, sobre el
+            # registro recién leído: su «initial» es lo que está guardado
+            # ahora. No se valida ni se guarda nada.
+            form = self.get_form()
+            cambios = concurrencia.diferencias(form)
+            return self.render_to_response(self.get_context_data(
+                form=form, conflicto=True, conflicto_cambios=cambios,
+                huella=self._huella,
+            ))
+        return super().post(request, *args, **kwargs)
+
+    def get_object(self, queryset=None):
+        # ``post`` ya lo leyó una vez; UpdateView lo vuelve a pedir. Se
+        # reutiliza el mismo para que la huella y lo que se valida sean
+        # exactamente el mismo registro.
+        if getattr(self, "object", None) is not None and queryset is None:
+            return self.object
+        return super().get_object(queryset)
+
     def form_valid(self, form):
         # El «antes» se arma con los valores que el formulario trae marcados
         # como cambiados, y hay que leerlos ANTES de guardar: después ya no
         # existen. Es la mitad del «antes y después» que pide INT-03.
         antes = _resumen_auditoria(form, iniciales=True)
         respuesta = super().form_valid(form)
+        _versionar(self.request, self.object, getattr(self, "_antes", None))
         auditar(self.request, "editar", self.object,
                 entidad=self.model._meta.verbose_name.capitalize(),
                 antes=antes, despues=_resumen_auditoria(form))
@@ -694,12 +760,14 @@ class CambiarEstado(AlcanceDelegacion, View):
                 return self._volver(request)
 
         antes = "activo" if obj.activo else "inactivo"
+        foto = obj.datos_version() if hasattr(obj, "datos_version") else None
         obj.activo = activar
         if hasattr(obj, "desactivada"):
             obj.desactivada = None if activar else timezone.localdate()
             obj.save(update_fields=["activo", "desactivada"])
         else:
             obj.save(update_fields=["activo"])
+        _versionar(request, obj, foto)
 
         auditar(request, "estado", obj,
                 entidad=self.model._meta.verbose_name.capitalize(),

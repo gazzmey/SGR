@@ -213,6 +213,7 @@ class CartaEditar(_PermisoCartas, _ConDelegacion, EditarMantenedor):
 
 class CartaDetalle(_PermisoCartas, DetalleMantenedor):
     model = Carta
+    template_name = "gestion/carta_detalle.html"
     menu = "cartas"
     singular = "carta"
     plural = "cartas"
@@ -247,6 +248,13 @@ class CartaDetalle(_PermisoCartas, DetalleMantenedor):
         "El original queda en oficina de partes. Aquí se registra lo necesario "
         "para encontrarlo y saber en qué quedó."
     )
+
+    def get_context_data(self, **kwargs):
+        from comun.observaciones import hilo
+
+        contexto = super().get_context_data(**kwargs)
+        contexto["hilo"] = hilo(self.request, "carta", contexto["obj"])
+        return contexto
 
 
 class CartaEstado(CambiarEstado):

@@ -45,8 +45,13 @@
   </div>
 {% endif %}
 
+{% if conflicto %}
+  {% include "comun/_conflicto.html" %}
+{% endif %}
+
 <form class="grid g-side" method="post" novalidate>
   {% csrf_token %}
+  {% if huella %}<input type="hidden" name="{{ campo_huella }}" value="{{ huella }}">{% endif %}
 
   <section class="card" style="align-self: start">
     {% if form.errors %}

@@ -176,6 +176,7 @@ class PeriodoDetalle(DetalleMantenedor):
         ("Duración", lambda o: f"{o.dias_totales} días de calendario"),
         ("Transcurrido", lambda o: f"{o.dias_transcurridos()} días"),
         ("Avance esperado hoy", lambda o: f"{o.avance_esperado():.2f} %".replace(".", ",")),
+        ("Regla con que se mide", lambda o: _regla_del_periodo(o), {"ancho": True, "html": True}),
         ("Observación", "observacion", {"ancho": True}),
     ]
     kpis = [
@@ -261,6 +262,14 @@ class PeriodoTransicion(View):
             periodo.cerrado_el = None
             periodo.cerrado_por = None
         periodo.save(update_fields=campos)
+
+        if paso == "cerrar":
+            # La regla con que se midió queda fija como regla propia del
+            # período: editar después la general ya no lo toca (HU-25).
+            from gestion.versiones import congelar_regla
+
+            regla = congelar_regla(periodo, request.user)
+            texto = f"{texto} Se midió con «{regla.nombre}», versión {regla.version}."
 
         # El ciclo del período es de lo más delicado que tiene el sistema:
         # cerrar congela resultados y reabrir los vuelve a poner en juego.
@@ -593,6 +602,31 @@ class MetaEditar(EditarMantenedor):
         return self._congelada(request) or super().post(request, *args, **kwargs)
 
 
+def _regla_del_periodo(periodo):
+    """
+    La regla y su versión: en un período cerrado, con la que quedó medido
+    (HU-38, criterio 2).
+    """
+    from gestion import reglas as R
+
+    regla = R.vigente(periodo)
+    if not regla.pk:
+        return format_html("Propuesta del plan, sin regla guardada")
+    propia = "propia del período" if regla.periodo_id else "la general"
+    congelada = " · congelada al cierre" if periodo.estado == Periodo.Estado.CERRADO else ""
+    return format_html(
+        '<a class="link" href="{}">{}</a> · versión {} · {}{} · {}',
+        reverse("gestion:regla_detalle", args=[regla.pk]), regla.nombre,
+        regla.version, propia, congelada, _enlace_historial(regla),
+    )
+
+
+def _enlace_historial(obj):
+    from gestion.views_versiones import enlace_historial
+
+    return enlace_historial(obj)
+
+
 class MetaDetalle(DetalleMantenedor):
     model = MetaPeriodo
     permiso = P.DEFINIR_META
@@ -611,6 +645,7 @@ class MetaDetalle(DetalleMantenedor):
         ("Ponderador", lambda o: f"{o.ponderador} %"),
         ("Suma del cargo en el período",
          lambda o: f"{o.periodo.suma_ponderadores(o.cargo)} %"),
+        ("Historial", lambda o: _enlace_historial(o), {"html": True}),
     ]
     pie = "Mientras el período no se cierre, la meta se puede ajustar."
 
@@ -774,9 +809,35 @@ class ReglaNueva(CrearMantenedor):
 
 
 class ReglaEditar(EditarMantenedor):
+    """
+    Edición de una regla, salvo la de un período cerrado (CU-68).
+
+    Es la regla con que quedó medido ese resultado. Cambiarla exige reabrir
+    el período, y la reapertura queda auditada.
+    """
+
     model = ReglaCalculo
     form_class = ReglaCalculoForm
     permiso = P.CONFIGURAR_PERIODO
+
+    def _congelada(self, request):
+        regla = super().get_object()
+        if regla.periodo_id and regla.periodo.estado == Periodo.Estado.CERRADO:
+            anunciar(
+                request, "Esta regla quedó congelada",
+                f"Es la regla con que se midió «{regla.periodo.nombre}», que está "
+                "cerrado. Para cambiarla hay que reabrir el período; la "
+                "reapertura queda en la auditoría.",
+                icono="error",
+            )
+            return redirect("gestion:regla_detalle", pk=regla.pk)
+        return None
+
+    def get(self, request, *args, **kwargs):
+        return self._congelada(request) or super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        return self._congelada(request) or super().post(request, *args, **kwargs)
     menu = "reglas"
     singular = "regla"
     plural = "reglas"
@@ -824,6 +885,8 @@ class ReglaDetalle(DetalleMantenedor):
         ("Situación", lambda o: "Aprobada" if o.aprobada else
          "Propuesta, pendiente de aprobación formal"),
         ("Aprobada por", lambda o: o.aprobada_por or "Todavía nadie"),
+        ("Versión vigente", lambda o: o.version),
+        ("Historial", lambda o: _enlace_historial(o), {"html": True}),
         ("De dónde salen los valores",
          lambda o: o.observacion or "Sin observación", {"ancho": True}),
     ]

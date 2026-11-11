@@ -19,7 +19,7 @@ from django.views.decorators.http import require_POST
 from atencion import plazos
 from atencion.forms import CasoSocialForm
 from atencion.models import Atencion, CasoSocial
-from comun import permisos as P
+from comun import concurrencia, observaciones, permisos as P
 from comun.mantenedor import Columna, Filtro, ListaMantenedor, auditar
 from comun.permisos import redirect_al_login, tiene_permiso
 from comun.resultado import anunciar
@@ -253,12 +253,18 @@ def caso_detalle(request, pk):
     caso = get_object_or_404(consulta, pk=pk)
 
     puede_editar = tiene_permiso(request.user, P.REGISTRAR_ATENCION)
+    huella = concurrencia.huella(caso)
     formulario = CasoSocialForm(request.POST or None, instance=caso)
+    conflicto, cambios = False, []
 
     if request.method == "POST":
         if not puede_editar:
             raise PermissionDenied("Puedes consultar el caso, pero no modificarlo.")
-        if formulario.is_valid():
+        if concurrencia.hay_conflicto(request, caso):
+            # Otra persona guardó fechas mientras este formulario estaba
+            # abierto (HU-23): no se pisa, se muestra la diferencia.
+            conflicto, cambios = True, concurrencia.diferencias(formulario)
+        elif formulario.is_valid():
             cambios = ", ".join(formulario.changed_data[:6])
             formulario.save()
             auditar(request, "editar", caso, entidad="Caso social", despues=cambios)
@@ -273,6 +279,11 @@ def caso_detalle(request, pk):
         "menu": "casos",
         "caso": caso,
         "form": formulario,
+        "huella": huella,
+        "campo_huella": concurrencia.CAMPO,
+        "conflicto": conflicto,
+        "conflicto_cambios": cambios,
+        "hilo": observaciones.hilo(request, "caso", caso),
         "puede_editar": puede_editar,
         "tramos": plazos.tramos(caso, regla, hoy),
         "situacion": plazos.situacion(caso, regla, hoy),

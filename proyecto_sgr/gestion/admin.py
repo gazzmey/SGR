@@ -18,6 +18,7 @@ from .models import (
     Periodo,
     Reconocimiento,
     ReglaCalculo,
+    VersionParametro,
 )
 
 
@@ -273,3 +274,21 @@ class CartaAdmin(admin.ModelAdmin):
     list_select_related = ("responsable", "delegacion")
     readonly_fields = ("codigo", "registrada_por", "creada")
     actions = [activar, desactivar]
+
+
+@admin.register(VersionParametro)
+class VersionParametroAdmin(admin.ModelAdmin):
+    """El historial de parámetros es de solo lectura, también aquí."""
+
+    list_display = ("etiqueta", "tipo", "version", "origen", "autor", "creada")
+    list_filter = ("tipo", "origen")
+    search_fields = ("etiqueta",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

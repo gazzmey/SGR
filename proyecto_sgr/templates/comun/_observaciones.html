@@ -1,0 +1,41 @@
+{% comment %}
+  La conversación de un registro (HU-24). Recibe «hilo» de
+  comun.observaciones.hilo(): la lista en orden cronológico y si la persona
+  puede escribir. Una observación no se edita ni se borra.
+{% endcomment %}
+<section class="card mt20" id="observaciones" aria-labelledby="t-obs">
+  <div class="card-h">
+    <h2 id="t-obs">Observaciones</h2>
+    <span class="sub">{% if hilo.lista %}{{ hilo.lista|length }} en orden cronológico{% else %}Consultas y comentarios sobre este registro{% endif %}</span>
+  </div>
+  <div class="card-b">
+    {% if hilo.lista %}
+      <ol class="tl" style="margin-bottom: 18px">
+        {% for o in hilo.lista %}
+          <li>
+            <span class="pt"></span>
+            <b>{{ o.autor_nombre }}</b>
+            <span>{{ o.creada|date:"d-m-Y · H:i" }}</span>
+            <div style="white-space: pre-line; margin-top: 4px; color: var(--tinta)">{{ o.texto }}</div>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="soft" style="margin: 0 0 16px">Todavía nadie ha dejado una observación aquí.</p>
+    {% endif %}
+    {% if hilo.puede_escribir %}
+      <form method="post" action="{% url 'comun:observacion_nueva' %}">
+        {% csrf_token %}
+        <input type="hidden" name="tipo" value="{{ hilo.tipo }}">
+        <input type="hidden" name="objeto" value="{{ hilo.objeto }}">
+        <div class="field">
+          <label for="obs-texto">Nueva observación o consulta</label>
+          <textarea class="input" id="obs-texto" name="texto" rows="3" maxlength="2000" required
+                    placeholder="Pregunta o deja contexto. La ve quien puede abrir este registro."></textarea>
+          <span class="help">Queda con tu nombre y la hora, y no se puede editar ni borrar.</span>
+        </div>
+        <div class="row mt8" style="justify-content: flex-end"><button type="submit" class="btn btn-primary">Enviar observación</button></div>
+      </form>
+    {% endif %}
+  </div>
+</section>

@@ -112,9 +112,44 @@ class Item(models.Model):
     def __str__(self):
         return f"{self.codigo} — {self.nombre}"
 
+    # --- versiones (HU-25) ------------------------------------------------
+
+    TIPO_VERSION = "item"
+
+    def datos_version(self):
+        return {
+            "Código": self.codigo,
+            "Nombre": self.nombre,
+            "Área": self.get_area_display(),
+            "Cómo se mide": self.get_medicion_display(),
+            "Unidad": self.get_unidad_display(),
+            "Meta sugerida": str(self.meta),
+            "Ponderador sugerido": f"{self.ponderador} %",
+            "Estado": "Activo" if self.activo else "Inactivo",
+        }
+
+    def vigencia_version(self):
+        from datetime import date
+
+        return (f"Desde el {date.today():%d-%m-%Y}, en las metas de los "
+                "períodos que no están cerrados")
+
     def clean(self):
         """El ítem medido por la agenda es un porcentaje, y su meta también."""
         super().clean()
+        # Cambiar cómo se mide un ítem cambiaría el resultado de los períodos
+        # cerrados que lo usaron (RF-038.3). Para medir distinto se crea otro.
+        if self.pk:
+            previo = Item.objects.filter(pk=self.pk).values_list("medicion", flat=True).first()
+            if (previo and previo != self.medicion
+                    and self.metas.filter(periodo__estado="cerrado").exists()):
+                raise ValidationError({
+                    "medicion": (
+                        "Este ítem se usó en un período cerrado: cambiar cómo "
+                        "se mide alteraría ese resultado. Crea un ítem nuevo "
+                        "con la medición que necesitas."
+                    ),
+                })
         if self.medicion == self.Medicion.AGENDA:
             errores = {}
             if self.unidad != self.Unidad.PORCENTAJE:

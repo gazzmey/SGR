@@ -106,7 +106,7 @@
                 {% else %}{{ col.titulo }}{% endif %}
               </th>
             {% endfor %}
-            <th class="r">Acciones</th>
+            {% if url_editar or url_estado %}<th class="r">Acciones</th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -115,6 +115,7 @@
               {% for celda in fila.celdas %}
                 <td{% if celda.clases %} class="{{ celda.clases }}"{% endif %}>{{ celda.html }}</td>
               {% endfor %}
+              {% if url_editar or url_estado %}
               <td class="r">
                 <div class="row" style="justify-content:flex-end;flex-wrap:nowrap;gap:6px">
                   {% if url_editar %}
@@ -134,6 +135,7 @@
                   {% endif %}
                 </div>
               </td>
+              {% endif %}
             </tr>
           {% endfor %}
         </tbody>

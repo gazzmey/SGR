@@ -38,6 +38,12 @@ def filtro_area():
 # =========================================================================
 
 
+def _enlace_historial(obj):
+    from gestion.views_versiones import enlace_historial
+
+    return enlace_historial(obj)
+
+
 class ItemsLista(ListaMantenedor):
     model = Item
     permiso = PERMISO
@@ -153,6 +159,7 @@ class ItemDetalle(DetalleMantenedor):
         ("Nombre", "nombre"),
         ("Área", "area"),
         ("Cómo se mide", "medicion"),
+        ("Historial", lambda o: _enlace_historial(o), {"html": True}),
         ("Unidad de medida", "unidad"),
         ("Meta sugerida", lambda o: f"{o.meta} {o.get_unidad_display().lower()}"),
         ("Ponderador sugerido", lambda o: f"{o.ponderador} %"),

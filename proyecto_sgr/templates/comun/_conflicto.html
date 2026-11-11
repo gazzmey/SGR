@@ -1,0 +1,28 @@
+{% comment %}
+  El aviso de edición simultánea (HU-23, CU-67). Aparece cuando otra persona
+  guardó el registro mientras este formulario estaba abierto. Nada se guardó:
+  se muestra lo que hay ahora y lo que la persona escribió, y ella decide.
+{% endcomment %}
+<div class="notice warn" role="alert" style="margin-bottom: 20px">
+  <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/></svg>
+  <div style="flex: 1; min-width: 0">
+    <b>Otra persona guardó cambios mientras editabas</b>
+    No se guardó nada todavía, para no pisar su cambio.
+    {% if conflicto_cambios %}
+      Estas son las diferencias entre lo que está guardado ahora y lo que escribiste:
+      <div class="tabla-wrap" style="margin-top: 10px">
+        <table class="tabla" style="font-size: 13.5px; background: transparent">
+          <thead><tr><th>Campo</th><th>Guardado ahora</th><th>Lo que escribiste</th></tr></thead>
+          <tbody>
+            {% for c in conflicto_cambios %}
+              <tr><td><b>{{ c.campo }}</b></td><td style="white-space: normal">{{ c.guardado }}</td><td style="white-space: normal">{{ c.escrito }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      Lo que escribiste coincide con lo guardado en los campos de este formulario; el otro cambio fue en otro dato del registro.
+    {% endif %}
+    <span class="small" style="display: block; margin-top: 8px">Si quieres dejar tu versión, revisa los campos y vuelve a guardar. Si prefieres la que está guardada, vuelve al listado sin guardar.</span>
+  </div>
+</div>

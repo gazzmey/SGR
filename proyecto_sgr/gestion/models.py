@@ -298,6 +298,24 @@ class MetaPeriodo(models.Model):
     def __str__(self):
         return f"{self.item} · {self.cargo.nombre} · {self.periodo.nombre}"
 
+    # --- versiones (HU-25) ------------------------------------------------
+
+    TIPO_VERSION = "meta"
+
+    def datos_version(self):
+        return {
+            "Período": self.periodo.nombre,
+            "Cargo": self.cargo.nombre,
+            "Ítem": str(self.item),
+            "Meta": str(self.meta),
+            "Ponderador": f"{self.ponderador} %",
+            "Estado": "Activa" if self.activo else "Inactiva",
+        }
+
+    def vigencia_version(self):
+        return (f"{self.periodo.nombre} · del {self.periodo.inicio:%d-%m-%Y} "
+                f"al {self.periodo.termino:%d-%m-%Y}")
+
     def clean(self):
         """
         Meta mayor que cero y ponderadores que no se pasen de 100.
@@ -399,3 +417,10 @@ from gestion.modelos_ajustes import Ausencia, Reconocimiento  # noqa: E402,F401
 # la matriz). No es un compromiso: muchas cartas son solo para conocimiento.
 
 from gestion.modelos_cartas import Carta  # noqa: E402,F401
+
+# =========================================================================
+# Versiones de los parámetros
+# =========================================================================
+# El historial de ítems, metas y reglas (HU-25 y HU-38).
+
+from gestion.modelos_versiones import VersionParametro  # noqa: E402,F401
