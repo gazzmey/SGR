@@ -26,6 +26,7 @@ ni más ni menos—.
 """
 
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from django.shortcuts import redirect, render
 
 from catalogos.models import Item
@@ -58,21 +59,19 @@ def _delegaciones_permitidas(request):
     return Delegacion.objects.filter(activo=True)
 
 
-def informes(request):
-    """Arma el informe pedido, o lo entrega como archivo si lo piden así."""
-    desvio = _exigir(request, P.VER_INFORMES,
-                     "No tienes permiso para consultar informes.")
-    if desvio:
-        return desvio
+def _alcance(request):
+    """
+    (permitidas, elegida, delegaciones) del pedido.
 
-    periodo = T.periodo_elegido(request)
+    Lo usan el informe y la ficha de una brecha: los dos tienen que decidir
+    igual qué delegaciones entran, o el detalle podría mostrar personas que
+    el informe no contó.
+    """
     permitidas = _delegaciones_permitidas(request).filter(activo=True)
-
-    # --- qué delegaciones entran ----------------------------------------
     pedida = (request.GET.get("delegacion") or "").strip()
     elegida = None
     if pedida:
-        elegida = permitidas.filter(pk=pedida).first()
+        elegida = permitidas.filter(pk=pedida).first() if pedida.isdigit() else None
         if elegida is None:
             raise PermissionDenied(
                 "Esa delegación no está entre las que tu perfil autoriza."
@@ -86,6 +85,18 @@ def informes(request):
         activa = delegacion_activa(request)
         if activa is not None and not delegaciones:
             delegaciones = [activa]
+    return permitidas, elegida, delegaciones
+
+
+def informes(request):
+    """Arma el informe pedido, o lo entrega como archivo si lo piden así."""
+    desvio = _exigir(request, P.VER_INFORMES,
+                     "No tienes permiso para consultar informes.")
+    if desvio:
+        return desvio
+
+    periodo = T.periodo_elegido(request)
+    permitidas, elegida, delegaciones = _alcance(request)
 
     # --- qué ítem ---------------------------------------------------------
     pedido_item = (request.GET.get("item") or "").strip()
@@ -163,3 +174,73 @@ def _exportar(request, informe, formato):
         filas=filas,
         archivo="SGR_informe_" + informe.tipo,
     )
+
+
+def brecha(request):
+    """
+    La ficha de una brecha: el detalle que origina el promedio (HU-22).
+
+    Por cada período comparado, la regla con que se midió, la meta del
+    cargo y lo que logró cada persona. Mismo permiso y mismo alcance que el
+    informe del que se llega.
+    """
+    from django.shortcuts import get_object_or_404
+
+    from gestion import brechas as B
+    from gestion.models import Cargo, MetaPeriodo
+    from gestion.versiones import version_de
+
+    desvio = _exigir(request, P.VER_INFORMES,
+                     "No tienes permiso para consultar informes.")
+    if desvio:
+        return desvio
+
+    periodo = T.periodo_elegido(request)
+    _, elegida, delegaciones = _alcance(request)
+    pedidos = {c: (request.GET.get(c) or "").strip() for c in ("cargo", "item")}
+    if not all(v.isdigit() for v in pedidos.values()):
+        raise Http404("Falta el cargo o el ítem de la brecha.")
+    cargo = get_object_or_404(Cargo, pk=int(pedidos["cargo"]))
+    item = get_object_or_404(Item, pk=int(pedidos["item"]))
+    if periodo is None:
+        raise PermissionDenied("Todavía no hay un período configurado.")
+
+    analisis = B.analizar(periodo, delegaciones, item=item, cargo=cargo)
+    linea = analisis.lineas[0] if analisis.lineas else None
+
+    tramos = []
+    for indice, comparado in enumerate(analisis.periodos):
+        tramo = linea.tramos[indice] if linea else None
+        meta = MetaPeriodo.objects.filter(
+            periodo=comparado.periodo, cargo=cargo, item=item, activo=True).first()
+        tramos.append({
+            "comparado": comparado,
+            "tramo": tramo,
+            "meta": meta,
+            "version_meta": version_de(meta) if meta else None,
+            "personas": sorted(
+                tramo.personas if tramo else [],
+                key=lambda p: (p.delegacion.nombre, p.nombre),
+            ),
+        })
+
+    volver = request.GET.copy()
+    for clave in ("cargo", "item"):
+        volver.pop(clave, None)
+    volver["tipo"] = "brechas"
+
+    return render(request, "gestion/brecha_detalle.html", {
+        "menu": "informes",
+        "cargo": cargo,
+        "item": item,
+        "periodo": periodo,
+        "analisis": analisis,
+        "linea": linea,
+        "tramos": list(reversed(tramos)),
+        "delegacion_elegida": elegida,
+        "delegaciones": delegaciones,
+        "advertencia_reglas": B.advertencia_reglas(analisis),
+        "no_decide": B.NO_DECIDE,
+        "puede_historial": tiene_permiso(request.user, P.CONFIGURAR_PERIODO),
+        "volver": volver.urlencode(),
+    })

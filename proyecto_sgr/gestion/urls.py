@@ -24,6 +24,7 @@ urlpatterns = [
     # --- alertas y auditoría ---
     path("alertas/", al.alertas, name="alertas"),
     path("informes/", inf.informes, name="informes"),
+    path("informes/brecha/", inf.brecha, name="brecha"),
     path("alertas/revisar/", al.RevisarAlerta.as_view(), name="alerta_revisar"),
     # La auditoría solo tiene listado: no hay creación, edición ni borrado, y
     # esa ausencia es la protección que pide INT-03.

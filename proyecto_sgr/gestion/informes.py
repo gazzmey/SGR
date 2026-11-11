@@ -10,6 +10,7 @@ matriz SGR (HU-14):
     Compromisos de la agenda       pendientes, vencidos y realizados
     Compromisos por colaborador    cuántos tiene cada uno en cada estado
     Tendencia histórica            compara períodos cerrados
+    Brechas por cargo e ítem       dónde el cargo no llega a su meta (HU-22)
 
 Por qué este módulo no calcula nada
 -----------------------------------
@@ -87,6 +88,7 @@ class Celda:
     texto: str
     chip: str = ""        # "ok" | "warn" | "bad" | "line" | ""
     fuerte: bool = False
+    enlace: str = ""      # solo en pantalla; el archivo lleva el texto
 
 
 @dataclass(frozen=True)
@@ -113,6 +115,9 @@ class Informe:
     quien: str = ""
     regla: object = None
     sin_datos: str = ""
+    #: La columna que en pantalla va como fila de grupo y en el archivo
+    #: como columna propia: la delegación, salvo en brechas, que es el cargo.
+    titulo_grupo: str = "Delegación"
 
     @property
     def hay_datos(self):
@@ -137,7 +142,7 @@ class Informe:
 
 
 # =========================================================================
-# Los cinco informes
+# Los seis informes
 # =========================================================================
 
 
@@ -152,6 +157,8 @@ TIPOS = (
      "Cuántos tiene cada uno en cada estado"),
     ("tendencia", "Tendencia histórica",
      "Compara los períodos ya cerrados"),
+    ("brechas", "Brechas por cargo e ítem",
+     "Dónde el cargo no llega a su meta, período a período"),
 )
 
 TIPOS_VALIDOS = {clave for clave, _, _ in TIPOS}
@@ -525,11 +532,82 @@ def _tendencia(periodo, delegaciones, item, regla, al_dia):
             )))
             filas.extend(medidas)
 
+    from gestion.brechas import diferencias_de_reglas
+
+    distintas = diferencias_de_reglas([R.vigente(p) for p in cerrados])
+    aviso = (" Ojo: no todos se midieron con la misma regla (%s)."
+             % ", ".join(distintas).lower()) if distintas else ""
     return columnas, tuple(filas), (), (
         "Solo se comparan períodos cerrados, cuyo resultado quedó congelado. "
         "Cada período se calcula con la regla que estaba vigente en él, no "
-        "con la de hoy: así la comparación es honesta."
+        "con la de hoy: así la comparación es honesta." + aviso
     ), "Todavía no hay períodos cerrados con los que comparar."
+
+
+def _brechas(periodo, delegaciones, item, regla, al_dia):
+    """
+    Cada ítem de cada cargo frente a su meta, en los períodos cerrados (HU-22).
+
+    Una fila por cargo e ítem; una columna por período, con el cumplimiento
+    promedio del cargo. El nombre del ítem lleva a la ficha con el detalle
+    de cada persona, que es lo que sostiene el promedio.
+    """
+    from django.urls import reverse
+
+    from gestion import brechas as B
+
+    analisis = B.analizar(periodo, delegaciones, item=item)
+    if not analisis.comparable:
+        return (), (), (), B.NO_DECIDE, (
+            "Hacen falta al menos dos períodos cerrados para ver una "
+            "tendencia, y hasta ahora hay %d. Se compara solo lo cerrado: "
+            "a mitad de período casi todo está bajo la meta por falta de "
+            "tiempo, no de trabajo." % len(analisis.periodos)
+        )
+
+    # Lo que decide va primero: en una pantalla angosta los períodos quedan
+    # al fondo de la tabla, y la situación y la tendencia siguen a la vista.
+    columnas = (
+        Columna("Ítem", ancho=34),
+        Columna("Situación", ancho=20),
+        Columna("Tendencia", ancho=20),
+        *(Columna(p.periodo.codigo, derecha=True, ancho=12) for p in analisis.periodos),
+        Columna("Cambios de meta", ancho=28),
+    )
+    base = reverse("gestion:brecha")
+    filtro_delegacion = (f"&delegacion={delegaciones[0].pk}"
+                         if len(delegaciones) == 1 else "")
+    filas = []
+    cargo_anterior = None
+    for linea in analisis.lineas:
+        if linea.cargo.pk != cargo_anterior:
+            filas.append(Fila(grupo=linea.cargo.nombre))
+            cargo_anterior = linea.cargo.pk
+        enlace = (f"{base}?periodo={periodo.pk}&cargo={linea.cargo.pk}"
+                  f"&item={linea.item.pk}{filtro_delegacion}")
+        filas.append(Fila(celdas=(
+            Celda(linea.item.nombre, fuerte=True, enlace=enlace),
+            Celda(linea.situacion_texto, chip=linea.situacion_chip),
+            Celda(linea.tendencia),
+            *(Celda(pct(t.promedio), fuerte=t.brecha) for t in linea.tramos),
+            Celda(" · ".join(linea.cambios) or "Sin cambios"),
+        ), delegacion=linea.cargo.nombre))
+
+    reglas = "; ".join(f"{p.periodo.codigo} con {p.rotulo_regla}" for p in analisis.periodos)
+    nota = (
+        "Cumplimiento promedio de las personas del cargo en cada ítem, con la "
+        "regla de cada período (%s). Hay brecha cuando el promedio queda bajo "
+        "el umbral de ítem realizado de esa regla. %s %s"
+        % (reglas, B.advertencia_reglas(analisis), B.NO_DECIDE)
+    ).replace("  ", " ")
+    etiquetas = (
+        "Períodos comparados: " + ", ".join(p.periodo.codigo for p in analisis.periodos),
+        "%d con brecha de %d" % (len(analisis.con_brecha), len(analisis.lineas)),
+    )
+    return columnas, tuple(filas), (), nota, (
+        "Ningún cargo tiene metas medidas en los períodos cerrados con los "
+        "filtros elegidos."
+    ), {"etiquetas": etiquetas, "titulo_grupo": "Cargo"}
 
 
 CONSTRUCTORES = {
@@ -538,6 +616,7 @@ CONSTRUCTORES = {
     "compromisos": _compromisos,
     "responsables": _por_responsable,
     "tendencia": _tendencia,
+    "brechas": _brechas,
 }
 
 
@@ -563,8 +642,12 @@ def construir(tipo, periodo, delegaciones, item=None, regla=None,
     al_dia = al_dia or date.today()
     delegaciones = list(delegaciones)
 
-    columnas, filas, pie, nota, sin_datos = CONSTRUCTORES[tipo](
-        periodo, delegaciones, item, regla, al_dia)
+    armado = CONSTRUCTORES[tipo](periodo, delegaciones, item, regla, al_dia)
+    columnas, filas, pie, nota, sin_datos = armado[:5]
+    # Un informe puede sumar distintivos propios —el de brechas dice qué
+    # períodos comparó, que es parte de lo que el reporte tiene que mostrar—
+    # y agrupar por otra cosa que la delegación.
+    extra = armado[5] if len(armado) > 5 else {}
 
     nombre_tipo = next(t for c, t, _ in TIPOS if c == tipo)
 
@@ -576,8 +659,9 @@ def construir(tipo, periodo, delegaciones, item=None, regla=None,
         ),
         "Ítems: " + (item.nombre if item is not None else "todos"),
     ]
-    if tipo in ("funcionario", "delegacion", "tendencia"):
+    if tipo in ("funcionario", "delegacion", "tendencia", "brechas"):
         etiquetas.append("Solo evidencias aprobadas")
+    etiquetas.extend(extra.get("etiquetas", ()))
 
     return Informe(
         tipo=tipo,
@@ -591,6 +675,7 @@ def construir(tipo, periodo, delegaciones, item=None, regla=None,
         quien=quien,
         regla=regla,
         sin_datos=sin_datos,
+        titulo_grupo=extra.get("titulo_grupo", "Delegación"),
     )
 
 
@@ -623,15 +708,15 @@ def para_exportar(informe):
     """
     Las columnas y las filas del informe, en la forma que pide ``comun.excel``.
 
-    Se agrega «Delegación» como primera columna y se sueltan las filas de
-    grupo: en una planilla, la agrupación visual estorba y lo que sirve es
-    poder ordenar y filtrar por esa columna.
+    Se agrega el grupo —la delegación o, en brechas, el cargo— como primera
+    columna y se sueltan las filas de grupo: en una planilla, la agrupación
+    visual estorba y lo que sirve es poder ordenar y filtrar por esa columna.
     """
-    lleva_delegacion = not any(c.titulo == "Delegación" for c in informe.columnas)
+    lleva_grupo = not any(c.titulo == informe.titulo_grupo for c in informe.columnas)
 
     columnas = []
-    if lleva_delegacion:
-        columnas.append(ColumnaExportada("Delegación", -1, ancho=26))
+    if lleva_grupo:
+        columnas.append(ColumnaExportada(informe.titulo_grupo, -1, ancho=26))
     columnas += [
         ColumnaExportada(c.titulo, i, ancho=c.ancho)
         for i, c in enumerate(informe.columnas)

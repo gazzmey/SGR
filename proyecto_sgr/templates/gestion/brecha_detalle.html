@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% comment %}
+  La ficha de una brecha (HU-22, criterio 2): el detalle objetivo que origina
+  el promedio del informe. Por período, del más nuevo al más antiguo: la
+  regla con que se midió, la meta del cargo y lo que logró cada persona.
+{% endcomment %}
+
+{% block titulo %}Brecha · {{ item.nombre }}{% endblock %}
+
+{% block ruta %}
+  <a href="{% url 'gestion:informes' %}?{{ volver }}">Informes</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Brecha</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>{{ item.nombre }}</h1>
+    <p>{{ cargo.nombre }} · {% if delegacion_elegida %}{{ delegacion_elegida.nombre }}{% else %}{{ delegaciones|length }} delegaci{{ delegaciones|length|pluralize:"ón,ones" }} autorizada{{ delegaciones|length|pluralize }}{% endif %} · períodos cerrados hasta {{ periodo.nombre }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="{% url 'gestion:informes' %}?{{ volver }}">Volver al informe</a>
+  </div>
+</div>
+
+{% if not analisis.comparable %}
+  <div class="notice info">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>Todavía no hay con qué comparar</b>Hacen falta al menos dos períodos cerrados, y hasta {{ periodo.nombre }} hay {{ analisis.periodos|length }}.</div>
+  </div>
+{% elif not linea %}
+  <div class="notice info">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>Sin mediciones</b>Ninguna persona con el cargo {{ cargo.nombre }} tuvo meta en este ítem en los períodos cerrados que puedes consultar.</div>
+  </div>
+{% else %}
+
+  <section class="card">
+    <div class="card-h">
+      <h2>En resumen</h2>
+      <div class="end"><span class="chip {{ linea.situacion_chip }}">{{ linea.situacion_texto }}</span></div>
+    </div>
+    <dl class="datos">
+      <div class="par"><dt>Último período medido</dt><dd>{{ linea.ultimo.periodo.nombre }}<span class="t2">Promedio {{ linea.ultimo.promedio|floatformat:1 }} % · umbral {{ linea.ultimo.umbral }} %{% if linea.ultimo.brecha %} · faltan {{ linea.ultimo.distancia|floatformat:1 }} puntos{% endif %}</span></dd></div>
+      <div class="par"><dt>Tendencia</dt><dd>{{ linea.tendencia }}{% if linea.previo %}<span class="t2">Frente a {{ linea.previo.periodo.nombre }} ({{ linea.previo.promedio|floatformat:1 }} %)</span>{% endif %}</dd></div>
+      <div class="par"><dt>Llegaron al umbral</dt><dd>{{ linea.ultimo.alcanzaron }} de {{ linea.ultimo.personas|length }} persona{{ linea.ultimo.personas|length|pluralize }}</dd></div>
+      <div class="par"><dt>Cómo se mide</dt><dd>{{ item.get_medicion_display }}<span class="t2">{{ item.get_unidad_display }}</span></dd></div>
+    </dl>
+  </section>
+
+  {% if linea.cambios or advertencia_reglas %}
+    <div class="notice warn mt20">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/></svg>
+      <div><b>Los parámetros cambiaron entre períodos</b>{% if linea.cambios %}En este cargo: {{ linea.cambios|join:" · " }}. {% endif %}{{ advertencia_reglas }}</div>
+    </div>
+  {% endif %}
+
+  {% for t in tramos %}
+    <section class="card mt20" aria-labelledby="t-per-{{ forloop.counter }}">
+      <div class="card-h" style="align-items: flex-start">
+        <div>
+          <h2 id="t-per-{{ forloop.counter }}">{{ t.comparado.periodo.nombre }}</h2>
+          <span class="sub">
+            Medido con la regla {{ t.comparado.rotulo_regla }}
+            {% if t.meta %} · meta {{ t.meta.meta }}, ponderador {{ t.meta.ponderador }} %, versión {{ t.version_meta }} de la meta{% endif %}
+            {% if puede_historial and t.meta %} · <a class="link" href="{% url 'gestion:historial' %}?tipo=meta&amp;objeto={{ t.meta.pk }}">ver su historial</a>{% endif %}
+          </span>
+        </div>
+        <div class="end">
+          {% if t.tramo.personas %}
+            <span class="chip {% if t.tramo.brecha %}warn{% else %}ok{% endif %}">Promedio {{ t.tramo.promedio|floatformat:1 }} %</span>
+          {% else %}<span class="chip line">Sin meta en este período</span>{% endif %}
+        </div>
+      </div>
+      {% if t.personas %}
+        <div class="tabla-wrap">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Persona</th>
+                <th>Delegación</th>
+                <th>De dónde sale</th>
+                <th class="r">Cumplimiento</th>
+                <th>¿Llegó al umbral?</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in t.personas %}
+                <tr>
+                  <td>{{ p.nombre }}</td>
+                  <td>{{ p.delegacion.nombre }}</td>
+                  <td>{{ p.item.detalle }}{% if p.item.nota %}<span class="t2">{{ p.item.nota }}</span>{% endif %}</td>
+                  <td class="r"><b>{{ p.item.cumplimiento|floatformat:1 }} %</b></td>
+                  <td>{% if p.item.alcanzado %}<span class="chip ok">Sí</span>{% else %}<span class="chip line">No</span>{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </section>
+  {% endfor %}
+{% endif %}
+
+<div class="notice info mt20">
+  <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+  <div><b>Cómo leer esto</b>Cada período se calculó con su propia regla, la que quedó congelada al cerrarlo, y cuenta solo actividades aprobadas. {{ no_decide }}</div>
+</div>
+{% endblock %}

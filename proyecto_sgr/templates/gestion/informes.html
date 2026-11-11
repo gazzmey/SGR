@@ -76,6 +76,7 @@
             </select>
           </span>
           <span class="help">En «Cumplimiento por funcionario», elegir un ítem cambia la cifra: pasa a ser el avance en ese ítem, no el total de la persona.</span>
+          <span class="help">En «Brechas», el período elegido es hasta dónde se compara: entran los cerrados hasta ese, como máximo cuatro.</span>
         </div>
 
         <div class="generar">
@@ -129,7 +130,8 @@
                 <tr>
                   {% for celda in f.celdas %}
                     <td{% if forloop.counter0 in informe.columnas_derecha %} class="r"{% endif %}>
-                      {% if celda.chip %}<span class="chip {{ celda.chip }}">{{ celda.texto }}</span>
+                      {% if celda.enlace %}<a class="link" href="{{ celda.enlace }}">{% if celda.fuerte %}<b>{{ celda.texto }}</b>{% else %}{{ celda.texto }}{% endif %}</a>
+                      {% elif celda.chip %}<span class="chip {{ celda.chip }}">{{ celda.texto }}</span>
                       {% elif celda.fuerte %}<b>{{ celda.texto }}</b>
                       {% else %}{{ celda.texto }}{% endif %}
                     </td>

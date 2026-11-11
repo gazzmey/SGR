@@ -76,7 +76,8 @@ recorrido cortado a la mitad.
 | Historial de parámetros | `/periodo/historial/` | Cada versión de un ítem, una meta o una regla de cálculo: qué cambió, la vigencia, el autor y la versión anterior (HU-25 y HU-38). Solo consulta. |
 | Observaciones | `/observaciones/` | Las consultas y comentarios recientes en compromisos, casos sociales y cartas que la persona puede abrir. Se escriben al pie de la ficha de cada registro (HU-24). |
 | Auditoría | `/periodo/auditoria/` | Historial de operaciones críticas. Solo listado: no hay creación, edición ni borrado. |
-| Informes | `/periodo/informes/` | Cinco informes consolidados con filtros, y exportación a Excel, CSV y PDF. |
+| Informes | `/periodo/informes/` | Seis informes consolidados con filtros, y exportación a Excel, CSV y PDF. El sexto, *Brechas por cargo e ítem*, compara los períodos cerrados con la regla de cada uno (HU-22). |
+| Detalle de una brecha | `/periodo/informes/brecha/` | Por período: la regla y la meta con que se midió, y lo que logró cada persona del cargo. Se llega desde el informe de brechas. |
 
 La cadena que forman, y que es la razón del orden en que se construyeron:
 
@@ -579,6 +580,11 @@ es el que puede explicarle a la persona por qué se rechazó su archivo.
 - **Las observaciones son de tres registros** (HU-24): compromisos, casos
   sociales y cartas, que son donde hay seguimiento entre personas. No llegan
   por correo: se ven en la ficha y en *Observaciones*.
+- **Las brechas usan el cargo actual de cada persona** (HU-22). El sistema
+  no guarda qué cargo tenía alguien en un período anterior, así que quien
+  cambió de cargo aparece medido con el de hoy en los períodos pasados. Lo
+  mismo vale para quien hoy está inactivo: no entra. Guardar el cargo por
+  período exigiría una tabla de asignaciones que hoy no existe.
 - **El historial de parámetros empieza con esta versión** (HU-25). Lo que
   cambió antes no se puede reconstruir; la primera vez que se edita un
   parámetro se guarda cómo estaba como «estado previo al historial». Los
@@ -726,7 +732,8 @@ proyecto_sgr/
     modelos_versiones.py            VersionParametro: el historial de parámetros
     versiones.py                    cómo se escribe una versión y cómo se congela la regla
     alertas.py                      las siete condiciones, calculadas al vuelo
-    informes.py                     los cinco informes consolidados
+    informes.py                     los seis informes consolidados
+    brechas.py                      cada ítem del cargo frente a su meta, período a período (HU-22)
     forms.py  forms_actividad.py  forms_agenda.py  forms_ajustes.py  forms_cartas.py
     views.py  views_actividad.py  views_agenda.py  views_ajustes.py  views_cartas.py
     views_alertas.py  views_versiones.py
