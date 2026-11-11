@@ -49,7 +49,9 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from atencion.models import Atencion, CasoSocial, Solicitante
+from atencion.models import (
+    Atencion, CampanaRegalos, CasoSocial, InscripcionRegalo, Solicitante,
+)
 from catalogos.models import Item, SubAtencion, TipoAtencion
 from gestion.models import Cargo, MetaPeriodo, Periodo
 from gestion.modelos_actividad import Actividad, Evidencia
@@ -1250,6 +1252,19 @@ CASOS_DEMO = [
      "ingreso": -2, "visita": False},
 ]
 
+# Niños inscritos para regalos (hoja REGALOS NIÑOS). Solo RUT ficticio y
+# tramo de edad: el sistema no guarda el nombre del niño.
+REGALOS_DEMO = [
+    {"codigo": "REG-D001", "delegacion": "DEL-01", "rut": "25123456-6", "tramo": "3-5",
+     "inscribe": "marcela.rios@ejemplo.cl", "entregado": True},
+    {"codigo": "REG-D002", "delegacion": "DEL-01", "rut": "26234567-K", "tramo": "0-2",
+     "inscribe": "camila.otarola@ejemplo.cl"},
+    {"codigo": "REG-D003", "delegacion": "DEL-01", "rut": "24345678-9", "tramo": "6-8",
+     "inscribe": "marcela.rios@ejemplo.cl"},
+    {"codigo": "REG-D004", "delegacion": "DEL-02", "rut": "27456789-9", "tramo": "3-5",
+     "inscribe": "hector.pizarro@ejemplo.cl"},
+]
+
 CARGO_POR_TEXTO = {
     "Encargado territorial": "CAR-01",
     "Inspector municipal": "CAR-02",
@@ -1302,6 +1317,7 @@ class Command(BaseCommand):
         if not opciones["sin_atenciones"]:
             self._atenciones(subatenciones, usuarios, delegaciones)
             self._casos()
+            self._regalos()
 
         if not opciones["sin_superusuario"]:
             self._superusuario()
@@ -1524,6 +1540,48 @@ class Command(BaseCommand):
                     "  Atención: %s — %s (creada)"
                     % (persona.nombre, subatenciones[sub].nombre)
                 )
+
+    def _regalos(self):
+        """
+        Una campaña de Navidad abierta y cuatro niños inscritos.
+
+        Los RUT son ficticios, con dígito verificador válido, igual que los de
+        los solicitantes. Uno ya entregado, para que se vea la diferencia.
+        """
+        hoy = timezone.localdate()
+        campana, nueva = CampanaRegalos.objects.update_or_create(
+            evento=CampanaRegalos.Evento.NAVIDAD, anio=hoy.year,
+            defaults={
+                "codigo": "CRG-D1",
+                "edad_maxima": 12,
+                "inscripcion_hasta": hoy + timedelta(days=20),
+                "fecha_entrega": hoy + timedelta(days=30),
+                "observacion": "Campaña de demostración.",
+                "activo": True,
+            },
+        )
+        self._informar("Campaña de regalos", campana, nueva)
+        usuarios = {u.email: u for u in User.objects.all() if u.email}
+        delegaciones = {d.codigo: d for d in Delegacion.objects.all()}
+        adultos = list(Solicitante.objects.order_by("rut"))
+        if not adultos:
+            return
+        for indice, fila in enumerate(REGALOS_DEMO):
+            registro, nuevo = InscripcionRegalo.objects.update_or_create(
+                codigo=fila["codigo"],
+                defaults={
+                    "campana": campana,
+                    "delegacion": delegaciones[fila["delegacion"]],
+                    "rut_menor": fila["rut"],
+                    "tramo_edad": fila["tramo"],
+                    "apoderado": adultos[indice % len(adultos)],
+                    "registrado_por": usuarios[fila["inscribe"]],
+                    "entregado_el": hoy if fila.get("entregado") else None,
+                    "entregado_por": usuarios[fila["inscribe"]] if fila.get("entregado") else None,
+                    "activo": True,
+                },
+            )
+            self._informar("Inscripción de regalo", registro, nuevo)
 
     def _casos(self):
         """

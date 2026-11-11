@@ -72,6 +72,9 @@
       <a href="{% url 'atencion:casos' %}"{% if menu == 'casos' %} aria-current="page"{% endif %}>
         <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>Casos sociales</span>
       </a>
+      <a href="{% url 'atencion:regalos' %}"{% if menu == 'regalos' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="9" width="17" height="11.5" rx="1.5"/><path d="M3.5 13h17M12 9v11.5"/><path d="M12 9c-1.5-3.5-5.5-4-5.5-1.5S10 9 12 9zM12 9c1.5-3.5 5.5-4 5.5-1.5S14 9 12 9z"/></svg><span>Regalos para niños</span>
+      </a>
     {% endif %}
 
     {% if sgr_permisos.validar_evidencia or sgr_permisos.ver_tablero or sgr_permisos.ver_informes or sgr_permisos.registrar_ajuste %}
@@ -124,6 +127,9 @@
       {% if sgr_permisos.configurar_periodo %}
         <a href="{% url 'gestion:reglas' %}"{% if menu == 'reglas' %} aria-current="page"{% endif %}>
           <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/><circle cx="9" cy="7" r="2.2"/><circle cx="15" cy="12" r="2.2"/><circle cx="17" cy="17" r="2.2"/></svg><span>Reglas de cálculo</span>
+        </a>
+        <a href="{% url 'atencion:campanas' %}"{% if menu == 'campanas' %} aria-current="page"{% endif %}>
+          <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="9" width="17" height="11.5" rx="1.5"/><path d="M3.5 13h17M12 9v11.5"/></svg><span>Campañas de regalos</span>
         </a>
       {% endif %}
     {% endif %}

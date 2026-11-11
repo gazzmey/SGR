@@ -70,6 +70,8 @@ recorrido cortado a la mitad.
 | Felicitaciones y reclamos | `/periodo/reconocimientos/` | Lo que la comunidad escribió sobre cada funcionario; suma o resta al resultado (hoja RECLAMOS de la matriz). |
 | Ausencias | `/periodo/ausencias/` | Licencias, vacaciones, emergencias y compensatorios, que bajan el avance esperado (hoja SEMAFORO). |
 | Casos sociales | `/atencion/casos/` | El seguimiento de una atención social —visita, informe, beneficio— con el plazo de cada paso (hojas G SOC). |
+| Regalos para niños | `/atencion/regalos/` | Inscripción por RUT del niño en una campaña, sin duplicados entre delegaciones, con entrega y resumen por tramo de edad (hoja REGALOS NIÑOS). |
+| Campañas de regalos | `/atencion/campanas/` | Navidad, Día del Niño y Aniversario de cada año, con su cierre de inscripciones y fecha de entrega. |
 | Tubo de cartas | `/periodo/cartas/` | Las cartas de oficina de partes, con su encargado, su estado y lo que se respondió (hoja TUBO CARTAS). |
 | Auditoría | `/periodo/auditoria/` | Historial de operaciones críticas. Solo listado: no hay creación, edición ni borrado. |
 | Informes | `/periodo/informes/` | Cinco informes consolidados con filtros, y exportación a Excel, CSV y PDF. |
@@ -152,6 +154,7 @@ colación, esa búsqueda no encontraría nada.
 | `catalogos` | `SubAtencion` | Detalle de un tipo, y si **exige documento de respaldo**. |
 | `atencion` | `Solicitante` | Persona que acude: RUT validado, nombre, teléfono, territorio. |
 | `atencion` | `Atencion` | La atención entregada: solicitante, subatención, delegación, funcionario, detalle y respaldo. |
+| `atencion` | `CampanaRegalos` · `InscripcionRegalo` | La campaña de regalos y cada niño inscrito: solo su RUT y su tramo de edad, más el adulto que lo inscribe. |
 | `atencion` | `CasoSocial` | El seguimiento de una atención social: fechas de visita, informe y beneficio, y devoluciones del informe. |
 | `cuenta` | `CodigoRecuperacion` | Código de seis dígitos de un solo uso, con vigencia e intentos. |
 
@@ -175,6 +178,7 @@ sistema no hacía se implementó así:
 | Resumen por colaborador del tubo (ingresado, pendiente, en proceso, realizado, % realizado) | Cuadro sobre el listado de la agenda e informe *Compromisos por colaborador* (HU-14). El % es el mismo que mide el ítem del tubo. |
 | Una hoja por cargo, con sus ítems, ponderadores y metas, y el *Descriptor de funciones* | `Cargo.funciones`, visibles en la ficha del cargo y en *Mi resultado*; el comando `cargar_estructura_municipal` carga cargos, ítems, metas y catálogo social sin datos personales. |
 | Hojas G SOC: primera, segunda y tercera gestión con «hasta 10 días», «sin diferencia», «hasta 4 días», «hasta 4 días» y «hasta 20 días» | `CasoSocial`, en *Comunidad → Casos sociales*. Cada paso se mide contra su plazo, que vive en la regla de cálculo; el listado muestra los tiempos de respuesta y un caso vencido aparece en las alertas. Las devoluciones del informe se registran pero no descuentan: la matriz no les da fórmula. |
+| Hoja REGALOS NIÑOS: «RUT del menor» y «RUT ya ingresado por delegación XX» | `InscripcionRegalo`, en *Comunidad → Regalos para niños*. El RUT se revisa contra todas las delegaciones y el aviso dice en cuál está inscrito. Del niño no se guarda el nombre; el RUT va enmascarado en listados y exportaciones. |
 | Hoja TUBO CARTAS: cartas de oficina de partes con estado En proceso / Aprobada / Finalizada / No aplica | `Carta`, en *Comunidad → Tubo de cartas*, con recuento por estado. Aprobarla o finalizarla exige escribir qué se respondió. |
 
 Al revisar el cálculo apareció además una promesa que no se cumplía: al
@@ -400,6 +404,7 @@ veces sin duplicar nada.
 | Ausencias | 2: vacaciones de `camila.otarola` y una emergencia de dos días de toda `DEL-01` |
 | Cartas de oficina de partes | 4 en `DEL-01`, una en cada estado |
 | Casos sociales | 3: uno cerrado con dos pasos fuera de plazo, uno con la visita vencida y uno al día |
+| Regalos para niños | 1 campaña de Navidad abierta y 4 niños inscritos (uno ya entregado), con RUT ficticio |
 | Reglas de cálculo | 1 general, **sin aprobar**: el sistema la aplica y la rotula como propuesta |
 | Actividades y evidencias | 111 cada una: 108 aprobadas, 2 por validar y 1 rechazada con su motivo |
 | Compromisos de la agenda | 17; los 10 vigentes de `DEL-01` reproducen el lote CAL-C del plan: 8 realizados, 1 pendiente y 1 en proceso, o sea 80 % realizado |
@@ -679,8 +684,10 @@ proyecto_sgr/
   atencion/                         Solicitante, Atencion, CasoSocial
     models.py  forms.py  views.py  urls.py  admin.py
     plazos.py                       los tiempos de respuesta de un caso, tramo por tramo
+    modelos_regalos.py              CampanaRegalos e InscripcionRegalo
+    forms_regalos.py  views_regalos.py  campañas, inscripción, entrega
     views_casos.py                  listado, apertura y ficha de los casos sociales
-    migrations/0001_initial.py  0002_casos_sociales.py
+    migrations/0001_initial.py  0002_casos_sociales.py  0003_regalos_para_ninos.py
   cuenta/                           CodigoRecuperacion y el acceso
     models.py  forms.py  views.py  urls.py  admin.py
     migrations/0001_initial.py

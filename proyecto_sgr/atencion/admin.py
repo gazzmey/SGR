@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from .models import Atencion, CasoSocial, Solicitante
+from .models import Atencion, CampanaRegalos, CasoSocial, InscripcionRegalo, Solicitante
 
 
 class AtencionInline(admin.TabularInline):
@@ -76,3 +76,26 @@ class CasoSocialAdmin(admin.ModelAdmin):
     search_fields = ("codigo", "atencion__solicitante__nombre", "observacion")
     list_select_related = ("atencion__solicitante", "atencion__subatencion", "responsable")
     readonly_fields = ("codigo", "atencion", "creado", "actualizado")
+
+
+@admin.register(CampanaRegalos)
+class CampanaRegalosAdmin(admin.ModelAdmin):
+    list_display = ("codigo", "evento", "anio", "inscripcion_hasta", "fecha_entrega", "activo")
+    list_filter = ("evento", "activo")
+    readonly_fields = ("codigo", "creada")
+
+
+@admin.register(InscripcionRegalo)
+class InscripcionRegaloAdmin(admin.ModelAdmin):
+    """El RUT del niño se muestra enmascarado también aquí, en el listado."""
+
+    list_display = ("codigo", "rut_enmascarado", "tramo_edad", "campana", "delegacion",
+                    "entregado_el", "activo")
+    list_filter = ("campana", "delegacion", "tramo_edad", "activo")
+    search_fields = ("codigo", "=rut_menor", "apoderado__nombre")
+    list_select_related = ("campana", "delegacion", "apoderado")
+    readonly_fields = ("codigo", "registrada", "registrado_por", "entregado_por")
+
+    @admin.display(description="RUT")
+    def rut_enmascarado(self, obj):
+        return obj.rut_enmascarado

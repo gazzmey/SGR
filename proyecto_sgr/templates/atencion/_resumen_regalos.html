@@ -1,0 +1,25 @@
+{% comment %}
+  Cuántos regalos hay que preparar, por tramo de edad, para la campaña
+  elegida. Cuenta solo las delegaciones que la persona puede ver.
+{% endcomment %}
+<section class="card" style="margin-bottom: 20px" aria-labelledby="t-regalos">
+  <div class="card-h">
+    <h2 id="t-regalos">{{ campana.nombre }}</h2>
+    <span class="sub">{% if abierta %}Inscripciones abiertas{% if campana.inscripcion_hasta %} hasta el {{ campana.inscripcion_hasta|date:"d-m-Y" }}{% endif %}{% else %}Inscripciones cerradas{% endif %}{% if campana.fecha_entrega %} · entrega el {{ campana.fecha_entrega|date:"d-m-Y" }}{% endif %}</span>
+    <div class="end"><span class="chip {% if abierta %}ok{% else %}line{% endif %}">{{ total_inscritos }} inscrito{{ total_inscritos|pluralize }} · {{ total_entregados }} entregado{{ total_entregados|pluralize }}</span></div>
+  </div>
+  {% if por_tramo %}
+    <div class="tabla-wrap">
+      <table class="tabla">
+        <thead><tr><th>Tramo de edad</th><th class="r">Regalos a preparar</th><th class="r">Ya entregados</th><th class="r">Por entregar</th></tr></thead>
+        <tbody>
+          {% for fila in por_tramo %}
+            <tr><td><b>{{ fila.tramo }}</b></td><td class="r">{{ fila.inscritos }}</td><td class="r">{{ fila.entregados }}</td><td class="r">{{ fila.pendientes }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card-b"><p class="soft">Todavía no hay niños inscritos en esta campaña.</p></div>
+  {% endif %}
+</section>

@@ -100,6 +100,7 @@
     {% endcomment %}
     {% block acciones_extra %}{% endblock %}
 
+    {% block form_estado %}
     <form method="post" action="{% url url_estado obj.pk %}" class="card" style="padding: 16px">
       {% csrf_token %}
       <input type="hidden" name="activar" value="{% if obj.activo %}0{% else %}1{% endif %}">
@@ -110,6 +111,7 @@
         {% if obj.activo %}Desactivar{% else %}Activar{% endif %}
       </button>
     </form>
+    {% endblock %}
   </aside>
 </div>
 {% endblock %}

@@ -1,0 +1,25 @@
+{% extends "comun/mantenedor_detalle.html" %}
+
+{% comment %}
+  La ficha de una inscripción: además de anularla, se marca la entrega. Quien
+  solo consulta —el delegado, por ejemplo— no ve los botones que no puede usar.
+{% endcomment %}
+
+{% block acciones_extra %}
+  {% if puede_entregar and obj.activo and not obj.entregado %}
+    <form method="post" action="{% url 'atencion:regalo_entregar' obj.pk %}" class="card" style="padding: 16px">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-block btn-primary">Marcar entregado hoy</button>
+      <p class="small soft mt8" style="margin-bottom: 0">Verifica antes el RUT del niño con el adulto que retira.</p>
+    </form>
+  {% elif obj.entregado %}
+    <div class="notice ok">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+      <div><b>Entregado</b>El {{ obj.entregado_el|date:"d-m-Y" }}.</div>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block form_estado %}
+  {% if puede_entregar %}{{ block.super }}{% endif %}
+{% endblock %}

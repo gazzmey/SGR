@@ -281,3 +281,8 @@ class CasoSocial(models.Model):
         if self.lleva_beneficio and not self.beneficio_entregado:
             return "Entregar el beneficio"
         return "Cerrado"
+
+
+# Los regalos para niños van en su propio archivo; se importan aquí para que
+# Django los registre en esta aplicación.
+from atencion.modelos_regalos import CampanaRegalos, InscripcionRegalo  # noqa: E402,F401
