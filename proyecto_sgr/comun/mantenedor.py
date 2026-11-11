@@ -26,7 +26,7 @@ mayúsculas y acentos, así que ``nombre__icontains="companias"`` encuentra
 
 from urllib.parse import urlencode
 
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
@@ -640,6 +640,12 @@ class CambiarEstado(AlcanceDelegacion, View):
     Antes de desactivar se consulta ``motivo_bloqueo()`` del propio modelo:
     es la clase la que sabe qué relaciones la protegen.
 
+    Antes de activar se aplican las mismas reglas que al guardar el
+    formulario (ver ``_motivo_para_activar``). Sin eso, este botón era una
+    puerta lateral: una meta que dejaba a su cargo sobre 100 %, un período
+    que se cruzaba con otro abierto o una segunda regla general entraban
+    activándolos, aunque el formulario los habría rechazado.
+
     Es el único de los cinco caminos que **escribe**, así que además del
     permiso comprueba el alcance: un pk de otra delegación se trata como
     inexistente.
@@ -662,6 +668,17 @@ class CambiarEstado(AlcanceDelegacion, View):
         obj = get_object_or_404(self.limitar(self.model._default_manager.all()), pk=pk)
         activar = request.POST.get("activar") == "1"
         vocal = "a" if self.genero == "la" else "o"
+
+        if activar and not obj.activo:
+            motivo = self._motivo_para_activar(obj)
+            if motivo:
+                anunciar(
+                    request,
+                    f"No se puede activar «{obj}»",
+                    motivo,
+                    icono="error",
+                )
+                return self._volver(request)
 
         if not activar:
             motivo = obj.motivo_bloqueo() if hasattr(obj, "motivo_bloqueo") else ""
@@ -698,6 +715,30 @@ class CambiarEstado(AlcanceDelegacion, View):
                "Deja de ofrecerse en los registros nuevos; lo ya registrado se conserva."),
         )
         return self._volver(request)
+
+    @staticmethod
+    def _motivo_para_activar(obj):
+        """
+        Por qué no se puede activar, o cadena vacía si se puede.
+
+        Primero se pregunta al modelo por sus bloqueos propios de activación
+        (``motivo_bloqueo_activar``), como el de un período cerrado. Después
+        se corre su ``clean()`` con el registro marcado como activo, sin
+        guardarlo: son las reglas que el formulario ya aplica, y así viven
+        en un solo lugar.
+        """
+        if hasattr(obj, "motivo_bloqueo_activar"):
+            motivo = obj.motivo_bloqueo_activar()
+            if motivo:
+                return motivo
+        obj.activo = True
+        try:
+            obj.clean()
+        except ValidationError as error:
+            return " ".join(error.messages)
+        finally:
+            obj.activo = False
+        return ""
 
     def _volver(self, request):
         """

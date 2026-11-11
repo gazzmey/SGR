@@ -142,12 +142,16 @@ colación, esa búsqueda no encontraría nada.
 | `organizacion` | `Delegacion` | Unidad territorial: código, nombre, zona, dirección, teléfono, horario, estado. |
 | `organizacion` | `Rol` | Función: código, nombre, descripción, alcance y **lista de permisos**. |
 | `organizacion` | `PerfilUsuario` | Datos del SGR de una persona: código, cargo, rol, delegación base y delegaciones autorizadas. |
-| `catalogos` | `Item` | Elemento medible: área, unidad de medida, meta del período y ponderador. |
+| `catalogos` | `Item` | Elemento medible: área, unidad de medida, y la meta y el ponderador **sugeridos** que se proponen al crear una meta. |
 | `catalogos` | `TipoAtencion` | Clasificación general de una atención, con su área. |
 | `catalogos` | `SubAtencion` | Detalle de un tipo, y si **exige documento de respaldo**. |
 | `atencion` | `Solicitante` | Persona que acude: RUT validado, nombre, teléfono, territorio. |
 | `atencion` | `Atencion` | La atención entregada: solicitante, subatención, delegación, funcionario, detalle y respaldo. |
 | `cuenta` | `CodigoRecuperacion` | Código de seis dígitos de un solo uso, con vigencia e intentos. |
+
+La meta y el ponderador que usa el cálculo están en `MetaPeriodo`, por período, cargo e ítem; ahí se aplica la regla de que los ítems de cada cargo sumen 100 %. Los del ítem son solo sugeridos: se proponen al elegir el ítem en *Nueva meta* y no se suman entre sí, así que el catálogo no exige ningún total.
+
+Activar un registro aplica las mismas reglas que guardarlo desde su formulario: no se puede reactivar una meta que deje a su cargo sobre 100 % ni una de un período cerrado, un período que se cruce con otro abierto, ni una segunda regla de cálculo activa para el mismo alcance.
 
 ### Relaciones y estrategia de eliminación
 
@@ -333,7 +337,7 @@ veces sin duplicar nada.
 | Delegaciones | 18 (16 activas; `DEL-17` y `DEL-18` inactivas) |
 | Roles | 6 (`ROL-06` inactivo) |
 | Usuarios con perfil | 15 (`USR-08` inactivo) |
-| Ítems | 10 · los ponderadores activos suman 100 % |
+| Ítems | 10, con su meta y ponderador sugeridos |
 | Tipos de atención | 8 |
 | Subatenciones | 24 (22 activas; 11 exigen documento de respaldo) |
 | Solicitantes | 5, con RUT ficticio de dígito verificador válido |

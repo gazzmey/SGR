@@ -318,6 +318,10 @@ class MetaPeriodo(models.Model):
             )
         return ""
 
+    def motivo_bloqueo_activar(self):
+        """Reactivar una meta de un período cerrado también cambia su resultado."""
+        return self.motivo_bloqueo()
+
 
 # =========================================================================
 # Actividades y evidencias

@@ -25,8 +25,6 @@ from comun.mantenedor import (
     enlace_nombre,
     filtro_estado,
 )
-from comun.utilidades import suma_ponderadores
-
 PERMISO = P.GESTIONAR_CATALOGO
 
 
@@ -46,8 +44,8 @@ class ItemsLista(ListaMantenedor):
     menu = "items"
     titulo = "Ítems y metas"
     bajada = (
-        "Lo que se mide en el período, con su meta y el peso que tiene en el "
-        "resultado de la delegación."
+        "Lo que se puede medir, con la meta y el peso que se proponen al "
+        "asignarlo a un cargo."
     )
     singular = "ítem"
     plural = "ítems"
@@ -79,9 +77,9 @@ class ItemsLista(ListaMantenedor):
             ),
         ),
         Columna("unidad", "Unidad", valor=lambda o: o.get_unidad_display()),
-        Columna("meta", "Meta", alineado="r"),
+        Columna("meta", "Meta sugerida", alineado="r"),
         Columna(
-            "ponderador", "Ponderador", alineado="r",
+            "ponderador", "Ponderador sugerido", alineado="r",
             celda=lambda o: format_html("{} %", o.ponderador),
             valor=lambda o: o.ponderador,
         ),
@@ -92,53 +90,15 @@ class ItemsLista(ListaMantenedor):
         ),
     ]
 
-    @property
-    def nota(self):
-        """
-        Cuánto suman los ponderadores activos ahora mismo.
-
-        Se calcula al pintar y no se guarda en ninguna parte: un total
-        almacenado se desactualizaría en cuanto alguien desactive un ítem.
-        """
-        total = suma_ponderadores(Item)
-        if total == 100:
-            return (
-                "<b>Los ponderadores suman 100 %.</b> La configuración del "
-                "período está completa: el resultado de cada delegación se "
-                "calcula sobre esta base."
-            )
-        if total < 100:
-            return (
-                "<b>Los ponderadores activos suman %d %%.</b> Faltan %d %% "
-                "para completar el 100 %%. Mientras no se cierre, el "
-                "resultado del período se calcula sobre lo que haya."
-                % (total, 100 - total)
-            )
-        return (
-            "<b>Los ponderadores activos suman %d %%</b>, más de 100 %%. "
-            "Revisa los pesos: el resultado quedaría calculado sobre una "
-            "base distinta de 100." % total
-        )
+    nota = (
+        "<b>La meta y el ponderador de esta lista son sugeridos.</b> Se "
+        "proponen al asignar el ítem a un cargo. El peso que usa el cálculo "
+        "se define por período y cargo en Metas y ponderadores, donde los "
+        "ítems de cada cargo suman 100 %."
+    )
 
 
-class _ConPonderador:
-    """
-    Le pasa al panel lateral cuánto ponderador queda libre.
-
-    Lo comparten crear y editar; la diferencia es que al editar hay que
-    descontar el ítem que se está modificando, para que su propio valor no
-    aparezca como ya ocupado.
-    """
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        otros = suma_ponderadores(Item, excluir_pk=getattr(self.object, "pk", None))
-        ctx["suma_otros"] = otros
-        ctx["ponderador_libre"] = max(0, 100 - otros)
-        return ctx
-
-
-class ItemNuevo(_ConPonderador, CrearMantenedor):
+class ItemNuevo(CrearMantenedor):
     model = Item
     form_class = ItemForm
     permiso = PERMISO
@@ -154,12 +114,12 @@ class ItemNuevo(_ConPonderador, CrearMantenedor):
          ["codigo", "nombre", "area"]),
         ("Qué se considera", "El criterio que se aplica al revisar los registros.",
          ["descripcion"]),
-        ("Medición", "En qué unidad se mide, cuál es la meta y cuánto pesa en el resultado.",
+        ("Medición", "En qué unidad se mide y qué meta y peso se proponen al asignarlo a un cargo.",
          ["unidad", "meta", "ponderador"]),
     ]
 
 
-class ItemEditar(_ConPonderador, EditarMantenedor):
+class ItemEditar(EditarMantenedor):
     model = Item
     form_class = ItemForm
     permiso = PERMISO
@@ -188,17 +148,22 @@ class ItemDetalle(DetalleMantenedor):
         ("Nombre", "nombre"),
         ("Área", "area"),
         ("Unidad de medida", "unidad"),
-        ("Meta del período", lambda o: f"{o.meta} {o.get_unidad_display().lower()}"),
-        ("Ponderador", lambda o: f"{o.ponderador} %"),
+        ("Meta sugerida", lambda o: f"{o.meta} {o.get_unidad_display().lower()}"),
+        ("Ponderador sugerido", lambda o: f"{o.ponderador} %"),
         ("Qué se considera", "descripcion", {"ancho": True}),
     ]
     kpis = [
-        ("Peso en el resultado", lambda o: f"{o.ponderador} %",
-         "Del 100 % de la evaluación"),
-        ("Suman los activos", lambda o: f"{suma_ponderadores(Item)} %",
-         "Incluido este ítem si está activo"),
+        ("En metas vigentes",
+         lambda o: o.metas.filter(activo=True).exclude(periodo__estado="cerrado").count(),
+         "De períodos abiertos o en preparación"),
+        ("Ponderador sugerido", lambda o: f"{o.ponderador} %",
+         "Se propone al crear una meta con este ítem"),
     ]
-    pie = "Cambiar el ponderador recalcula el resultado del período en curso."
+    pie = (
+        "La meta y el ponderador que usa el cálculo se definen por período y "
+        "cargo, en Metas y ponderadores. Cambiar los sugeridos no altera "
+        "ninguna meta ya creada."
+    )
 
 
 class ItemEstado(CambiarEstado):

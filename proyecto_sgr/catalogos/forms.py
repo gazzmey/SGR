@@ -1,16 +1,18 @@
 """
 Formularios de ítems, tipos de atención y subatenciones.
 
-La regla interesante de este archivo es la de los ponderadores: los ítems
-activos tienen que sumar 100 %. No se impone con una restricción de base de
-datos porque mientras se configura el período la suma pasa necesariamente por
-valores intermedios; se avisa al guardar y se muestra cuánto falta.
+Sobre la meta y el ponderador del ítem: son valores **sugeridos**, los que se
+proponen al asignar el ítem a un cargo. El peso que usa el cálculo se define
+por período y cargo en ``MetaPeriodo``, y la regla del 100 % vive allí, donde
+de verdad importa: los ponderadores de cada cargo suman 100 % en cada
+período. Los ítems del catálogo no se suman entre sí, así que aquí no se
+exige ningún total.
 """
 
 from django import forms
 
 from catalogos.models import Item, SubAtencion, TipoAtencion
-from comun.utilidades import proximo_codigo, suma_ponderadores
+from comun.utilidades import proximo_codigo
 
 
 class _Base(forms.ModelForm):
@@ -96,28 +98,6 @@ class ItemForm(_Base):
         if valor > 100:
             raise forms.ValidationError("Un ponderador no puede pasar de 100 %.")
         return valor
-
-    def clean(self):
-        """
-        Avisa si los ítems activos se pasan del 100 %.
-
-        Pasarse es un error y no se guarda: el resultado del período se
-        calcularía sobre una base que no es 100. Quedarse corto, en cambio,
-        es un estado normal mientras se configura, así que solo se informa
-        en el listado.
-        """
-        datos = super().clean()
-        ponderador = datos.get("ponderador") or 0
-        otros = suma_ponderadores(Item, excluir_pk=self.instance.pk)
-        total = otros + ponderador
-        if total > 100:
-            self.add_error("ponderador", forms.ValidationError(
-                "Los demás ítems activos ya suman %(otros)d %%. Con este "
-                "quedarían en %(total)d %%, y el máximo es 100 %%. Puedes "
-                "usar hasta %(libre)d %%.",
-                params={"otros": otros, "total": total, "libre": 100 - otros},
-            ))
-        return datos
 
 
 # =========================================================================

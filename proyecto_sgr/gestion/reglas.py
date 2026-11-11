@@ -225,6 +225,15 @@ class ReglaCalculo(models.Model):
             )
         return ""
 
+    def motivo_bloqueo_activar(self):
+        if self.periodo_id and self.periodo.estado == self.periodo.Estado.CERRADO:
+            return (
+                "Es la regla de un período cerrado. Volver a activarla "
+                "cambiaría con qué parámetros se midió un resultado ya "
+                "cerrado. Reabre el período si de verdad hay que cambiarla."
+            )
+        return ""
+
     # --- lo que el motor le pregunta -------------------------------------
 
     @property

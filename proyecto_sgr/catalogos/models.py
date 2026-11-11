@@ -50,18 +50,25 @@ class Item(models.Model):
         "unidad de medida", max_length=12,
         choices=Unidad.choices, default=Unidad.CANTIDAD,
     )
+    # La meta y el ponderador del ítem son los que se proponen al asignarlo a
+    # un cargo. Los que usa el cálculo están en gestion.MetaPeriodo, por
+    # período y cargo: un inspector y una asistente social no se miden con
+    # la misma vara, y el año que viene puede pesar distinto que este.
     meta = models.PositiveIntegerField(
-        "meta del período", default=1,
+        "meta sugerida", default=1,
         validators=[MinValueValidator(1)],
         help_text=(
-            "En la unidad de medida elegida. Tiene que ser mayor que cero: "
-            "con meta cero el cumplimiento sería una división por cero, y "
-            "cualquier avance daría 100 % o infinito según cómo se calcule."
+            "La que se propone al asignar el ítem a un cargo, en la unidad "
+            "elegida. Tiene que ser mayor que cero: es el denominador del "
+            "cumplimiento."
         ),
     )
     ponderador = models.PositiveSmallIntegerField(
-        default=0,
-        help_text="Porcentaje del resultado total. Entre todos los activos deben sumar 100 %.",
+        "ponderador sugerido", default=0,
+        help_text=(
+            "El que se propone al asignar el ítem a un cargo. El peso real se "
+            "define por período y cargo, en Metas y ponderadores."
+        ),
     )
     activo = models.BooleanField(default=True)
     creada = models.DateField("creado el", auto_now_add=True)

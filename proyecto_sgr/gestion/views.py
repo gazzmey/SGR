@@ -513,6 +513,21 @@ class MetaNueva(CrearMantenedor):
                 inicial[campo] = valor
         return inicial
 
+    def get_context_data(self, **kwargs):
+        """
+        La meta y el ponderador sugeridos de cada ítem, para proponerlos.
+
+        Viajan a la página como datos y sgr-app.js los escribe al elegir el
+        ítem, solo en los campos que la persona no ha tocado. Sin
+        JavaScript no pasa nada: se escriben a mano, como antes.
+        """
+        ctx = super().get_context_data(**kwargs)
+        ctx["sugeridos"] = {
+            str(i.pk): {"meta": i.meta, "ponderador": i.ponderador}
+            for i in Item.objects.filter(activo=True)
+        }
+        return ctx
+
 
 class MetaEditar(EditarMantenedor):
     """

@@ -10,6 +10,7 @@
      · la subatención que depende del tipo, en el ingreso de atención
      · el medidor de fuerza de la contraseña nueva
      · las seis casillas del código de recuperación
+     · la meta y el ponderador sugeridos al crear una meta
 
    Todo lo de arriba funciona igual sin JavaScript: los formularios tienen
    su botón de enviar, y la validación que manda es la del servidor.
@@ -457,5 +458,38 @@
       restan--;
       setTimeout(tic, 1000);
     })();
+  });
+
+  /* ---------------------------------------------------------------------
+     9. Meta y ponderador sugeridos al crear una meta
+
+     Al elegir el ítem, propone la meta y el ponderador que el ítem trae en
+     el catálogo. Solo escribe en los campos que la persona no ha tocado:
+     lo que ya escribió a mano no se reemplaza. La validación del 100 % por
+     cargo la sigue haciendo el servidor.
+     --------------------------------------------------------------------- */
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var datos = document.getElementById('sgr-sugeridos');
+    var item = document.querySelector('select[name="item"]');
+    if (!datos || !item) return;
+
+    var sugeridos = JSON.parse(datos.textContent);
+    var campos = ['meta', 'ponderador'].map(function (nombre) {
+      return document.querySelector('input[name="' + nombre + '"]');
+    }).filter(Boolean);
+
+    campos.forEach(function (campo) {
+      if (campo.value === '') campo.dataset.propuesto = '1';
+      campo.addEventListener('input', function () { delete campo.dataset.propuesto; });
+    });
+
+    item.addEventListener('change', function () {
+      var valores = sugeridos[item.value];
+      campos.forEach(function (campo) {
+        if (!campo.dataset.propuesto) return;
+        campo.value = valores ? valores[campo.name] : '';
+      });
+    });
   });
 })();

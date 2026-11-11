@@ -5,6 +5,10 @@
 </div>
 <p>La <b>meta</b> es el denominador del cumplimiento: si la meta es 10 y se aprueban 8, el cumplimiento es 80 %. Por eso tiene que ser mayor que cero.</p>
 <p>El <b>ponderador</b> es cuánto pesa ese ítem dentro del resultado del cargo. Entre todos los ítems de un mismo cargo suman 100 %.</p>
+{% if sugeridos %}
+  <p class="small soft">Al elegir el ítem se proponen su meta y su ponderador sugeridos, los del catálogo. Puedes cambiarlos: lo que escribas no se reemplaza.</p>
+  {{ sugeridos|json_script:"sgr-sugeridos" }}
+{% endif %}
 <div class="divider"></div>
 <p class="small soft">Pasarse de 100 % no se guarda. Quedarse corto sí: mientras configuras el período la suma pasa por valores intermedios necesariamente, y el listado te avisa cuánto lleva cada cargo.</p>
 <div class="divider"></div>
