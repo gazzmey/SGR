@@ -16,19 +16,18 @@ from organizacion.models import Delegacion
 @login_required
 def panel(request):
     """
-    Pantalla de entrada: una tarjeta por módulo, con el color de su área.
+    Pantalla de entrada: lo que hay que atender, el avance y los módulos.
 
-    Las tarjetas que se muestran dependen del rol, con las mismas condiciones
-    que el menú. Si alguien escribe a mano la dirección de un módulo que no
-    tiene, la vista de destino lo rechaza igual. Cómo se arma cada tarjeta y
-    su estado está en ``comun/modulos.py``.
+    Lo que se muestra depende del rol, con las mismas condiciones que el
+    menú. Si alguien escribe a mano la dirección de un módulo que no tiene,
+    la vista de destino lo rechaza igual. Cómo se arma cada parte está en
+    ``comun/modulos.py``.
     """
-    from comun.modulos import tarjetas_de
+    from comun.modulos import panel_de
 
-    activa = delegacion_activa(request)
     return render(request, "comun/panel.html", {
         "menu": "panel",
-        "tarjetas": tarjetas_de(request, activa),
+        **panel_de(request, delegacion_activa(request)),
     })
 
 

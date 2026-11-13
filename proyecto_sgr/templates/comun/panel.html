@@ -1,68 +1,109 @@
 {% extends "base.html" %}
 
 {% comment %}
-  Mi panel: una tarjeta por módulo, con el color de su área. Las tarjetas y su
-  estado se arman en comun/modulos.py; aquí solo se dibujan.
+  Mi panel: lo que hay que atender, el avance y los módulos, en ese orden.
+  Todo se arma en comun/modulos.py; aquí solo se dibuja. El color se usa en
+  dos lugares: la banda de cada área y el punto de cada pendiente.
 {% endcomment %}
 
 {% block titulo %}Mi panel{% endblock %}
 {% block ruta %}<span aria-current="page">Mi panel</span>{% endblock %}
 
 {% block contenido %}
-<div class="page-head">
+<div class="pn-head">
   <div>
     <h1>Hola, {{ user.first_name|default:user.get_username }}</h1>
     <p>
       {% if sgr_delegacion %}
-        Estás trabajando en <b>{{ sgr_delegacion.nombre }}</b>. Lo que registres queda asociado a esa delegación.
+        {% if sgr_delegaciones|length > 1 %}Tienes {{ sgr_delegaciones|length }} delegaciones autorizadas. Ahora estás mirando {{ sgr_delegacion.nombre }}.{% else %}Trabajas en {{ sgr_delegacion.nombre }}.{% endif %}
+        Esto es lo que tienes pendiente y a dónde ir.
       {% else %}
         Tu cuenta todavía no tiene una delegación asignada. Pídele al administrador que te cree el perfil.
       {% endif %}
     </p>
-    <div class="panel-acceso">
-      <span class="tag">{% if sgr_perfil %}{{ sgr_perfil.rol.nombre }}{% else %}Superusuario de Django{% endif %}</span>
-      {% if sgr_perfil %}<span class="tag">{{ sgr_perfil.rol.get_alcance_display }} · {{ sgr_delegaciones|length }} delegaci{{ sgr_delegaciones|length|pluralize:"ón,ones" }}</span>{% endif %}
-    </div>
   </div>
+  {% if periodo_panel %}
+    <div class="pn-periodo">
+      <div class="fila"><b>{{ periodo_panel.nombre }}</b><span>Día {{ periodo_panel.dia }} de {{ periodo_panel.total }}</span></div>
+      <div class="pn-barra" role="img" aria-label="Día {{ periodo_panel.dia }} de {{ periodo_panel.total }}"><i style="width: {{ periodo_panel.barra|stringformat:'.1f' }}%"></i></div>
+      <div class="fila"><span>Cierra el {{ periodo_panel.cierra|date:"d-m-Y" }}</span><span>{% if periodo_panel.faltan %}Faltan {{ periodo_panel.faltan }} día{{ periodo_panel.faltan|pluralize }}{% else %}Cierra hoy{% endif %}</span></div>
+    </div>
+  {% endif %}
 </div>
 
-{% if tarjetas %}
-  <div class="modulos">
-      {% for t in tarjetas %}
-        <article class="modulo {{ t.area_clase }}">
-          <div class="modulo-h">
-            <span class="modulo-ic">
-              <svg class="i" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ t.icono }}</svg>
-            </span>
-            <span class="modulo-area">{{ t.area_nombre }}</span>
-            <span class="modulo-tipo">{{ t.tipo }}</span>
+<div class="pn-fila{% if not avance %} sola{% endif %}">
+  <section class="pn-caja" aria-labelledby="t-atender">
+    <div class="pn-caja-h">
+      <h2 id="t-atender">Para atender</h2>
+      {% if pendientes %}<span class="pn-cuenta">{{ pendientes|length }}</span>{% endif %}
+    </div>
+    {% if pendientes %}
+      <ul class="pn-atender">
+        {% for p in pendientes %}
+          <li>
+            <span class="pn-punto {{ p.tono }}" aria-hidden="true"></span>
+            <div class="tx"><b>{{ p.titulo }}</b><span>{{ p.detalle }}</span></div>
+            <a class="pn-ir" href="{{ p.url }}" aria-label="Revisar: {{ p.titulo }}">Revisar
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="pn-vacio">No tienes nada pendiente. Cuando algo venza o espere tu respuesta, aparecerá aquí.</p>
+    {% endif %}
+  </section>
+
+  {% if avance %}
+    <section class="pn-caja" aria-labelledby="t-avance">
+      <div class="pn-caja-h"><h2 id="t-avance">{{ avance.titulo }}</h2></div>
+      <div class="pn-avance">
+        <div class="num"><strong>{{ avance.cifra }}</strong>{% if avance.estado %}<span class="pn-pill {{ avance.tono }}">{{ avance.estado }}</span>{% endif %}</div>
+        <div class="pn-meta"><i class="{{ avance.tono }}" style="width: {{ avance.barra|stringformat:'.1f' }}%"></i>{% if avance.marca is not None %}<em style="left: {{ avance.marca|stringformat:'.1f' }}%"></em>{% endif %}</div>
+        <p class="nota">{{ avance.nota }}</p>
+        {% if avance.lista %}
+          <div class="pn-falta">
+            <b>{{ avance.lista_titulo }}</b>
+            <ul>{% for nombre, valor in avance.lista %}<li><span>{{ nombre }}</span><span>{{ valor }}</span></li>{% endfor %}</ul>
           </div>
-          <div class="modulo-b">
-            <div class="modulo-t">
-              <h3><a href="{{ t.url }}">{{ t.titulo }}</a></h3>
-              {% if t.nuevo %}<span class="modulo-nuevo">Nuevo</span>{% endif %}
-            </div>
-            <p class="modulo-d">{{ t.descripcion }}</p>
-            {% if t.estado %}
-              <a class="modulo-estado {{ t.estado.tono }}" href="{{ t.url }}" style="text-decoration: none">{{ t.estado.texto }}</a>
-            {% endif %}
-          </div>
-          <div class="modulo-f">
-            {% for d in t.datos %}
-              <span class="modulo-dato">
-                <svg class="i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ d.svg }}</svg>
-                {{ d.texto }}
-              </span>
-            {% endfor %}
-            <a class="modulo-ir" href="{{ t.url }}" aria-label="Abrir {{ t.titulo }}">Abrir
-              <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
-            </a>
-          </div>
-        </article>
-      {% endfor %}
+        {% elif avance.vacio %}
+          <p class="nota pn-falta">{{ avance.vacio }}</p>
+        {% endif %}
+        <a class="pn-ir" href="{{ avance.enlace.1 }}">{{ avance.enlace.0 }}
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></a>
+      </div>
+    </section>
+  {% endif %}
+</div>
+
+{% if areas %}
+  <h2 class="pn-sec">Tus módulos</h2>
+  <div class="pn-areas">
+    {% for area in areas %}
+      <section class="pn-area {{ area.clase }}" aria-labelledby="area-{{ area.clave }}">
+        <div class="pn-area-h">
+          <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ area.icono }}</svg></span>
+          <h3 id="area-{{ area.clave }}">{{ area.nombre }}</h3>
+          <span class="cuantos">{{ area.modulos|length }} módulo{{ area.modulos|length|pluralize }}</span>
+        </div>
+        <ul class="pn-mods">
+          {% for m in area.modulos %}
+            <li>
+              <a href="{{ m.url }}">
+                <span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ m.icono }}</svg></span>
+                <span class="tx">
+                  <b>{{ m.titulo }}{% if m.nuevo %} <span class="pn-nuevo">Nuevo</span>{% endif %}</b>
+                  <span class="d">{{ m.descripcion }}</span>
+                </span>
+                <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endfor %}
   </div>
 {% else %}
-  <div class="notice info">
+  <div class="notice info mt20">
     <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
     <div><b>Sin módulos</b>Tu rol todavía no tiene permisos asignados. Pídeselos al administrador.</div>
   </div>
