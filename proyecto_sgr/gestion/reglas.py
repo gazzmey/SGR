@@ -57,11 +57,11 @@ class ReglaCalculo(models.Model):
     )
 
     tope_aporte = models.PositiveSmallIntegerField(
-        "tope del cumplimiento", default=100,
+        "tope del cumplimiento", default=120,
         help_text=(
-            "Hasta cuánto se cuenta el cumplimiento de un ítem. Con 100, "
-            "quien hizo el doble de su meta aporta lo mismo que quien la "
-            "cumplió justo. Con 150, se le reconoce hasta una vez y media."
+            "Hasta cuánto se cuenta el cumplimiento de un ítem y del total. "
+            "El acordado es 120: a quien supera su meta se le reconoce hasta "
+            "un 20 % más, y no más que eso."
         ),
     )
     umbral_realizado = models.PositiveSmallIntegerField(
@@ -387,8 +387,10 @@ class ReglaCalculo(models.Model):
 #:
 #: Cada número sale de un lote del plan, y conviene dejar escrito de cuál:
 #:
-#:   tope_aporte 100     CAL-A mide sin tope —80 % y 50 % no lo tocan—. CAL-B
-#:                       lo sube a 150 para comprobar que es configurable.
+#:   tope_aporte 120     El acordado por el equipo (la matriz decía 150 y el
+#:                       plan de pruebas usaba 100). CAL-A no lo nota —80 % y
+#:                       50 % quedan bajo cualquier tope—, y CAL-B lo cambia
+#:                       para comprobar que es configurable.
 #:   umbral_realizado 80 CAL-F: «79,99 % no alcanza; 80 % alcanza».
 #:   umbral_ambar 60     CAL-E: con esperado 50 %, el 29,99 % es rojo y el
 #:                       30 % es ámbar. Esa frontera está en el 60 % de lo
@@ -402,7 +404,7 @@ class ReglaCalculo(models.Model):
 #: escritos: aviso 7 días antes de vencer, 10 días sin registrar, 5 días de
 #: espera de una evidencia.
 PROPUESTA_DEL_PLAN = {
-    "tope_aporte": 100,
+    "tope_aporte": 120,
     "umbral_realizado": 80,
     "umbral_ambar": 60,
     "convencion_dias": ReglaCalculo.Dias.CALENDARIO_INCLUSIVO,

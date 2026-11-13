@@ -291,13 +291,15 @@ ROLES = [{'codigo': 'ROL-01',
   'desactivada': None},
  {'codigo': 'ROL-05',
   'nombre': 'Administrador',
-  'descripcion': 'Gestiona el acceso y los catálogos, y es el único que '
-                 'consulta la auditoría completa.',
+  'descripcion': 'Gestiona el acceso y los catálogos, valida evidencias junto '
+                 'al Verificador y es el único que consulta la auditoría '
+                 'completa.',
   'permisos': ['gestionar_usuario',
                'gestionar_catalogo',
                'ver_auditoria',
                'configurar_periodo',
-               'ver_informes'],
+               'ver_informes',
+               'validar_evidencia'],
   'activo': True,
   'alcance': 'todas',
   'creada': '2024-01-12',

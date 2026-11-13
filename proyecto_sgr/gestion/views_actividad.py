@@ -379,7 +379,9 @@ class ColaValidacion(ListaMantenedor):
         if perfil is not None:
             visibles = perfil.delegaciones_visibles().values_list("pk", flat=True)
             consulta = consulta.filter(actividad__delegacion_id__in=list(visibles))
-        return consulta
+        # Lo propio no entra en la cola: lo decide otra persona.
+        usuario = self.request.user
+        return consulta.exclude(actividad__funcionario=usuario).exclude(autor=usuario)
 
 
 def _chip_decision(evidencia):
@@ -394,6 +396,26 @@ def _chip_decision(evidencia):
     return format_html('<span class="chip {}">{}</span>', clase, texto)
 
 
+def es_propia(evidencia, usuario):
+    """
+    True si la evidencia es de esa persona: la actividad es suya o la cargó ella.
+
+    Nadie decide sobre su propio trabajo, tenga el rol que tenga —tampoco un
+    superusuario—. Si se pudiera, la validación dejaría de ser un control.
+    """
+    return usuario.pk in (evidencia.actividad.funcionario_id, evidencia.autor_id)
+
+
+def _en_alcance(request, evidencia):
+    """403 si la evidencia es de una delegación que la persona no tiene autorizada."""
+    perfil = P.perfil_de(request.user)
+    if perfil is None:
+        return
+    visibles = set(perfil.delegaciones_visibles().values_list("pk", flat=True))
+    if evidencia.actividad.delegacion_id not in visibles:
+        raise PermissionDenied("Esa evidencia es de una delegación que no tienes autorizada.")
+
+
 def evidencia_detalle(request, pk):
     """Ficha de la evidencia, desde donde se aprueba o se rechaza."""
     desvio = _exigir(request, P.VALIDAR_EVIDENCIA, "No tienes permiso para validar.")
@@ -406,10 +428,12 @@ def evidencia_detalle(request, pk):
             "actividad__delegacion", "autor", "verificador"),
         pk=pk,
     )
+    _en_alcance(request, evidencia)
     return render(request, "gestion/evidencia_detalle.html", {
         "menu": "validar",
         "obj": evidencia,
         "form_rechazo": RechazoForm(),
+        "propia": es_propia(evidencia, request.user),
     })
 
 
@@ -431,6 +455,12 @@ class DecidirEvidencia(View):
 
         evidencia = get_object_or_404(Evidencia, pk=pk)
         actividad = evidencia.actividad
+        _en_alcance(request, evidencia)
+        if es_propia(evidencia, request.user):
+            raise PermissionDenied(
+                "Es tu propia actividad: la decide otro verificador o el "
+                "administrador. Nadie aprueba ni anula su propio trabajo."
+            )
 
         if paso in {"aprobar", "rechazar"} and not evidencia.pendiente:
             anunciar(

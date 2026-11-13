@@ -20,7 +20,7 @@ personas de un cargo.
 Sin opciones crea o actualiza los cargos, los ítems del catálogo y los tipos
 y subatenciones sociales de la hoja LISTA. Con ``--periodo`` además crea las
 metas de cada cargo en ese período, y con ``--regla`` una regla de cálculo
-propia del período con el tope de 150 % que fija la matriz. Se puede
+propia del período con el tope de 120 % acordado (la matriz decía 150 %). Se puede
 ejecutar varias veces: cada registro se busca por su nombre antes de crearse.
 
 Lo que la matriz no deja claro y se resolvió así
@@ -290,7 +290,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--regla", action="store_true",
-            help="Crea o actualiza una regla de cálculo propia del período, con el tope de 150 %% de la matriz.",
+            help="Crea o actualiza una regla de cálculo propia del período, con el tope acordado de 120 %%.",
         )
         parser.add_argument(
             "--sin-catalogo-social", action="store_true",
@@ -413,14 +413,16 @@ class Command(BaseCommand):
     def _regla(self, periodo):
         valores = dict(PROPUESTA_DEL_PLAN)
         valores.update({
-            # «El sobrecumplimiento de cada colaborador no puede ser mayor a
-            # 150 %»: hoja RECLAMOS de la matriz.
-            "tope_aporte": 150,
+            # La hoja RECLAMOS de la matriz decía «el sobrecumplimiento de
+            # cada colaborador no puede ser mayor a 150 %». El equipo acordó
+            # 120 %, y ese es el tope que se carga.
+            "tope_aporte": 120,
             "periodo": periodo,
             "aprobada": False,
             "aprobada_por": "",
             "observacion": (
-                "Valores de la matriz SGR de las delegaciones: tope de 150 %, "
+                "Valores de la matriz SGR de las delegaciones, con el tope "
+                "acordado de 120 % (la matriz decía 150 %), "
                 "+10 por felicitación (hasta 3), −20 por reclamo, plazos de los "
                 "casos sociales de las hojas G SOC. Falta confirmar si el "
                 "reclamo descuenta 20 o 30: la matriz usa los dos."

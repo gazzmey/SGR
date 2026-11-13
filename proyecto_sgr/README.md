@@ -174,7 +174,7 @@ sistema no hacía se implementó así:
 | En la matriz | En el sistema |
 |---|---|
 | Felicitaciones +10 % (máximo 3) y reclamos −20 %, por escrito | `Reconocimiento`, en *Supervisión → Felicitaciones y reclamos*. Se aplican sobre el cumplimiento ponderado; los valores están en la regla de cálculo. |
-| «El sobrecumplimiento no puede ser mayor a 150 %» | El total, con ajustes, queda entre 0 y el tope de la regla. |
+| «El sobrecumplimiento no puede ser mayor a 150 %» | El total, con ajustes, queda entre 0 y el tope de la regla. El tope acordado por el equipo es **120 %**, y es el valor que traen las reglas nuevas y la carga de la matriz. |
 | Reclamos «no más de 2 trimestres seguidos (informar a RRHH)» | Sexta alerta, configurable en la regla. |
 | Licencias, vacaciones, emergencias y compensatorios en la hoja SEMAFORO | `Ausencia`, de una persona o de toda la delegación. El esperado de la persona es (días transcurridos − días ausente) ÷ días del período. |
 | «Soluciones de ingresos al tubo»: % de compromisos realizados del colaborador, meta 80 % | `Item.medicion = agenda`: el ítem se mide con los compromisos del responsable, sin actividades. |
@@ -337,7 +337,7 @@ carga los ocho cargos del *Descriptor de funciones* 2026 con sus funciones,
 los 28 ítems de la *Matriz SGR* con su forma de medirse, y los tipos y
 subatenciones sociales de su hoja LISTA. Con `--periodo` crea además las
 metas y ponderadores de cada cargo en ese período, y con `--regla` una regla
-propia del período con el tope de 150 % de la matriz. No carga ningún dato
+propia del período con el tope acordado de 120 % (la matriz decía 150 %). No carga ningún dato
 personal: de la matriz solo toma qué se mide, cuánto pesa y cuánto se pide.
 
 ```bash
@@ -378,6 +378,14 @@ modelo.
 hacer; el alcance, *sobre qué delegaciones*: su delegación, varias o todas. Un
 rol puede validar evidencias solo en su delegación o en todas, con el mismo
 permiso marcado.
+
+**Nadie valida su propio trabajo.** Validan el Verificador, en su
+delegación, y el Administrador, en todas. Dos reglas lo sostienen en el
+servidor: nadie aprueba, rechaza ni anula una evidencia de una actividad
+suya, ni valida un compromiso del que es responsable —aunque tenga el
+permiso, y aunque sea superusuario—; y un rol no puede tener a la vez
+«registrar actividades» y «validar evidencias» (`comun.permisos.INCOMPATIBLES`).
+Lo propio tampoco aparece en la cola de validación.
 
 **La comprobación es del servidor.** Que el menú esconda una opción es
 cortesía, no seguridad. Cada vista lleva el mixin `RequierePermiso`, que
@@ -431,7 +439,7 @@ territorial.
 
 | Cuenta | Contraseña | Rol | Para qué sirve |
 |---|---|---|---|
-| `felipe.araya@ejemplo.cl` | `Demo.Sgr2026` | Administrador | Los seis mantenedores. |
+| `felipe.araya@ejemplo.cl` | `Demo.Sgr2026` | Administrador | Los seis mantenedores, y validar evidencias y compromisos en todas las delegaciones. |
 | `pablo.fuentes@ejemplo.cl` | `Demo.Sgr2026` | Verificador | Validar evidencias y compromisos; sin acceso a los mantenedores. |
 | `marcela.rios@ejemplo.cl` | `Demo.Sgr2026` | Funcionario | Registrar actividades, atención ciudadana y compromisos. |
 | `valentina.cortes@ejemplo.cl` | `Demo.Sgr2026` | Coordinador del sistema | Períodos, metas y reglas de cálculo; alcance en todas las delegaciones. |

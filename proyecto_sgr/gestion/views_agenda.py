@@ -369,6 +369,7 @@ def compromiso_detalle(request, pk):
         ),
         "puede_validar": (
             tiene_permiso(request.user, P.VALIDAR_EVIDENCIA)
+            and compromiso.responsable_id != request.user.pk
             and compromiso.estado == Compromiso.Estado.REALIZADO
             and compromiso.requiere_validacion
             and not compromiso.validado
@@ -558,6 +559,11 @@ class CompromisoValidar(View):
         visibles = _visibles_para(request.user)
         if visibles is not None and compromiso.delegacion_id not in visibles:
             raise PermissionDenied("Ese compromiso no es de tu delegación.")
+        if compromiso.responsable_id == request.user.pk:
+            raise PermissionDenied(
+                "Eres el responsable de este compromiso: lo valida otra "
+                "persona. Nadie valida su propio trabajo."
+            )
 
         if compromiso.estado != Compromiso.Estado.REALIZADO:
             anunciar(request, "Todavía no corresponde validar",

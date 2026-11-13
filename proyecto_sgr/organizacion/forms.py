@@ -126,6 +126,18 @@ class RolForm(_Base):
             )
         return texto
 
+    def clean_permisos(self):
+        """Separación de funciones: quien registra actividades no las valida."""
+        elegidos = self.cleaned_data.get("permisos") or []
+        for uno, otro in P.INCOMPATIBLES:
+            if uno in elegidos and otro in elegidos:
+                raise forms.ValidationError(
+                    "Un mismo rol no puede «%s» y «%s»: aprobaría su propio "
+                    "trabajo. Validar es del Verificador y del Administrador."
+                    % (P.etiqueta(uno).lower(), P.etiqueta(otro).lower())
+                )
+        return elegidos
+
 
 # =========================================================================
 # Usuarios

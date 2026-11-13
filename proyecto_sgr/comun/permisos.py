@@ -57,6 +57,13 @@ PERMISOS = [
     (VER_AUDITORIA, "Consultar la auditoría", "Administración"),
 ]
 
+#: Pares de permisos que un mismo rol no puede tener a la vez. Quien
+#: registra actividades no valida evidencias: si pudiera, aprobaría su
+#: propio trabajo. Validan el Verificador y el Administrador.
+INCOMPATIBLES = [
+    (REGISTRAR_ACTIVIDAD, VALIDAR_EVIDENCIA),
+]
+
 CLAVES = [clave for clave, _, _ in PERMISOS]
 ETIQUETAS = {clave: texto for clave, texto, _ in PERMISOS}
 OPCIONES = [(clave, texto) for clave, texto, _ in PERMISOS]

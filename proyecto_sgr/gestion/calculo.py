@@ -40,8 +40,8 @@ Y para la persona completa::
     esperado = (días transcurridos − días de ausencia) / días totales × 100
 
 Las dos últimas líneas vienen de la matriz SGR de las delegaciones: la hoja
-RECLAMOS suma y resta sobre el cumplimiento ponderado («el sobrecumplimiento
-de cada colaborador no puede ser mayor a 150 %»), y la hoja SEMAFORO
+RECLAMOS suma y resta sobre el cumplimiento ponderado, sin pasar del tope
+de la regla (la matriz decía 150 %; el tope acordado es 120 %), y la hoja SEMAFORO
 descuenta licencias, vacaciones, emergencias y compensatorios del objetivo al
 día de hoy de cada persona.
 
@@ -762,8 +762,8 @@ def de_perfil(perfil, periodo, al_dia=None, regla=None):
     gestion = sum(f.aporte for f in validas)
 
     # Felicitaciones y reclamos (hoja RECLAMOS): se aplican sobre el
-    # cumplimiento ponderado, y el total queda entre cero y el tope. «El
-    # sobrecumplimiento de cada colaborador no puede ser mayor a 150 %».
+    # cumplimiento ponderado, y el total queda entre cero y el tope de la
+    # regla: el acordado es 120 % (la matriz decía 150 %).
     felicitaciones, reclamos = reconocimientos_de(perfil, periodo)
     contadas = min(felicitaciones, regla.max_felicitaciones)
     ajuste = float(contadas * regla.valor_felicitacion
