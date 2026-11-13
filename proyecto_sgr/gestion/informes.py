@@ -101,6 +101,10 @@ class Fila:
     #: El color de la fila según el semáforo: ok (verde), warn (amarillo) o
     #: bad (rojo). Vacío si no hay con qué compararla.
     tono: str = ""
+    #: Lo que la pantalla necesita para dibujar la fila con más detalle que
+    #: las celdas —iniciales, barra, cargo bajo el nombre—. El archivo no lo
+    #: usa: exporta las celdas, igual que siempre.
+    vista: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -121,6 +125,11 @@ class Informe:
     #: La columna que en pantalla va como fila de grupo y en el archivo
     #: como columna propia: la delegación, salvo en brechas, que es el cargo.
     titulo_grupo: str = "Delegación"
+    #: «personas» o «delegaciones» si el informe tiene vista propia en
+    #: pantalla; vacío para la tabla común.
+    vista: str = ""
+    #: Cuántas filas quedaron en cada color, para el resumen de arriba.
+    resumen: dict | None = None
 
     @property
     def hay_datos(self):
@@ -144,9 +153,27 @@ class Informe:
         return sum(1 for f in self.filas if not f.grupo)
 
     @property
-    def con_colores(self):
-        """True si alguna fila va pintada según el semáforo."""
-        return any(f.tono for f in self.filas)
+    def filas_vista(self):
+        """Las filas de la vista propia, sin las que no tienen nada medido."""
+        return [f for f in self.filas
+                if f.grupo or not f.vista or f.vista.get("barra") is not None]
+
+    @property
+    def sin_medir_vista(self):
+        """
+        Los nombres de lo que no tiene metas en el período.
+
+        En la vista propia van juntos en una sola línea al final, en vez de
+        una fila vacía cada uno entre medio de las que sí tienen datos. El
+        archivo los sigue trayendo uno por fila.
+        """
+        return [f.vista["nombre"] for f in self.filas
+                if not f.grupo and f.vista and f.vista.get("barra") is None]
+
+    @property
+    def pie_valor(self):
+        """La cifra del pie —el promedio del informe—, para la vista propia."""
+        return next((c.texto for c in self.pie[1:] if c.fuerte), "")
 
 
 # =========================================================================
@@ -194,6 +221,48 @@ def _chip_de(clase):
 def _tono_de(clase):
     """El color de la fila entera: el mismo del semáforo, o ninguno."""
     return {"verde": "ok", "ambar": "warn", "rojo": "bad"}.get(clase, "")
+
+
+ESTADOS = (("ok", "Al día"), ("warn", "Atrasado"), ("bad", "Crítico"))
+
+
+def _iniciales(nombre):
+    partes = [p for p in (nombre or "").split() if p]
+    return "".join(p[0] for p in partes[:2]).upper() or "·"
+
+
+def _barra(valor):
+    """El ancho de la barra en la pantalla: el cumplimiento, hasta 100."""
+    return 0.0 if valor is None else max(0.0, min(100.0, valor))
+
+
+def _distribucion(tonos):
+    """[(tono, cuántos)] en el orden verde, amarillo, rojo, sin los ceros."""
+    return [(t, tonos.count(t)) for t, _ in ESTADOS if tonos.count(t)]
+
+
+def _resumen(tonos, que, nota):
+    """Los números de arriba del informe: cuántos en cada color."""
+    total = len(tonos)
+    if not total:
+        return None
+    return {
+        "total": total,
+        "que": que,
+        "partes": [
+            {"tono": t, "texto": texto, "cuantos": tonos.count(t),
+             "porcentaje": round(tonos.count(t) * 100 / total)}
+            for t, texto in ESTADOS
+        ],
+        "distribucion": _distribucion(tonos),
+        "nota": nota,
+    }
+
+
+NOTA_COLORES = (
+    "Al día: va en lo esperado a la fecha o más. Atrasado: bajo lo esperado. "
+    "Crítico: bajo el %d %% de lo esperado."
+)
 
 
 def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
@@ -251,6 +320,15 @@ def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
                 ),
                 delegacion=delegacion.nombre,
                 tono=_tono_de(clase),
+                vista={
+                    "iniciales": _iniciales(perfil.nombre),
+                    "nombre": perfil.nombre,
+                    "detalle": _nombre_cargo(r, perfil),
+                    "numeros": (str(cuantos_items), ajuste or "—"),
+                    "valor": pct(valor),
+                    "barra": _barra(valor),
+                    "estado": texto,
+                },
             )))
             suma += valor
             cuantos += 1
@@ -266,10 +344,19 @@ def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
         # a lo esperado a la fecha. Antes comparaba el promedio con el 60 %
         # como si fuera un porcentaje fijo, y una delegación «bajo el umbral»
         # podía tener a todas sus personas en verde.
-        _, estado = C.semaforo_de(promedio, resultado.esperado, regla)
-        filas.append(Fila(grupo=(
-            "%s · promedio %s · %s" % (delegacion.nombre, pct(promedio), estado.lower())
-        )))
+        clase_grupo, estado = C.semaforo_de(promedio, resultado.esperado, regla)
+        tonos_grupo = [f.tono for _, f in medidas]
+        filas.append(Fila(
+            grupo="%s · promedio %s · %s" % (delegacion.nombre, pct(promedio), estado.lower()),
+            tono=_tono_de(clase_grupo),
+            vista={
+                "nombre": delegacion.nombre,
+                "detalle": "%d persona%s · promedio %s" % (
+                    len(medidas), "" if len(medidas) == 1 else "s", pct(promedio)),
+                "distribucion": _distribucion(tonos_grupo),
+                "estado": estado,
+            },
+        ))
         filas.extend(fila for _, fila in medidas)
 
     pie = ()
@@ -282,10 +369,14 @@ def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
             Celda(""),
         )
 
+    tonos = [f.tono for f in filas if not f.grupo]
     return columnas, tuple(filas), pie, (
         "Cumplimiento = avance aprobado ÷ meta × 100. No se incluyen "
         "actividades anuladas ni evidencias pendientes. " + NOTA_AJUSTES
-    ), "Ninguna persona de las delegaciones elegidas tiene metas medibles en este período."
+    ), "Ninguna persona de las delegaciones elegidas tiene metas medibles en este período.", {
+        "vista": "personas",
+        "resumen": _resumen(tonos, "Personas medidas", NOTA_COLORES % regla.umbral_ambar),
+    }
 
 
 def _por_delegacion(periodo, delegaciones, item, regla, al_dia):
@@ -309,7 +400,15 @@ def _por_delegacion(periodo, delegaciones, item, regla, al_dia):
                 Celda(str(len(resultado.sin_medir))),
                 Celda("—"), Celda("—"),
                 Celda("Sin metas definidas", chip="line"),
-            ), delegacion=delegacion.nombre))
+            ), delegacion=delegacion.nombre, vista={
+                "iniciales": _iniciales(delegacion.nombre),
+                "nombre": delegacion.nombre,
+                "detalle": "Nadie con metas en este período",
+                "numeros": ("—",),
+                "valor": "—",
+                "barra": None,
+                "estado": "Sin metas definidas",
+            }))
             continue
 
         filas.append(Fila(celdas=(
@@ -319,25 +418,39 @@ def _por_delegacion(periodo, delegaciones, item, regla, al_dia):
             Celda(pct(resultado.promedio), fuerte=True),
             Celda(pct(resultado.esperado)),
             Celda(resultado.semaforo_texto, chip=_chip_de(resultado.semaforo_clase)),
-        ), delegacion=delegacion.nombre, tono=_tono_de(resultado.semaforo_clase)))
+        ), delegacion=delegacion.nombre, tono=_tono_de(resultado.semaforo_clase), vista={
+            "iniciales": _iniciales(delegacion.nombre),
+            "nombre": delegacion.nombre,
+            "detalle": "%d medida%s%s" % (
+                len(resultado.medidas), "" if len(resultado.medidas) == 1 else "s",
+                " · %d sin medir" % len(resultado.sin_medir) if resultado.sin_medir else ""),
+            "numeros": (pct(resultado.esperado),),
+            "valor": pct(resultado.promedio),
+            "barra": _barra(resultado.promedio),
+            "estado": resultado.semaforo_texto,
+        }))
         suma += resultado.promedio
         cuantas += 1
 
     pie = ()
     if cuantas:
         pie = (
-            Celda("Promedio de %d delegación%s"
-                  % (cuantas, "" if cuantas == 1 else "es")),
+            Celda("Promedio de %d %s"
+                  % (cuantas, "delegación" if cuantas == 1 else "delegaciones")),
             Celda(""), Celda(""),
             Celda(pct(suma / cuantas), fuerte=True),
             Celda(""), Celda(""),
         )
 
+    tonos = [f.tono for f in filas if f.tono]
     return columnas, tuple(filas), pie, (
         "El promedio de una delegación se calcula solo sobre las personas "
         "que tienen metas definidas. Quien no tiene metas no baja el "
         "promedio de los demás. " + NOTA_AJUSTES
-    ), "Las delegaciones elegidas no tienen resultados en este período."
+    ), "Las delegaciones elegidas no tienen resultados en este período.", {
+        "vista": "delegaciones",
+        "resumen": _resumen(tonos, "Delegaciones medidas", NOTA_COLORES % regla.umbral_ambar),
+    }
 
 
 ROTULO_ESTADO = {
@@ -692,6 +805,8 @@ def construir(tipo, periodo, delegaciones, item=None, regla=None,
         regla=regla,
         sin_datos=sin_datos,
         titulo_grupo=extra.get("titulo_grupo", "Delegación"),
+        vista=extra.get("vista", ""),
+        resumen=extra.get("resumen"),
     )
 
 

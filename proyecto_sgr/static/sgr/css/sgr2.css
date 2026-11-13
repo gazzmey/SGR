@@ -1169,32 +1169,85 @@
 }
 
 /* =====================================================================
-   Informes: cada fila con el color de su semáforo
+   Informes: la tarjeta y la vista de cumplimiento
 
-   Verde, amarillo o rojo en toda la fila, para que se vea sin tener que
-   llegar a la columna «Semáforo» —que en una pantalla angosta queda fuera
-   de vista—. La franja de la izquierda y el porcentaje llevan el tono
-   fuerte; el fondo, el suave, para que el texto se siga leyendo.
+   La tarjeta del informe va con más aire y botones en píldora. En los dos
+   informes de cumplimiento, cada fila lleva iniciales, el detalle bajo el
+   nombre, una barra fina y el estado como un punto de color: el color está
+   donde informa, y la tabla se lee sin cansar. Arriba, el resumen dice
+   cuántos quedaron en cada color.
    ===================================================================== */
-.tabla tbody tr.t-ok td { background: var(--verde-bg) }
-.tabla tbody tr.t-warn td { background: var(--ambar-bg) }
-.tabla tbody tr.t-bad td { background: var(--rojo-bg) }
-.tabla tbody tr.t-ok td:first-child { box-shadow: inset 4px 0 0 var(--verde-bar) }
-.tabla tbody tr.t-warn td:first-child { box-shadow: inset 4px 0 0 var(--ambar-bar) }
-.tabla tbody tr.t-bad td:first-child { box-shadow: inset 4px 0 0 var(--rojo-bar) }
-.tabla tbody tr.t-ok td.r b { color: var(--verde) }
-.tabla tbody tr.t-warn td.r b { color: var(--ambar) }
-.tabla tbody tr.t-bad td.r b { color: var(--rojo) }
-.tabla tbody tr.t-ok:hover td, .tabla tbody tr.t-warn:hover td, .tabla tbody tr.t-bad:hover td { filter: brightness(.98) }
-.leyenda-semaforo { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 12px 20px; border-top: 1px solid var(--linea); font-size: 13px; color: var(--tinta2) }
-.leyenda-semaforo span { display: inline-flex; align-items: center; gap: 6px }
-.leyenda-semaforo b { color: var(--tinta); font-weight: 600 }
-.leyenda-semaforo i { width: 12px; height: 12px; border-radius: 3px }
-.leyenda-semaforo i.ok { background: var(--verde-bar) }
-.leyenda-semaforo i.warn { background: var(--ambar-bar) }
-.leyenda-semaforo i.bad { background: var(--rojo-bar) }
+.inf-card { border-radius: 20px; overflow: hidden; box-shadow: 0 1px 2px rgba(78, 11, 15, .04), 0 12px 32px rgba(78, 11, 15, .06) }
+.inf-card > .card-h { padding: 26px 28px 18px; border-bottom: 0 }
+.inf-card #t-inf { font-size: 21px !important; letter-spacing: -.01em }
+.inf-card .card-h .btn-sm { border-radius: 99px; padding: 0 14px }
+.inf-card > .card-f { padding: 14px 28px }
+.inf-card .tabla thead th { background: var(--sup); font-weight: 500; color: var(--tinta3) }
+.inf-card .tabla th:first-child, .inf-card .tabla td:first-child { padding-left: 28px }
+.inf-card .tabla th:last-child, .inf-card .tabla td:last-child { padding-right: 28px }
+
+.pr-resumen { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 28px; border: 1px solid var(--linea); border-radius: 16px; overflow: hidden }
+.pr-resumen > div { padding: 16px 20px }
+.pr-resumen > div + div { border-left: 1px solid var(--linea) }
+.pr-resumen small { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--tinta2) }
+.pr-resumen small i { width: 8px; height: 8px; border-radius: 50% }
+.pr-resumen strong { display: block; margin-top: 6px; font-size: 26px; font-weight: 600; letter-spacing: -.02em; line-height: 1 }
+.pr-resumen strong span { margin-left: 6px; font-size: 12.5px; font-weight: 500; letter-spacing: 0; color: var(--tinta3) }
+.pr-dist { display: flex; gap: 2px; height: 6px; margin: 14px 28px 4px; border-radius: 99px; overflow: hidden; background: var(--hueso) }
+.pr-dist i { display: block; height: 100% }
+.pr-dist.chica { width: 120px; margin: 0 }
+.pr-nota { margin: 6px 28px 18px; font-size: 12.5px; color: var(--tinta3) }
+.pr-resumen i.ok, .pr-dist i.ok, .pr-bar i.ok { background: var(--verde-bar) }
+.pr-resumen i.warn, .pr-dist i.warn, .pr-bar i.warn { background: var(--ambar-bar) }
+.pr-resumen i.bad, .pr-dist i.bad, .pr-bar i.bad { background: var(--rojo-bar) }
+
+.inf-pr thead th { border-bottom: 1px solid var(--linea) }
+.inf-pr tbody td { padding-top: 14px; padding-bottom: 14px; border-bottom: 1px solid #F1ECE7 }
+.inf-pr tbody tr:hover td { background: #FCFAF8 }
+.inf-pr tr.pr-grupo td { background: var(--sup2); padding-top: 16px; padding-bottom: 14px; border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea) }
+.inf-pr tr.pr-grupo:hover td { background: var(--sup2) }
+.pr-g { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px }
+.pr-g b { font-size: 15px; font-weight: 600 }
+.pr-g .m { font-size: 13px; color: var(--tinta2) }
+.pr-p { display: flex; align-items: center; gap: 12px }
+.pr-av { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #F4EFEA; color: var(--tinta2); font-size: 12.5px; font-weight: 700; letter-spacing: .02em }
+.pr-p b { display: block; font-size: 14.5px; font-weight: 600 }
+.pr-p small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--tinta3); white-space: normal }
+.pr-c { display: flex; align-items: center; justify-content: flex-end; gap: 14px }
+.pr-c b { min-width: 58px; font-size: 15.5px; font-weight: 600; text-align: right }
+.pr-bar { position: relative; width: 140px; height: 4px; border-radius: 99px; background: #EFE9E3 }
+.pr-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--tinta3) }
+.pr-est { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--tinta2) }
+.pr-est::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--linea2); box-shadow: 0 0 0 4px var(--hueso) }
+.pr-est.ok { color: var(--verde) }
+.pr-est.ok::before { background: var(--verde-bar); box-shadow: 0 0 0 4px var(--verde-bg) }
+.pr-est.warn { color: var(--ambar) }
+.pr-est.warn::before { background: var(--ambar-bar); box-shadow: 0 0 0 4px var(--ambar-bg) }
+.pr-est.bad { color: var(--rojo) }
+.pr-est.bad::before { background: var(--rojo-bar); box-shadow: 0 0 0 4px var(--rojo-bg) }
+.inf-pr tr.pr-sinmedir td { background: var(--sup2); white-space: normal }
+.inf-pr tr.pr-sinmedir:hover td { background: var(--sup2) }
+.inf-pr tr.pr-sinmedir b { display: block; font-size: 14px; font-weight: 600; color: var(--tinta2) }
+.inf-pr tr.pr-sinmedir small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--tinta3) }
+.inf-pr tfoot td { padding-top: 14px; padding-bottom: 14px; border-top: 1px solid var(--linea); font-weight: 600 }
+.inf-pr tfoot td.r b { font-size: 15.5px }
+
+@media (max-width: 860px) {
+  .inf-card > .card-h { padding: 20px 18px 14px }
+  .inf-card > .card-h > div:first-child { min-width: 0 }
+  .inf-card #t-inf { font-size: 18px !important }
+  .inf-card .tag { height: auto; min-height: 22px; padding: 3px 8px; white-space: normal }
+  .inf-card > .card-f { padding: 14px 18px }
+  .inf-card .tabla th:first-child, .inf-card .tabla td:first-child { padding-left: 18px }
+  .inf-card .tabla th:last-child, .inf-card .tabla td:last-child { padding-right: 18px }
+  .pr-resumen, .pr-dist, .pr-nota { margin-left: 18px; margin-right: 18px }
+  .pr-resumen { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .pr-resumen > div:nth-child(3) { border-left: 0 }
+  .pr-resumen > div:nth-child(n+3) { border-top: 1px solid var(--linea) }
+  .pr-bar { width: 72px }
+}
 @media print {
-  .tabla tbody tr.t-ok td, .tabla tbody tr.t-warn td, .tabla tbody tr.t-bad td { -webkit-print-color-adjust: exact; print-color-adjust: exact }
+  .pr-dist, .pr-bar, .pr-est::before, .pr-resumen i { -webkit-print-color-adjust: exact; print-color-adjust: exact }
 }
 
 /* =====================================================================

@@ -102,7 +102,7 @@
   </div>
 {% else %}
 
-<section class="card" aria-labelledby="t-inf">
+<section class="card inf-card" aria-labelledby="t-inf">
   <div class="card-h" style="align-items: flex-start">
     <div>
       <h2 id="t-inf" style="font-size: 19px">{{ informe.titulo }}</h2>
@@ -129,13 +129,91 @@
     </div>
   </div>
     {% if informe.hay_datos %}
-      {% if informe.con_colores %}
-        <div class="leyenda-semaforo" aria-label="Qué significa cada color">
-          <span><i class="ok"></i><b>Verde:</b> al día, va en lo esperado o más</span>
-          <span><i class="warn"></i><b>Amarillo:</b> atrasado, bajo lo esperado</span>
-          <span><i class="bad"></i><b>Rojo:</b> crítico, bajo el {{ informe.regla.umbral_ambar }} % de lo esperado</span>
+      {% if informe.resumen %}
+        {% comment %}Cuántos quedaron en cada color: la lectura rápida del informe.{% endcomment %}
+        <div class="pr-resumen">
+          <div><small>{{ informe.resumen.que }}</small><strong>{{ informe.resumen.total }}</strong></div>
+          {% for parte in informe.resumen.partes %}
+            <div><small><i class="{{ parte.tono }}"></i>{{ parte.texto }}</small><strong>{{ parte.cuantos }}<span>{{ parte.porcentaje }} %</span></strong></div>
+          {% endfor %}
         </div>
+        <div class="pr-dist" role="img" aria-label="{% for parte in informe.resumen.partes %}{{ parte.texto }}: {{ parte.cuantos }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+          {% for tono, cuantos in informe.resumen.distribucion %}<i class="{{ tono }}" style="flex: {{ cuantos }}"></i>{% endfor %}
+        </div>
+        <p class="pr-nota">{{ informe.resumen.nota }}</p>
       {% endif %}
+
+      {% if informe.vista %}
+        {% comment %}
+          La vista propia de los informes de cumplimiento: iniciales, el
+          detalle bajo el nombre, una barra fina y el estado como un punto de
+          color. El archivo exporta las columnas de siempre.
+        {% endcomment %}
+        <div class="tabla-wrap">
+          <table class="tabla inf-pr" id="tabla-informe">
+            <thead>
+              <tr>
+                {% if informe.vista == 'personas' %}
+                  <th>Persona</th><th class="r">Ítems</th><th class="r">Ajustes</th><th class="r">Cumplimiento</th>
+                {% else %}
+                  <th>Delegación</th><th class="r">Esperado a la fecha</th><th class="r">Promedio</th>
+                {% endif %}
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in informe.filas_vista %}
+                {% if f.grupo %}
+                  <tr class="pr-grupo">
+                    <td colspan="{% if informe.vista == 'personas' %}4{% else %}3{% endif %}">
+                      <div class="pr-g">
+                        <b>{{ f.vista.nombre }}</b>
+                        <span class="m">{{ f.vista.detalle }}</span>
+                        <span class="pr-dist chica" aria-hidden="true">{% for tono, cuantos in f.vista.distribucion %}<i class="{{ tono }}" style="flex: {{ cuantos }}"></i>{% endfor %}</span>
+                      </div>
+                    </td>
+                    <td><span class="pr-est {{ f.tono|default:'sin' }}">{{ f.vista.estado }}</span></td>
+                  </tr>
+                {% else %}
+                  <tr>
+                    <td>
+                      <div class="pr-p">
+                        <span class="pr-av" aria-hidden="true">{{ f.vista.iniciales }}</span>
+                        <div><b>{{ f.vista.nombre }}</b><small>{{ f.vista.detalle }}</small></div>
+                      </div>
+                    </td>
+                    {% for numero in f.vista.numeros %}<td class="r">{{ numero }}</td>{% endfor %}
+                    <td class="r">
+                      <div class="pr-c">
+                        {% if f.vista.barra is not None %}<span class="pr-bar" aria-hidden="true"><i class="{{ f.tono }}" style="width: {{ f.vista.barra|stringformat:'.1f' }}%"></i></span>{% endif %}
+                        <b>{{ f.vista.valor }}</b>
+                      </div>
+                    </td>
+                    <td><span class="pr-est {{ f.tono|default:'sin' }}">{{ f.vista.estado }}</span></td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+              {% if informe.sin_medir_vista %}
+                <tr class="pr-sinmedir">
+                  <td colspan="{% if informe.vista == 'personas' %}5{% else %}4{% endif %}">
+                    <b>{{ informe.sin_medir_vista|length }} {% if informe.vista == 'personas' %}persona{{ informe.sin_medir_vista|length|pluralize }}{% else %}delegaci{{ informe.sin_medir_vista|length|pluralize:"ón,ones" }}{% endif %} sin metas en este período</b>
+                    <small>{{ informe.sin_medir_vista|join:", " }}. No entran en el promedio.</small>
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+            {% if informe.pie %}
+              <tfoot>
+                <tr>
+                  <td colspan="{% if informe.vista == 'personas' %}3{% else %}2{% endif %}">{{ informe.pie.0.texto }}</td>
+                  <td class="r"><b>{{ informe.pie_valor }}</b></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            {% endif %}
+          </table>
+        </div>
+      {% else %}
       <div class="tabla-wrap">
         <table class="tabla" id="tabla-informe">
           <thead>
@@ -172,6 +250,7 @@
           {% endif %}
         </table>
       </div>
+      {% endif %}
     {% else %}
       <div class="card-b" style="padding: 28px 20px">
         <p class="small soft">{{ informe.sin_datos }}</p>
