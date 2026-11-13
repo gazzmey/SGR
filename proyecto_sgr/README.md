@@ -35,7 +35,7 @@ clase se convierte en seis mantenedores distintos.
 | 2 | Recuperar contraseña | `/cuenta/recuperar/` | Paso 1: pide el correo y envía un código. |
 | 3 | Validar código | `/cuenta/recuperar/codigo/` | Paso 3: los seis dígitos, con vigencia e intentos. |
 | 4 | Crear contraseña | `/cuenta/recuperar/clave/` | Paso 4: la contraseña nueva, con los validadores de Django. |
-| 5 | Mi panel | `/` | Entrada al sistema: lo que hay que atender hoy (vencido, rechazado, por decidir), el avance frente a lo esperado y los módulos del rol agrupados por área. |
+| 5 | Mi panel | `/` | Entrada al sistema: el avance frente a lo esperado, lo que hay que atender hoy (vencido, rechazado, por decidir) y los módulos del rol, cada uno con el color de su área. |
 | 6 | Delegaciones | `/gestion/delegaciones/` | Mantenedor completo. |
 | 7 | Roles y permisos | `/gestion/roles/` | Mantenedor completo, con la tabla de permisos. |
 | 8 | Usuarios | `/gestion/usuarios/` | Mantenedor completo sobre `User` + `PerfilUsuario`. |

@@ -3,16 +3,16 @@ Lo que muestra «Mi panel».
 
 El panel responde tres preguntas, en este orden:
 
-    Para atender      qué necesita acción hoy: lo vencido, lo rechazado,
-                      lo que espera una decisión. Solo eso.
     Tu avance         cómo va la persona frente a lo esperado a la fecha;
                       quien supervisa ve, en cambio, cómo van sus
                       delegaciones.
-    Tus módulos       a dónde ir, agrupado por las mismas áreas del menú,
+    Para atender      qué necesita acción hoy: lo vencido, lo rechazado,
+                      lo que espera una decisión. Solo eso.
+    Tus módulos       a dónde ir, en el orden y con las áreas del menú,
                       con una línea de qué hace cada pantalla.
 
-El color se reserva para dos cosas: la banda de cada área y el punto rojo o
-ámbar de lo que hay que atender. El resto es blanco y papel, para que la
+El color se reserva para dos cosas: el área de cada módulo y el punto rojo
+o ámbar de lo que hay que atender. El resto es blanco y papel, para que la
 pantalla se lea sin cansar.
 
 Qué ve cada persona

@@ -1070,30 +1070,56 @@
 /* =====================================================================
    Mi panel
 
-   Tres bloques: «Para atender», el avance y los módulos por área. El color
-   se reserva para la banda de cada área y el punto de cada pendiente; el
-   resto es blanco y papel. Los colores de área salen de la paleta del SGR
-   y todos dejan el texto blanco sobre 4,5:1 o más.
+   Todo va a lo ancho, en este orden: el avance, «Para atender» y una
+   grilla pareja de módulos. Nada queda lado a lado con algo de otro alto,
+   así que no se abren huecos. El color se reserva para el punto de cada
+   pendiente y para el área de cada módulo (franja, ícono y nombre); los
+   colores de área salen de la paleta del SGR y todos dejan el texto blanco
+   sobre 4,5:1 o más.
    ===================================================================== */
-.pn-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px; margin-bottom: 28px }
+.pn-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px; margin-bottom: 24px }
 .pn-head h1 { font-size: 28px; font-weight: 600; letter-spacing: -.015em; line-height: 1.15 }
 .pn-head p { margin-top: 6px; color: var(--tinta2); font-size: 15px; max-width: 64ch }
 .pn-periodo { min-width: 300px; padding: 14px 18px; border-radius: 16px; background: var(--sup); border: 1px solid var(--linea) }
 .pn-periodo .fila { display: flex; justify-content: space-between; gap: 16px; font-size: 13.5px; color: var(--tinta2) }
 .pn-periodo .fila b { color: var(--tinta); font-weight: 600 }
-.pn-barra + .fila { margin-top: 8px }
+.pn-periodo .fila span { white-space: nowrap }
 .pn-barra { position: relative; height: 6px; border-radius: 99px; background: var(--hueso); margin-top: 10px; overflow: hidden }
 .pn-barra i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--g800) }
+.pn-barra + .fila { margin-top: 8px }
 
-.pn-fila { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 24px; align-items: start }
-.pn-fila.sola { grid-template-columns: minmax(0, 1fr) }
+/* El avance, en una franja */
+.pn-avance {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 36px;
+  padding: 20px 24px; margin-bottom: 20px; background: var(--sup); border: 1px solid var(--linea); border-radius: 20px;
+}
+.pn-avance h2 { font-size: 15px; font-weight: 600; color: var(--tinta2) }
+.pn-avance .num { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-top: 4px }
+.pn-avance .num strong { font-size: 40px; font-weight: 600; letter-spacing: -.02em; line-height: 1; white-space: nowrap }
+.pn-avance .pn-meta { margin: 6px 0 8px }
+.pn-avance .nota { font-size: 13px; color: var(--tinta2) }
+.pn-avance .falta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 10px; font-size: 13px; color: var(--tinta2) }
+.pn-avance .falta > b { color: var(--tinta); font-weight: 600 }
+.pn-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 2px 10px; border-radius: 99px; background: var(--hueso); color: var(--tinta); font-size: 12.5px }
+.pn-chip b { font-weight: 700; white-space: nowrap }
+.pn-pill { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 99px; font-size: 13px; font-weight: 600; border: 1.5px solid var(--linea2); background: var(--sup2); color: var(--tinta2) }
+.pn-pill.ok { border-color: var(--verde-bar); background: var(--verde-bg); color: var(--verde) }
+.pn-pill.warn { border-color: var(--ambar-bar); background: var(--ambar-bg); color: var(--ambar) }
+.pn-pill.bad { border-color: var(--rojo-bar); background: var(--rojo-bg); color: var(--rojo) }
+.pn-meta { position: relative; height: 10px; border-radius: 99px; background: var(--hueso) }
+.pn-meta i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--tinta3) }
+.pn-meta i.ok { background: var(--verde-bar) }
+.pn-meta i.warn { background: var(--ambar-bar) }
+.pn-meta i.bad { background: var(--rojo-bar) }
+.pn-meta em { position: absolute; top: -5px; width: 2px; height: 20px; margin-left: -1px; background: var(--tinta); border-radius: 2px }
+
+/* Para atender */
 .pn-caja { background: var(--sup); border: 1px solid var(--linea); border-radius: 20px }
 .pn-caja-h { display: flex; align-items: center; gap: 10px; padding: 18px 22px 6px }
 .pn-caja-h h2 { font-size: 17px; font-weight: 600 }
 .pn-cuenta { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 8px; border-radius: 99px; background: var(--g50); color: var(--g800); font-size: 13px; font-weight: 700 }
-
 .pn-atender { list-style: none; margin: 0; padding: 6px 10px 10px }
-.pn-atender li { display: flex; align-items: center; gap: 14px; padding: 13px 12px }
+.pn-atender li { display: flex; align-items: center; gap: 14px; padding: 12px }
 .pn-atender li + li { border-top: 1px solid var(--linea) }
 .pn-punto { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--rojo-bar); box-shadow: 0 0 0 4px var(--rojo-bg) }
 .pn-punto.warn { background: var(--ambar-bar); box-shadow: 0 0 0 4px var(--ambar-bg) }
@@ -1107,61 +1133,37 @@
 }
 .pn-ir:hover { color: var(--g700) }
 
-.pn-avance { padding: 4px 22px 20px }
-.pn-avance .num { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; margin-top: 6px }
-.pn-avance .num strong { font-size: 44px; font-weight: 600; letter-spacing: -.02em; line-height: 1 }
-.pn-pill { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 99px; font-size: 13px; font-weight: 600; border: 1.5px solid var(--linea2); background: var(--sup2); color: var(--tinta2) }
-.pn-pill.ok { border-color: var(--verde-bar); background: var(--verde-bg); color: var(--verde) }
-.pn-pill.warn { border-color: var(--ambar-bar); background: var(--ambar-bg); color: var(--ambar) }
-.pn-pill.bad { border-color: var(--rojo-bar); background: var(--rojo-bg); color: var(--rojo) }
-.pn-meta { position: relative; height: 10px; border-radius: 99px; background: var(--hueso); margin: 18px 0 8px }
-.pn-meta i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--tinta3) }
-.pn-meta i.ok { background: var(--verde-bar) }
-.pn-meta i.warn { background: var(--ambar-bar) }
-.pn-meta i.bad { background: var(--rojo-bar) }
-.pn-meta em { position: absolute; top: -5px; width: 2px; height: 20px; margin-left: -1px; background: var(--tinta); border-radius: 2px }
-.pn-avance .nota { font-size: 13px; color: var(--tinta2) }
-.pn-falta { margin: 16px 0 14px; padding-top: 14px; border-top: 1px solid var(--linea) }
-.pn-falta > b { font-size: 13px; font-weight: 600 }
-.pn-falta ul { list-style: none; margin: 6px 0 0; padding: 0 }
-.pn-falta li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 4px 0 }
-.pn-falta li span:last-child { font-weight: 600; white-space: nowrap }
-.pn-avance > .pn-ir { margin-top: 2px }
-.pn-avance > .nota + .pn-ir { margin-top: 14px }
-
-.pn-sec { font-size: 19px; font-weight: 600; margin: 36px 0 14px }
-.pn-areas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start }
-.pn-area { --banda: var(--g700); background: var(--sup); border: 1px solid var(--linea); border-radius: 20px; overflow: hidden }
-.pn-area.a-bordo { --banda: var(--g800) }
-.pn-area.a-ocre { --banda: var(--ambar) }
-.pn-area.a-granate { --banda: var(--g900) }
-.pn-area.a-grafito { --banda: var(--tinta2) }
-.pn-area.a-tinta { --banda: var(--tinta) }
-.pn-area-h { display: flex; align-items: center; gap: 12px; padding: 12px 16px 12px 18px; background: var(--banda); color: #fff }
-.pn-area-h .ic { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: rgba(255, 255, 255, .16) }
-.pn-area-h h3 { font-size: 15.5px; font-weight: 700; color: #fff }
-.pn-area-h .cuantos {
-  margin-left: auto; flex: none; height: 28px; display: inline-flex; align-items: center; padding: 0 12px;
-  border-radius: 99px; border: 1.5px solid rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .1);
-  font-size: 12.5px; font-weight: 700; white-space: nowrap;
+/* Los módulos: una grilla pareja; el área va en la franja, el ícono y el nombre */
+.pn-sec { font-size: 19px; font-weight: 600; margin: 32px 0 14px }
+.pn-mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px }
+.pn-mod {
+  --banda: var(--g700);
+  position: relative; display: flex; align-items: center; gap: 14px; padding: 16px 16px 14px;
+  background: var(--sup); border: 1px solid var(--linea); border-radius: 16px; overflow: hidden;
+  color: var(--tinta); text-decoration: none;
 }
-.pn-mods { list-style: none; margin: 0; padding: 4px 8px 8px }
-.pn-mods li + li { border-top: 1px solid var(--linea) }
-.pn-mods a { display: flex; align-items: center; gap: 14px; padding: 12px 10px; border-radius: 12px; color: var(--tinta); text-decoration: none }
-.pn-mods a:hover { background: var(--sup2) }
-.pn-mods a:hover b { color: var(--g700) }
-.pn-mods a:focus-visible { outline: 2px solid var(--g700); outline-offset: -2px }
-.pn-mods .ico { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--hueso); color: var(--banda) }
-.pn-mods .tx { flex: 1; min-width: 0 }
-.pn-mods b { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 15px; font-weight: 600 }
-.pn-mods .d { display: block; font-size: 13px; color: var(--tinta2); margin-top: 1px }
-.pn-mods .chev { flex: none; color: var(--tinta3) }
+.pn-mod::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--banda) }
+.pn-mod:hover { border-color: var(--linea2); box-shadow: var(--sh1) }
+.pn-mod:hover b { color: var(--g700) }
+.pn-mod:focus-visible { outline: 2px solid var(--g700); outline-offset: 2px }
+.pn-mod.a-bordo { --banda: var(--g800) }
+.pn-mod.a-ocre { --banda: var(--ambar) }
+.pn-mod.a-granate { --banda: var(--g900) }
+.pn-mod.a-grafito { --banda: var(--tinta2) }
+.pn-mod.a-tinta { --banda: var(--tinta) }
+.pn-mod .ico { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--banda); color: #fff }
+.pn-mod .tx { flex: 1; min-width: 0 }
+.pn-mod small { display: block; font-size: 12px; font-weight: 600; color: var(--banda); margin-bottom: 1px }
+.pn-mod b { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 15px; font-weight: 600 }
+.pn-mod .d { display: block; font-size: 13px; color: var(--tinta2); margin-top: 1px }
+.pn-mod .chev { flex: none; color: var(--tinta3) }
 .pn-nuevo { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 99px; background: var(--g50); border: 1px solid var(--g100); color: var(--g800); font-size: 12px; font-weight: 600 }
 
-@media (max-width: 1100px) {
-  .pn-fila, .pn-areas { grid-template-columns: minmax(0, 1fr); gap: 16px }
+@media (max-width: 1000px) {
+  .pn-avance { grid-template-columns: minmax(0, 1fr); gap: 14px }
 }
 @media (max-width: 860px) {
   .pn-periodo { min-width: 0; width: 100% }
-  .pn-avance .num strong { font-size: 38px }
+  .pn-avance .num strong { font-size: 36px }
+  .pn-mods { grid-template-columns: minmax(0, 1fr); gap: 12px }
 }

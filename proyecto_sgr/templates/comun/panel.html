@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 
 {% comment %}
-  Mi panel: lo que hay que atender, el avance y los módulos, en ese orden.
-  Todo se arma en comun/modulos.py; aquí solo se dibuja. El color se usa en
-  dos lugares: la banda de cada área y el punto de cada pendiente.
+  Mi panel: el avance, lo que hay que atender y los módulos, todo a lo
+  ancho para que no queden huecos. Se arma en comun/modulos.py; aquí solo
+  se dibuja. El color va en el punto de cada pendiente y en el área de cada
+  módulo.
 {% endcomment %}
 
 {% block titulo %}Mi panel{% endblock %}
@@ -31,76 +32,61 @@
   {% endif %}
 </div>
 
-<div class="pn-fila{% if not avance %} sola{% endif %}">
-  <section class="pn-caja" aria-labelledby="t-atender">
-    <div class="pn-caja-h">
-      <h2 id="t-atender">Para atender</h2>
-      {% if pendientes %}<span class="pn-cuenta">{{ pendientes|length }}</span>{% endif %}
+{% if avance %}
+  <section class="pn-avance" aria-labelledby="t-avance">
+    <div>
+      <h2 id="t-avance">{{ avance.titulo }}</h2>
+      <div class="num"><strong>{{ avance.cifra }}</strong>{% if avance.estado %}<span class="pn-pill {{ avance.tono }}">{{ avance.estado }}</span>{% endif %}</div>
     </div>
-    {% if pendientes %}
-      <ul class="pn-atender">
-        {% for p in pendientes %}
-          <li>
-            <span class="pn-punto {{ p.tono }}" aria-hidden="true"></span>
-            <div class="tx"><b>{{ p.titulo }}</b><span>{{ p.detalle }}</span></div>
-            <a class="pn-ir" href="{{ p.url }}" aria-label="Revisar: {{ p.titulo }}">Revisar
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></a>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="pn-vacio">No tienes nada pendiente. Cuando algo venza o espere tu respuesta, aparecerá aquí.</p>
-    {% endif %}
+    <div>
+      <div class="pn-meta" role="img" aria-label="{{ avance.titulo }}: {{ avance.cifra }}"><i class="{{ avance.tono }}" style="width: {{ avance.barra|stringformat:'.1f' }}%"></i>{% if avance.marca is not None %}<em style="left: {{ avance.marca|stringformat:'.1f' }}%"></em>{% endif %}</div>
+      <p class="nota">{{ avance.nota }}{% if avance.vacio %} {{ avance.vacio }}{% endif %}</p>
+      {% if avance.lista %}
+        <p class="falta"><b>{{ avance.lista_titulo }}:</b>
+          {% for nombre, valor in avance.lista %}<span class="pn-chip">{{ nombre }} <b>{{ valor }}</b></span>{% endfor %}
+        </p>
+      {% endif %}
+    </div>
+    <a class="pn-ir" href="{{ avance.enlace.1 }}">{{ avance.enlace.0 }}
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></a>
   </section>
+{% endif %}
 
-  {% if avance %}
-    <section class="pn-caja" aria-labelledby="t-avance">
-      <div class="pn-caja-h"><h2 id="t-avance">{{ avance.titulo }}</h2></div>
-      <div class="pn-avance">
-        <div class="num"><strong>{{ avance.cifra }}</strong>{% if avance.estado %}<span class="pn-pill {{ avance.tono }}">{{ avance.estado }}</span>{% endif %}</div>
-        <div class="pn-meta"><i class="{{ avance.tono }}" style="width: {{ avance.barra|stringformat:'.1f' }}%"></i>{% if avance.marca is not None %}<em style="left: {{ avance.marca|stringformat:'.1f' }}%"></em>{% endif %}</div>
-        <p class="nota">{{ avance.nota }}</p>
-        {% if avance.lista %}
-          <div class="pn-falta">
-            <b>{{ avance.lista_titulo }}</b>
-            <ul>{% for nombre, valor in avance.lista %}<li><span>{{ nombre }}</span><span>{{ valor }}</span></li>{% endfor %}</ul>
-          </div>
-        {% elif avance.vacio %}
-          <p class="nota pn-falta">{{ avance.vacio }}</p>
-        {% endif %}
-        <a class="pn-ir" href="{{ avance.enlace.1 }}">{{ avance.enlace.0 }}
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></a>
-      </div>
-    </section>
+<section class="pn-caja" aria-labelledby="t-atender">
+  <div class="pn-caja-h">
+    <h2 id="t-atender">Para atender</h2>
+    {% if pendientes %}<span class="pn-cuenta">{{ pendientes|length }}</span>{% endif %}
+  </div>
+  {% if pendientes %}
+    <ul class="pn-atender">
+      {% for p in pendientes %}
+        <li>
+          <span class="pn-punto {{ p.tono }}" aria-hidden="true"></span>
+          <div class="tx"><b>{{ p.titulo }}</b><span>{{ p.detalle }}</span></div>
+          <a class="pn-ir" href="{{ p.url }}" aria-label="Revisar: {{ p.titulo }}">Revisar
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="pn-vacio">No tienes nada pendiente. Cuando algo venza o espere tu respuesta, aparecerá aquí.</p>
   {% endif %}
-</div>
+</section>
 
 {% if areas %}
   <h2 class="pn-sec">Tus módulos</h2>
-  <div class="pn-areas">
-    {% for area in areas %}
-      <section class="pn-area {{ area.clase }}" aria-labelledby="area-{{ area.clave }}">
-        <div class="pn-area-h">
-          <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ area.icono }}</svg></span>
-          <h3 id="area-{{ area.clave }}">{{ area.nombre }}</h3>
-          <span class="cuantos">{{ area.modulos|length }} módulo{{ area.modulos|length|pluralize }}</span>
-        </div>
-        <ul class="pn-mods">
-          {% for m in area.modulos %}
-            <li>
-              <a href="{{ m.url }}">
-                <span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ m.icono }}</svg></span>
-                <span class="tx">
-                  <b>{{ m.titulo }}{% if m.nuevo %} <span class="pn-nuevo">Nuevo</span>{% endif %}</b>
-                  <span class="d">{{ m.descripcion }}</span>
-                </span>
-                <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
-      </section>
-    {% endfor %}
+  <div class="pn-mods">
+    {% for area in areas %}{% for m in area.modulos %}
+      <a class="pn-mod {{ area.clase }}" href="{{ m.url }}">
+        <span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ m.icono }}</svg></span>
+        <span class="tx">
+          <small>{{ area.nombre }}</small>
+          <b>{{ m.titulo }}{% if m.nuevo %} <span class="pn-nuevo">Nuevo</span>{% endif %}</b>
+          <span class="d">{{ m.descripcion }}</span>
+        </span>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+      </a>
+    {% endfor %}{% endfor %}
   </div>
 {% else %}
   <div class="notice info mt20">
