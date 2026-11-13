@@ -15,8 +15,17 @@ from django.utils import timezone
 ANCHO_POR_DEFECTO = 24
 
 
-def libro_de_listado(*, titulo, filtro, columnas, filas, archivo):
-    """Devuelve una respuesta HTTP con el .xlsx del listado."""
+#: Los fondos del semáforo, los mismos de la hoja de estilos.
+FONDOS = {"ok": "FFE3F1E8", "warn": "FFFBEFD5", "bad": "FFFCE8E5"}
+
+
+def libro_de_listado(*, titulo, filtro, columnas, filas, archivo, tono_de=None):
+    """
+    Devuelve una respuesta HTTP con el .xlsx del listado.
+
+    ``tono_de``, si viene, dice para cada fila si va en verde, amarillo o
+    rojo («ok», «warn», «bad»): el archivo se ve igual que la pantalla.
+    """
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Alignment, Font, PatternFill
@@ -62,6 +71,10 @@ def libro_de_listado(*, titulo, filtro, columnas, filas, archivo):
 
     for obj in filas:
         hoja.append([_plano(c.valor(obj)) for c in columnas])
+        fondo = FONDOS.get(tono_de(obj)) if tono_de else None
+        if fondo:
+            for numero in range(1, len(columnas) + 1):
+                hoja.cell(row=hoja.max_row, column=numero).fill = PatternFill("solid", fgColor=fondo)
 
     for numero, columna in enumerate(columnas, start=1):
         ancho = getattr(columna, "ancho", None) or ANCHO_POR_DEFECTO

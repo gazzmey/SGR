@@ -76,7 +76,7 @@ recorrido cortado a la mitad.
 | Historial de parámetros | `/periodo/historial/` | Cada versión de un ítem, una meta o una regla de cálculo: qué cambió, la vigencia, el autor y la versión anterior (HU-25 y HU-38). Solo consulta. |
 | Observaciones | `/observaciones/` | Las consultas y comentarios recientes en compromisos, casos sociales y cartas que la persona puede abrir. Se escriben al pie de la ficha de cada registro (HU-24). |
 | Auditoría | `/periodo/auditoria/` | Historial de operaciones críticas. Solo listado: no hay creación, edición ni borrado. |
-| Informes | `/periodo/informes/` | Seis informes consolidados con filtros, y exportación a Excel, CSV y PDF. El sexto, *Brechas por cargo e ítem*, compara los períodos cerrados con la regla de cada uno (HU-22). |
+| Informes | `/periodo/informes/` | Seis informes consolidados, que se configuran en una ventana «Generar informe» y se muestran a todo el ancho, con exportación a Excel, CSV y PDF. En los de cumplimiento, cada fila va en verde, amarillo o rojo según su semáforo, también en el Excel. El sexto, *Brechas por cargo e ítem*, compara los períodos cerrados con la regla de cada uno (HU-22). |
 | Detalle de una brecha | `/periodo/informes/brecha/` | Por período: la regla y la meta con que se midió, y lo que logró cada persona del cargo. Se llega desde el informe de brechas. |
 
 La cadena que forman, y que es la razón del orden en que se construyeron:

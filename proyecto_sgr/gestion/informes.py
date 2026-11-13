@@ -98,6 +98,9 @@ class Fila:
     celdas: tuple = ()
     grupo: str = ""
     delegacion: str = ""   # se usa solo en la exportación
+    #: El color de la fila según el semáforo: ok (verde), warn (amarillo) o
+    #: bad (rojo). Vacío si no hay con qué compararla.
+    tono: str = ""
 
 
 @dataclass(frozen=True)
@@ -140,6 +143,11 @@ class Informe:
         """Cuántas filas de datos trae. Las de grupo no se cuentan."""
         return sum(1 for f in self.filas if not f.grupo)
 
+    @property
+    def con_colores(self):
+        """True si alguna fila va pintada según el semáforo."""
+        return any(f.tono for f in self.filas)
+
 
 # =========================================================================
 # Los seis informes
@@ -181,6 +189,11 @@ def _nombre_cargo(resultado, perfil):
 def _chip_de(clase):
     """Traduce el color del semáforo al distintivo de la hoja de estilos."""
     return {"verde": "ok", "ambar": "warn", "rojo": "bad"}.get(clase, "line")
+
+
+def _tono_de(clase):
+    """El color de la fila entera: el mismo del semáforo, o ninguno."""
+    return {"verde": "ok", "ambar": "warn", "rojo": "bad"}.get(clase, "")
 
 
 def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
@@ -237,6 +250,7 @@ def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
                     Celda(texto, chip=_chip_de(clase)),
                 ),
                 delegacion=delegacion.nombre,
+                tono=_tono_de(clase),
             )))
             suma += valor
             cuantos += 1
@@ -248,11 +262,13 @@ def _por_funcionario(periodo, delegaciones, item, regla, al_dia):
         # se acaba de formatear: ese viaje de ida y vuelta pierde decimales
         # y produce un total que no cuadra con sus propias filas.
         promedio = sum(v for v, _ in medidas) / len(medidas)
-        umbral = regla.umbral_ambar
-        relacion = "sobre" if promedio >= umbral else "bajo"
+        # El encabezado del grupo usa el mismo semáforo que las filas, frente
+        # a lo esperado a la fecha. Antes comparaba el promedio con el 60 %
+        # como si fuera un porcentaje fijo, y una delegación «bajo el umbral»
+        # podía tener a todas sus personas en verde.
+        _, estado = C.semaforo_de(promedio, resultado.esperado, regla)
         filas.append(Fila(grupo=(
-            "%s · promedio %s · %s el umbral de %d %%"
-            % (delegacion.nombre, pct(promedio), relacion, umbral)
+            "%s · promedio %s · %s" % (delegacion.nombre, pct(promedio), estado.lower())
         )))
         filas.extend(fila for _, fila in medidas)
 
@@ -303,7 +319,7 @@ def _por_delegacion(periodo, delegaciones, item, regla, al_dia):
             Celda(pct(resultado.promedio), fuerte=True),
             Celda(pct(resultado.esperado)),
             Celda(resultado.semaforo_texto, chip=_chip_de(resultado.semaforo_clase)),
-        ), delegacion=delegacion.nombre))
+        ), delegacion=delegacion.nombre, tono=_tono_de(resultado.semaforo_clase)))
         suma += resultado.promedio
         cuantas += 1
 

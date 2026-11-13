@@ -1167,3 +1167,72 @@
   .pn-avance .num strong { font-size: 36px }
   .pn-mods { grid-template-columns: minmax(0, 1fr); gap: 12px }
 }
+
+/* =====================================================================
+   Informes: cada fila con el color de su semáforo
+
+   Verde, amarillo o rojo en toda la fila, para que se vea sin tener que
+   llegar a la columna «Semáforo» —que en una pantalla angosta queda fuera
+   de vista—. La franja de la izquierda y el porcentaje llevan el tono
+   fuerte; el fondo, el suave, para que el texto se siga leyendo.
+   ===================================================================== */
+.tabla tbody tr.t-ok td { background: var(--verde-bg) }
+.tabla tbody tr.t-warn td { background: var(--ambar-bg) }
+.tabla tbody tr.t-bad td { background: var(--rojo-bg) }
+.tabla tbody tr.t-ok td:first-child { box-shadow: inset 4px 0 0 var(--verde-bar) }
+.tabla tbody tr.t-warn td:first-child { box-shadow: inset 4px 0 0 var(--ambar-bar) }
+.tabla tbody tr.t-bad td:first-child { box-shadow: inset 4px 0 0 var(--rojo-bar) }
+.tabla tbody tr.t-ok td.r b { color: var(--verde) }
+.tabla tbody tr.t-warn td.r b { color: var(--ambar) }
+.tabla tbody tr.t-bad td.r b { color: var(--rojo) }
+.tabla tbody tr.t-ok:hover td, .tabla tbody tr.t-warn:hover td, .tabla tbody tr.t-bad:hover td { filter: brightness(.98) }
+.leyenda-semaforo { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 12px 20px; border-top: 1px solid var(--linea); font-size: 13px; color: var(--tinta2) }
+.leyenda-semaforo span { display: inline-flex; align-items: center; gap: 6px }
+.leyenda-semaforo b { color: var(--tinta); font-weight: 600 }
+.leyenda-semaforo i { width: 12px; height: 12px; border-radius: 3px }
+.leyenda-semaforo i.ok { background: var(--verde-bar) }
+.leyenda-semaforo i.warn { background: var(--ambar-bar) }
+.leyenda-semaforo i.bad { background: var(--rojo-bar) }
+@media print {
+  .tabla tbody tr.t-ok td, .tabla tbody tr.t-warn td, .tabla tbody tr.t-bad td { -webkit-print-color-adjust: exact; print-color-adjust: exact }
+}
+
+/* =====================================================================
+   Informes: la ventana «Generar informe»
+
+   Un <dialog> del navegador, centrado, con los seis tipos en tres columnas
+   y los tres filtros en una fila. Así el informe ocupa todo el ancho de la
+   página y no queda apretado al lado del formulario.
+   ===================================================================== */
+.inf-modal {
+  width: min(880px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
+  padding: 0; border: 0; border-radius: 20px; background: var(--sup); color: var(--tinta);
+  box-shadow: 0 24px 64px rgba(30, 23, 21, .32);
+}
+.inf-modal::backdrop { background: rgba(30, 23, 21, .45) }
+.inf-modal[open] { animation: sgr-rise .26s var(--ease) both }
+.inf-modal form { display: flex; flex-direction: column; max-height: calc(100vh - 48px) }
+.inf-modal-h { display: flex; align-items: flex-start; gap: 16px; padding: 22px 24px 4px }
+.inf-modal-h h2 { font-size: 21px; font-weight: 600 }
+.inf-modal-h p { margin-top: 4px; font-size: 14px; color: var(--tinta2) }
+.inf-cerrar {
+  margin-left: auto; flex: none; display: grid; place-items: center; width: 36px; height: 36px;
+  border: 0; border-radius: 99px; background: none; color: var(--tinta3); cursor: pointer;
+}
+.inf-cerrar:hover { background: var(--hueso); color: var(--tinta) }
+.inf-modal-b { padding: 16px 24px 20px; overflow-y: auto }
+.inf-tipos { border: 0; margin: 0; padding: 0 }
+.inf-tipos legend { font-size: 14px; font-weight: 600; margin-bottom: 10px; padding: 0 }
+.inf-tipos .decision { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+.inf-tipos .opt { border-radius: 14px; padding: 14px }
+.inf-tipos .opt span b { display: block; line-height: 1.25 }
+.inf-campos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--linea) }
+.inf-campos .help { font-size: 12.5px }
+.inf-modal-f { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--linea); background: var(--sup2); border-radius: 0 0 20px 20px }
+.inf-modal.en-linea { position: static; display: block; width: auto; margin: 0 0 20px; box-shadow: var(--sh1); border: 1px solid var(--linea) }
+@media (max-width: 760px) {
+  .inf-tipos .decision, .inf-campos { grid-template-columns: minmax(0, 1fr) }
+  .inf-modal { width: calc(100vw - 16px); max-height: calc(100vh - 16px) }
+}
+@media print { .inf-modal { display: none } }
+@media (prefers-reduced-motion: reduce) { .inf-modal[open] { animation: none } }

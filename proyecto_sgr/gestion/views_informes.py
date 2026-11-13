@@ -166,14 +166,17 @@ def _exportar(request, informe, formato):
               despues=f"{informe.cuantas} filas · {formato}",
               detalle=I.describir_filtros(informe))
 
-    construir_archivo = csv_de_listado if formato == "csv" else libro_de_listado
-    return construir_archivo(
+    comun = dict(
         titulo=informe.titulo,
         filtro=I.describir_filtros(informe),
         columnas=columnas,
         filas=filas,
         archivo="SGR_informe_" + informe.tipo,
     )
+    if formato == "csv":
+        return csv_de_listado(**comun)
+    # En Excel, cada fila con el color de su semáforo, igual que en pantalla.
+    return libro_de_listado(**comun, tono_de=lambda fila: fila.tono)
 
 
 def brecha(request):
