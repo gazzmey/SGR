@@ -1,68 +1,70 @@
 {% extends "base.html" %}
 
+{% comment %}
+  Mi panel: una tarjeta por módulo, con el color de su área. Las tarjetas y su
+  estado se arman en comun/modulos.py; aquí solo se dibujan.
+{% endcomment %}
+
 {% block titulo %}Mi panel{% endblock %}
 {% block ruta %}<span aria-current="page">Mi panel</span>{% endblock %}
 
 {% block contenido %}
 <div class="page-head">
   <div>
-    <h1>Mi panel</h1>
+    <h1>Hola, {{ user.first_name|default:user.get_username }}</h1>
     <p>
       {% if sgr_delegacion %}
-        Estás trabajando en <b>{{ sgr_delegacion.nombre }}</b> ({{ sgr_delegacion.codigo }}).
-        Lo que registres queda asociado a esa delegación.
+        Estás trabajando en <b>{{ sgr_delegacion.nombre }}</b>. Lo que registres queda asociado a esa delegación.
       {% else %}
         Tu cuenta todavía no tiene una delegación asignada. Pídele al administrador que te cree el perfil.
       {% endif %}
     </p>
+    <div class="panel-acceso">
+      <span class="tag">{% if sgr_perfil %}{{ sgr_perfil.rol.nombre }}{% else %}Superusuario de Django{% endif %}</span>
+      {% if sgr_perfil %}<span class="tag">{{ sgr_perfil.rol.get_alcance_display }} · {{ sgr_delegaciones|length }} delegaci{{ sgr_delegaciones|length|pluralize:"ón,ones" }}</span>{% endif %}
+    </div>
   </div>
 </div>
 
 {% if tarjetas %}
-  <div class="kpis" style="margin-bottom: 20px">
-    {% for tarjeta in tarjetas %}
-      <a class="card kpi" href="{{ tarjeta.url }}" style="text-decoration: none; color: inherit">
-        <span class="lbl">{{ tarjeta.titulo }}</span>
-        <div class="val">{{ tarjeta.cuenta }}</div>
-        <div class="meta">{{ tarjeta.pie }}</div>
-      </a>
-    {% endfor %}
+  <div class="modulos">
+      {% for t in tarjetas %}
+        <article class="modulo {{ t.area_clase }}">
+          <div class="modulo-h">
+            <span class="modulo-ic">
+              <svg class="i" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ t.icono }}</svg>
+            </span>
+            <span class="modulo-area">{{ t.area_nombre }}</span>
+            <span class="modulo-tipo">{{ t.tipo }}</span>
+          </div>
+          <div class="modulo-b">
+            <div class="modulo-t">
+              <h3><a href="{{ t.url }}">{{ t.titulo }}</a></h3>
+              {% if t.nuevo %}<span class="modulo-nuevo">Nuevo</span>{% endif %}
+            </div>
+            <p class="modulo-d">{{ t.descripcion }}</p>
+            {% if t.estado %}
+              <a class="modulo-estado {{ t.estado.tono }}" href="{{ t.url }}" style="text-decoration: none">{{ t.estado.texto }}</a>
+            {% endif %}
+          </div>
+          <div class="modulo-f">
+            {% for d in t.datos %}
+              <span class="modulo-dato">
+                <svg class="i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ d.svg }}</svg>
+                {{ d.texto }}
+              </span>
+            {% endfor %}
+            <a class="modulo-ir" href="{{ t.url }}" aria-label="Abrir {{ t.titulo }}">Abrir
+              <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+            </a>
+          </div>
+        </article>
+      {% endfor %}
+  </div>
+{% else %}
+  <div class="notice info">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>Sin módulos</b>Tu rol todavía no tiene permisos asignados. Pídeselos al administrador.</div>
   </div>
 {% endif %}
-
-<div class="grid g-side">
-  <section class="card">
-    <div class="card-h"><h2>Qué hay en esta entrega</h2></div>
-    <div class="card-b stack" style="gap: 14px">
-      <p class="small soft">
-        Las once pantallas que exige la segunda entrega están construidas sobre Django:
-        el acceso con recuperación de contraseña, los seis mantenedores y el ingreso de
-        atención ciudadana. Cada una guarda en MariaDB.
-      </p>
-      <div class="divider"></div>
-      <p class="small soft">
-        El menú de la izquierda muestra solo los módulos que tu rol habilita. Esconder una
-        opción es cortesía, no seguridad: si escribes la dirección a mano, la vista te
-        rechaza igual.
-      </p>
-    </div>
-  </section>
-
-  <aside class="spec" style="align-self: start">
-    <div class="spec-h">
-      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8h.01"/></svg>
-      <h3>Tu acceso</h3>
-    </div>
-    <dl class="datos" style="padding: 0; grid-template-columns: 1fr">
-      <div class="par"><dt>Cuenta</dt><dd>{{ user.email|default:user.get_username }}</dd></div>
-      {% if sgr_perfil %}
-        <div class="par"><dt>Rol</dt><dd>{{ sgr_perfil.rol.nombre }}</dd></div>
-        <div class="par"><dt>Alcance</dt><dd>{{ sgr_perfil.rol.get_alcance_display }}</dd></div>
-        <div class="par"><dt>Delegaciones a las que accedes</dt><dd>{{ sgr_delegaciones|length }}</dd></div>
-      {% else %}
-        <div class="par"><dt>Rol</dt><dd>Superusuario de Django</dd></div>
-      {% endif %}
-    </dl>
-  </aside>
-</div>
 {% endblock %}

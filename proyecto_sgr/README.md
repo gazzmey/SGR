@@ -35,7 +35,7 @@ clase se convierte en seis mantenedores distintos.
 | 2 | Recuperar contraseña | `/cuenta/recuperar/` | Paso 1: pide el correo y envía un código. |
 | 3 | Validar código | `/cuenta/recuperar/codigo/` | Paso 3: los seis dígitos, con vigencia e intentos. |
 | 4 | Crear contraseña | `/cuenta/recuperar/clave/` | Paso 4: la contraseña nueva, con los validadores de Django. |
-| 5 | Mi panel | `/` | Entrada al sistema; muestra solo los módulos del rol. |
+| 5 | Mi panel | `/` | Entrada al sistema: una tarjeta por módulo del rol, con el color de su área y su estado del día («3 sin evidencia», «Sin vencidos»). |
 | 6 | Delegaciones | `/gestion/delegaciones/` | Mantenedor completo. |
 | 7 | Roles y permisos | `/gestion/roles/` | Mantenedor completo, con la tabla de permisos. |
 | 8 | Usuarios | `/gestion/usuarios/` | Mantenedor completo sobre `User` + `PerfilUsuario`. |
@@ -701,6 +701,7 @@ proyecto_sgr/
     excel.py                        exportación de los listados
     utilidades.py                   correlativos y suma de ponderadores
     views.py  urls.py               panel y cambio de delegación
+    modulos.py                      las tarjetas de Mi panel: área, permiso y estado de cada módulo
     templatetags/sgr.py             tres etiquetas de plantilla
   organizacion/                     Delegacion, Rol, PerfilUsuario
     models.py  forms.py  views.py  urls.py  admin.py

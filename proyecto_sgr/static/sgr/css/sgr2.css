@@ -1066,3 +1066,93 @@
 /* Un campo deshabilitado —el código que asigna el sistema— se ve como lo
    que es: un dato que no se escribe. */
 .input:disabled { background: var(--sup2); color: var(--tinta2); cursor: not-allowed }
+
+/* =====================================================================
+   Tarjetas de módulo («Mi panel»)
+
+   Una tarjeta por pantalla: banda de color por área, título, la píldora de
+   estado y el pie con datos y el enlace. Los seis colores de área salen de
+   la paleta del SGR; todos dejan el texto blanco sobre 4,5:1 o más.
+   ===================================================================== */
+.modulos { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 20px }
+
+.modulo {
+  --banda: var(--g700);
+  display: flex; flex-direction: column; min-width: 0;
+  background: var(--sup); border: 1px solid var(--linea); border-radius: 20px;
+  box-shadow: var(--sh1); overflow: hidden;
+  transition: box-shadow var(--t) var(--ease), transform var(--t) var(--ease);
+}
+.modulo:hover { box-shadow: var(--sh2); transform: translateY(-2px) }
+.modulo.a-rojo { --banda: var(--g700) }
+.modulo.a-bordo { --banda: var(--g800) }
+.modulo.a-ocre { --banda: var(--ambar) }
+.modulo.a-granate { --banda: var(--g900) }
+.modulo.a-grafito { --banda: var(--tinta2) }
+.modulo.a-tinta { --banda: var(--tinta) }
+
+.modulo-h {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px 14px 18px; background: var(--banda); color: #fff;
+}
+.modulo-ic {
+  flex: none; display: grid; place-items: center; width: 36px; height: 36px;
+  border-radius: 10px; background: rgba(255, 255, 255, .16);
+}
+.modulo-area { font-weight: 700; font-size: 15.5px; line-height: 1.2; min-width: 0 }
+.modulo-tipo {
+  margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 12px; border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .12);
+  font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+
+.modulo-b { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px 0; flex: 1 }
+.modulo-t { display: flex; align-items: flex-start; gap: 12px }
+.modulo-t h3 { font-size: 18px; font-weight: 600; line-height: 1.3; margin: 0; flex: 1; min-width: 0 }
+.modulo-t h3 a { color: var(--tinta); text-decoration: none }
+.modulo-t h3 a:hover { color: var(--g700) }
+.modulo-nuevo {
+  flex: none; display: inline-flex; align-items: center; height: 30px; padding: 0 14px;
+  border-radius: 999px; background: var(--g50); border: 1.5px solid var(--g100);
+  color: var(--g800); font-size: 13px; font-weight: 600;
+}
+.modulo-d { margin: -6px 0 0; font-size: 13.5px; color: var(--tinta2) }
+
+.modulo-estado {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 46px; padding: 6px 16px; border-radius: 999px; border: 2px solid var(--linea2);
+  background: var(--sup2); color: var(--tinta2); font-size: 14.5px; font-weight: 600;
+}
+.modulo-estado.ok { background: var(--verde-bg); border-color: var(--verde-bar); color: var(--verde) }
+.modulo-estado.warn { background: var(--ambar-bg); border-color: var(--ambar-bar); color: var(--ambar) }
+.modulo-estado.bad { background: var(--rojo-bg); border-color: var(--rojo-bar); color: var(--rojo) }
+
+.modulo-f {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin-top: auto; padding: 14px 20px 16px; border-top: 1px solid var(--linea);
+  min-height: 63px; /* con o sin datos, el pie mide lo mismo y «Abrir» queda alineado */
+}
+.modulo-b + .modulo-f { margin-top: 16px }
+.modulo-dato {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+  border-radius: 999px; background: var(--hueso); color: var(--tinta);
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.modulo-dato .i { color: var(--g700) }
+.modulo-ir {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  color: var(--tinta); font-weight: 600; font-size: 14.5px;
+  text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1.5px;
+}
+.modulo-ir:hover { color: var(--g700) }
+
+.panel-acceso { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px }
+
+@media (max-width: 860px) {
+  .modulos { grid-template-columns: 1fr; gap: 16px }
+  .modulo-t h3 { font-size: 17px }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modulo, .modulo:hover { transition: none; transform: none }
+}

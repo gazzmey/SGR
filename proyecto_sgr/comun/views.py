@@ -5,76 +5,30 @@ Vistas transversales: el panel de entrada y el cambio de delegación activa.
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
-from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from atencion.models import Atencion
-from catalogos.models import Item, SubAtencion, TipoAtencion
 from comun import permisos as P
 from comun.contexto import CLAVE_DELEGACION, delegacion_activa
 from comun.navegacion import desde_formulario
-from organizacion.models import Delegacion, PerfilUsuario, Rol
+from organizacion.models import Delegacion
 
 
 @login_required
 def panel(request):
     """
-    Pantalla de entrada. Resume lo que hay y lleva a cada mantenedor.
+    Pantalla de entrada: una tarjeta por módulo, con el color de su área.
 
-    Los accesos que se muestran dependen del rol: alguien sin el permiso de
-    gestionar catálogos no ve esas tarjetas. Y si igual escribe la dirección
-    a mano, la vista de destino lo rechaza.
+    Las tarjetas que se muestran dependen del rol, con las mismas condiciones
+    que el menú. Si alguien escribe a mano la dirección de un módulo que no
+    tiene, la vista de destino lo rechaza igual. Cómo se arma cada tarjeta y
+    su estado está en ``comun/modulos.py``.
     """
+    from comun.modulos import tarjetas_de
+
     activa = delegacion_activa(request)
-
-    tarjetas = []
-    if P.tiene_permiso(request.user, P.GESTIONAR_USUARIO):
-        tarjetas += [
-            {
-                "titulo": "Delegaciones",
-                "cuenta": Delegacion.objects.filter(activo=True).count(),
-                "pie": "activas de %d" % Delegacion.objects.count(),
-                "url": reverse("organizacion:delegaciones"),
-            },
-            {
-                "titulo": "Usuarios",
-                "cuenta": PerfilUsuario.objects.filter(activo=True).count(),
-                "pie": "con acceso al sistema",
-                "url": reverse("organizacion:usuarios"),
-            },
-            {
-                "titulo": "Roles",
-                "cuenta": Rol.objects.filter(activo=True).count(),
-                "pie": "definidos y en uso",
-                "url": reverse("organizacion:roles"),
-            },
-        ]
-    if P.tiene_permiso(request.user, P.GESTIONAR_CATALOGO):
-        tarjetas += [
-            {
-                "titulo": "Ítems y metas",
-                "cuenta": Item.objects.filter(activo=True).count(),
-                "pie": "medibles este período",
-                "url": reverse("catalogos:items"),
-            },
-            {
-                "titulo": "Tipos de atención",
-                "cuenta": TipoAtencion.objects.filter(activo=True).count(),
-                "pie": "con %d subatenciones" % SubAtencion.objects.filter(activo=True).count(),
-                "url": reverse("catalogos:tipos"),
-            },
-        ]
-    if P.tiene_permiso(request.user, P.REGISTRAR_ATENCION):
-        tarjetas.append({
-            "titulo": "Atenciones",
-            "cuenta": Atencion.objects.filter(delegacion=activa).count() if activa else 0,
-            "pie": "registradas en esta delegación",
-            "url": reverse("atencion:ingreso"),
-        })
-
     return render(request, "comun/panel.html", {
         "menu": "panel",
-        "tarjetas": tarjetas,
+        "tarjetas": tarjetas_de(request, activa),
     })
 
 
