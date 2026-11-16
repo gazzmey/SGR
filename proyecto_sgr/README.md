@@ -267,12 +267,15 @@ todas correctas.
 
 ### Evaluación 3
 
-| Integrante | Aporte en la Evaluación 3 |
+| Integrante | A cargo en la Evaluación 3 |
 |---|---|
-| José Alday | **Por completar antes de entregar.** |
-| José Briceño | **Por completar antes de entregar.** |
-| Adán Cuello | **Por completar antes de entregar.** |
-| Carlos Silva | **Por completar antes de entregar.** |
+| José Alday | Permisos y seguridad: grupos de Django Consulta y Gestión, permisos en cada vista del CRUD, pantalla de privilegios de roles y reglas contra la autoasignación. Entidades Delegación, Territorio y Rol. |
+| José Briceño | Servidor de AWS (la instancia EC2 corre en su cuenta del laboratorio). Entidades de personas: Usuario funcionario (RUT, nombres y apellidos), Vecino, Junta de vecinos y Participación en junta. |
+| Adán Cuello | Datos de prueba y sesión: carga de datos ficticios con registros inactivos, desechables y relaciones protegidas; comando de contraseñas de prueba; login y logout por POST. Entidades Hito, Actividad y Evidencia. |
+| Carlos Silva | Coordinación del trabajo con el asistente de IA (sección 11), despliegue y comprobación en AWS, README y `Evidencias.pdf`. Entidades Meta, Asignación de meta, Trimestre, Cargo, Tipo y Subtipo de atención y Gestión social. |
+
+Cada integrante revisó las entidades a su cargo y puede explicar en ellas una
+operación CRUD, una validación y una restricción de acceso.
 
 ### Entrega anterior
 
@@ -957,7 +960,10 @@ entidades en cada una) y las trece suites anteriores del proyecto (377
 comprobaciones) sin fallas; y una simulación de actualización: una base
 creada con el código de la entrega anterior y sus datos, migrada con el
 código nuevo, conserva todo y queda con los nombres repartidos, los
-sectores convertidos en territorios y cada actividad con su asignación.
+sectores convertidos en territorios y cada actividad con su asignación. En
+el servidor de AWS, las mismas 24 pruebas pasan sobre MariaDB 10.5.29, y
+`cargar_datos_demo` convive con la estructura municipal real que ya estaba
+cargada sin pisarla.
 
 ### Cómo se verificó
 
