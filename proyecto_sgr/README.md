@@ -225,14 +225,17 @@ pruebas (`test_sgr`), que Django crea y borra.
 | Componente | Versión |
 |---|---|
 | Python | 3.12 (servidor AWS) · 3.10 o superior en desarrollo |
-| Django | 5.0.14 |
+| Django | 5.0.14 (con asgiref 3.12.1 y sqlparse 0.6.0) |
 | mysqlclient | 2.2.7 |
-| Base de datos | MariaDB 10.5 en AWS (Amazon Linux 2023); MySQL 8 de Wampserver64 en desarrollo |
+| Base de datos | MariaDB 10.5.29 en AWS (Amazon Linux 2023); MySQL 8 de Wampserver64 en desarrollo |
 | whitenoise | 6.7.0 |
-| openpyxl | 3.1.5 |
+| openpyxl | 3.1.5 (con et_xmlfile 2.0.0) |
+| gunicorn | 26.2.0 (solo en el servidor) |
 
-Están fijadas en `requirements.txt`. En el servidor se comprueban con
-`venv/bin/pip freeze` y `mysql --version`.
+Son las que muestran `venv/bin/pip freeze` y `mysql --version` en el
+servidor de AWS el 16-11-2026, y están fijadas tal cual en `requirements.txt`.
+Ahí mismo, `python manage.py test pruebas` corre las 24 pruebas sobre MariaDB:
+todas correctas.
 
 ### Diferencias respecto de la entrega anterior
 
