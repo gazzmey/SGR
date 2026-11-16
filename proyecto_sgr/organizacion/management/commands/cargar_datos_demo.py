@@ -21,12 +21,11 @@ crearse.
 Dos cosas que conviene saber antes de preguntar
 -----------------------------------------------
 1. **Las contraseñas de demostración.** Las cuentas nuevas se crean con la
-   contraseña de la variable de entorno ``SGR_DEMO_PASSWORD``. En un equipo
-   local, con DEBUG encendido, hay una por omisión para revisar recién
-   clonado el repositorio; en un servidor el comando se niega a correr sin
-   esa variable, para que ninguna cuenta del servidor quede con una clave
-   escrita en el repositorio. ``manage.py claves_de_prueba`` cambia la de
-   las cuentas que ya existen. En una instalación real este comando no se
+   contraseña de la variable de entorno ``SGR_DEMO_PASSWORD``, definida en el
+   ``.env`` de cada equipo. Sin esa variable el comando no corre, en local ni
+   en el servidor: ninguna contraseña queda escrita en el código ni en el
+   repositorio. ``manage.py claves_de_prueba`` cambia la de las cuentas que
+   ya existen. En una instalación real este comando no se
    ejecuta, y las cuentas nacen sin contraseña utilizable desde el
    mantenedor de usuarios.
 
@@ -70,12 +69,9 @@ from gestion.reglas import PROPUESTA_DEL_PLAN, ReglaCalculo
 from organizacion.management.commands import _evaluacion3 as evaluacion3
 from organizacion.models import Delegacion, PerfilUsuario, Rol
 
-#: La clave por omisión existe solo para revisar en un equipo local (con
-#: DEBUG encendido). En un servidor se define SGR_DEMO_PASSWORD en el .env:
-#: sin ella el comando se niega a crear cuentas, para que ninguna cuenta del
-#: servidor quede con una clave que está escrita en un repositorio.
-CLAVE_LOCAL = "Demo.Sgr2026"
-CLAVE_DEMO = os.environ.get("SGR_DEMO_PASSWORD") or CLAVE_LOCAL
+#: La contraseña de las cuentas de demostración no se escribe en el código:
+#: sale de SGR_DEMO_PASSWORD, en el .env de cada equipo.
+VARIABLE_CLAVE = "SGR_DEMO_PASSWORD"
 
 DELEGACIONES = [{'codigo': 'DEL-01',
   'nombre': 'Las Compañías',
@@ -1366,15 +1362,13 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **opciones):
-        from django.conf import settings
-
-        if not settings.DEBUG and not os.environ.get("SGR_DEMO_PASSWORD"):
+        if not os.environ.get(VARIABLE_CLAVE):
             from django.core.management.base import CommandError
 
             raise CommandError(
-                "En un servidor (DEBUG apagado) define SGR_DEMO_PASSWORD en el .env "
-                "antes de cargar datos de prueba: así ninguna cuenta queda con la "
-                "clave que está escrita en el repositorio."
+                "Define SGR_DEMO_PASSWORD en el .env antes de cargar los datos de "
+                "prueba. La contraseña de las cuentas de demostración no se escribe "
+                "en el código ni en el repositorio."
             )
         delegaciones = self._delegaciones()
         evaluacion3.territorios(self)
@@ -1419,8 +1413,7 @@ class Command(BaseCommand):
         ))
         self.stdout.write(
             "Cuentas de la Evaluación 3: consulta@ejemplo.cl y gestion@ejemplo.cl. "
-            "La clave es la de SGR_DEMO_PASSWORD%s." % (
-                "" if os.environ.get("SGR_DEMO_PASSWORD") else " (en local, «%s»)" % CLAVE_LOCAL)
+            "Las cuentas nuevas usan la clave de SGR_DEMO_PASSWORD."
         )
         self.stdout.write(self.style.WARNING(
             "Son cuentas y datos ficticios de demostración. No usar esta "
@@ -1502,7 +1495,7 @@ class Command(BaseCommand):
                 },
             )
             if nueva:
-                cuenta.set_password(os.environ.get("SGR_DEMO_PASSWORD") or CLAVE_LOCAL)
+                cuenta.set_password(os.environ[VARIABLE_CLAVE])
                 cuenta.save(update_fields=["password"])
 
             cargo = fila["cargo"]
@@ -1533,22 +1526,18 @@ class Command(BaseCommand):
         """
         Un superusuario para revisar el administrador de Django.
 
-        La contraseña se toma del entorno. El valor por omisión existe para
-        que la revisión funcione recién clonado el repositorio; en un
-        servidor se define SGR_ADMIN_PASSWORD.
+        La contraseña sale de SGR_ADMIN_PASSWORD, en el .env. Sin ella no se
+        crea: queda «manage.py createsuperuser». Ninguna contraseña se
+        escribe en el código.
         """
-        from django.conf import settings
-
         usuario = os.environ.get("SGR_ADMIN_USER", "revisor")
         clave = os.environ.get("SGR_ADMIN_PASSWORD") or None
-        if clave is None and settings.DEBUG:
-            clave = "Sgr.Revision2026"   # solo en un equipo local
         correo = os.environ.get("SGR_ADMIN_EMAIL", "revisor@ejemplo.cl")
 
         existe = User.objects.filter(username=usuario).exists()
         if clave is None and not existe:
             self.stdout.write(self.style.WARNING(
-                "  Superusuario: no se creó. En un servidor define SGR_ADMIN_PASSWORD "
+                "  Superusuario: no se creó. Define SGR_ADMIN_PASSWORD en el .env "
                 "o créalo con «manage.py createsuperuser»."))
             return
         cuenta, nueva = User.objects.get_or_create(

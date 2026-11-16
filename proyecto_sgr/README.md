@@ -570,6 +570,7 @@ cp .env.example .env
 | `SGR_DB_HOST` · `SGR_DB_PORT` | `127.0.0.1` y `3306` en local. |
 | `SGR_EMAIL_BACKEND` y el resto de `SGR_EMAIL_*` | Envío del código de recuperación. Sin definir, el código se imprime en la consola de `runserver`. |
 | `SGR_MOSTRAR_CODIGO` | Muestra el código en pantalla para la demostración. Sigue a `SGR_DEBUG`; en el servidor queda apagado. |
+| `SGR_DEMO_PASSWORD` · `SGR_ADMIN_PASSWORD` | Claves de las cuentas ficticias y del superusuario que crea `cargar_datos_demo`. Cada equipo pone las suyas; sin la primera el comando no corre, y sin la segunda no crea el superusuario. |
 | `SGR_HTTPS` | `on` cuando el servidor tenga certificado. Enciende juntas la redirección a HTTPS, HSTS y las cookies seguras. Sobre HTTP tiene que quedar apagada: una cookie segura por un canal inseguro no se envía y nadie puede iniciar sesión. |
 | `SGR_COOKIES_SEGURAS` | Nombre anterior de `SGR_HTTPS`. Se sigue aceptando. |
 
@@ -722,10 +723,11 @@ desechables (detalle en la sección 0).
 
 **Las contraseñas no están en el repositorio.** Se entregan por el medio de
 evaluación. `cargar_datos_demo` crea las cuentas nuevas con la clave de la
-variable `SGR_DEMO_PASSWORD` (en un servidor, con DEBUG apagado, se niega a
-correr sin ella), y `python manage.py claves_de_prueba` cambia la de las que ya
-existen pidiéndola sin mostrarla. El superusuario de revisión se crea con
+variable `SGR_DEMO_PASSWORD`, que cada equipo define en su `.env` (sin ella el
+comando no corre), y `python manage.py claves_de_prueba` cambia la de las que
+ya existen pidiéndola sin mostrarla. El superusuario de revisión se crea con
 `SGR_ADMIN_USER` y `SGR_ADMIN_PASSWORD`, o con `manage.py createsuperuser`.
+Ninguna contraseña está escrita en el código.
 
 En una instalación real este comando no se ejecuta: las cuentas se crean desde
 el mantenedor de Usuarios y nacen **sin contraseña utilizable**, de modo que

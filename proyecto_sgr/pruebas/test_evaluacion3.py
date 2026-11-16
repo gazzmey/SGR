@@ -17,6 +17,7 @@ necesita permiso para crear bases de datos.
 """
 
 import os
+import secrets
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -36,6 +37,12 @@ from organizacion.models import Delegacion, PerfilUsuario, Rol, Territorio
 U = get_user_model()
 
 
+#: Clave de las cuentas en la base de pruebas, que Django crea y borra. Se
+#: genera al correr: ninguna contraseña queda escrita en el repositorio.
+if not os.environ.get("SGR_DEMO_PASSWORD"):
+    os.environ["SGR_DEMO_PASSWORD"] = "Prueba-" + secrets.token_urlsafe(12)
+
+
 def rut(numero):
     cuerpo = 30_190_000 + numero
     return f"{cuerpo}-{digito_verificador(cuerpo)}"
@@ -44,7 +51,6 @@ def rut(numero):
 class Base(TestCase):
     @classmethod
     def setUpTestData(cls):
-        os.environ.setdefault("SGR_DEMO_PASSWORD", "Prueba.Sgr2026")
         call_command("cargar_datos_demo", verbosity=0, stdout=open(os.devnull, "w"))
 
     def setUp(self):
@@ -436,7 +442,6 @@ class RelacionesProtegidas(Base):
 class Sesion(TestCase):
     @classmethod
     def setUpTestData(cls):
-        os.environ.setdefault("SGR_DEMO_PASSWORD", "Prueba.Sgr2026")
         call_command("cargar_datos_demo", verbosity=0, stdout=open(os.devnull, "w"))
 
     def test_login_logout(self):
