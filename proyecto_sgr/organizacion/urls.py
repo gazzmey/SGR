@@ -26,12 +26,21 @@ urlpatterns = [
     path("delegaciones/<int:pk>/editar/", views.DelegacionEditar.as_view(), name="delegacion_editar"),
     path("delegaciones/<int:pk>/estado/", views.DelegacionEstado.as_view(), name="delegacion_estado"),
 
+    # --- territorios ---
+    path("territorios/", views.TerritoriosLista.as_view(), name="territorios"),
+    path("territorios/nuevo/", views.TerritorioNuevo.as_view(), name="territorio_nuevo"),
+    path("territorios/<int:pk>/", views.TerritorioDetalle.as_view(), name="territorio_detalle"),
+    path("territorios/<int:pk>/editar/", views.TerritorioEditar.as_view(), name="territorio_editar"),
+    path("territorios/<int:pk>/estado/", views.TerritorioEstado.as_view(), name="territorio_estado"),
+
     # --- roles ---
     path("roles/", views.RolesLista.as_view(), name="roles"),
     path("roles/nuevo/", views.RolNuevo.as_view(), name="rol_nuevo"),
     path("roles/<int:pk>/", views.RolDetalle.as_view(), name="rol_detalle"),
     path("roles/<int:pk>/editar/", views.RolEditar.as_view(), name="rol_editar"),
     path("roles/<int:pk>/estado/", views.RolEstado.as_view(), name="rol_estado"),
+    # Los privilegios van aparte del formulario general (Evaluación 3).
+    path("roles/<int:pk>/privilegios/", views.RolPrivilegios.as_view(), name="rol_privilegios"),
 
     # --- usuarios ---
     path("usuarios/", views.UsuariosLista.as_view(), name="usuarios"),

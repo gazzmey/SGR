@@ -97,15 +97,47 @@ def tiene_permiso(usuario, clave):
     """
     True si esa persona puede hacer esa acción.
 
+    ``clave`` es una acción de negocio del SGR («validar_evidencia») o un
+    permiso de Django con su aplicación («gestion.view_hito»). Los permisos
+    de Django llegan por el grupo del rol (ver ``comun/entidades.py``).
+
     Un superusuario pasa siempre: es quien administra el sistema y no
-    depende de que alguien le haya creado un perfil.
+    depende de que alguien le haya creado un perfil. Un perfil o un rol
+    inactivo no pasa por ningún camino, aunque la sesión siga abierta.
     """
     if not getattr(usuario, "is_authenticated", False):
         return False
     if usuario.is_superuser:
         return True
     perfil = perfil_de(usuario)
+    if "." in clave:
+        if perfil is not None and not (perfil.activo and perfil.rol.activo):
+            return False
+        return usuario.has_perm(clave)
     return bool(perfil and perfil.puede(clave))
+
+
+def alternativas(permiso, modelo=None, accion=None):
+    """
+    Los permisos que abren una vista: su acción de negocio y, si el modelo
+    es una de las 17 entidades, el permiso de Django de esa operación.
+    """
+    from comun.entidades import de_modelo
+
+    opciones = [permiso] if permiso else []
+    entidad = de_modelo(modelo) if accion else None
+    if entidad is not None:
+        opciones.append(entidad.permiso(accion))
+    return opciones
+
+
+def autorizado(usuario, opciones):
+    """True si cumple alguna de las opciones. Sin opciones, basta la sesión."""
+    if not getattr(usuario, "is_authenticated", False):
+        return False
+    if not opciones:
+        return True
+    return any(tiene_permiso(usuario, clave) for clave in opciones)
 
 
 class RequierePermiso:
@@ -114,22 +146,38 @@ class RequierePermiso:
 
     Se antepone a la vista, no se consulta dentro de ella, para que no haya
     forma de olvidarlo en una rama del código.
+
+    Abre la vista la acción de negocio (``permiso``) **o**, si el modelo es
+    una de las 17 entidades, el permiso de Django de la operación que la
+    vista hace (``accion_django``: view, add, change o delete). Una vista
+    que no quiere ese segundo camino —la cola de validación, por ejemplo,
+    que es un flujo y no un CRUD— declara ``accion_django = None``.
     """
 
     permiso = None
+    accion_django = None
+
+    def permisos_que_abren(self):
+        return alternativas(self.permiso, getattr(self, "model", None), self.accion_django)
+
+    def autoriza(self, accion):
+        """¿Quien pide puede hacer esa otra operación sobre el mismo modelo?"""
+        return autorizado(self.request.user,
+                          alternativas(self.permiso, getattr(self, "model", None), accion))
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect_al_login(request)
 
-        if self.permiso and not tiene_permiso(request.user, self.permiso):
+        if not autorizado(request.user, self.permisos_que_abren()):
             messages.error(
                 request,
                 "No tienes permiso para entrar ahí. Si crees que es un error, "
                 "pídele al administrador que revise tu rol.",
             )
             raise PermissionDenied(
-                f"Falta el permiso «{etiqueta(self.permiso)}»."
+                "Falta el permiso «%s»." % " o ".join(
+                    etiqueta(c) for c in self.permisos_que_abren())
             )
         return super().dispatch(request, *args, **kwargs)
 

@@ -6,6 +6,7 @@
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var hasViewTransitions = 'CSSViewTransitionRule' in window && /^https?:$/.test(location.protocol);
   var CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  var ALERTA = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5v7M12 17.5h.01"/></svg>';
   var EYE_OFF = '<svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.7A9.7 9.7 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3 3.8M6.3 7.4A17 17 0 0 0 2.5 12S6 18.5 12 18.5a9.4 9.4 0 0 0 4.2-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
 
   /* ---------- paso suave entre páginas ---------- */
@@ -23,11 +24,13 @@
 
   /* ---------- avisos tipo toast ---------- */
   var stack;
-  function toast(msg, sub) {
+  /* tipo: 'bad' o 'warn' para errores y advertencias; sin tipo, el visto bueno. */
+  function toast(msg, sub, tipo) {
     if (!stack) { stack = document.createElement('div'); stack.className = 'toast-stack'; stack.setAttribute('role', 'status'); stack.setAttribute('aria-live', 'polite'); document.body.appendChild(stack); }
     var t = document.createElement('div');
     t.className = 'toast';
-    t.innerHTML = '<span class="ok-ic">' + CHECK + '</span><div style="flex:1"><b></b><div class="sub"></div></div>';
+    var alerta = tipo === 'bad' || tipo === 'warn';
+    t.innerHTML = '<span class="ok-ic' + (alerta ? ' ' + tipo : '') + '">' + (alerta ? ALERTA : CHECK) + '</span><div style="flex:1"><b></b><div class="sub"></div></div>';
     t.querySelector('b').textContent = msg;
     if (sub) t.querySelector('.sub').textContent = sub; else t.querySelector('.sub').remove();
     stack.appendChild(t);

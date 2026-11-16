@@ -1,0 +1,15 @@
+{% extends "comun/mantenedor_detalle.html" %}
+
+{% comment %}
+  Ficha del rol. Además de editar y desactivar, quien administra el acceso
+  ve el botón de privilegios; nadie lo ve para su propio rol.
+{% endcomment %}
+
+{% block acciones_extra %}
+  {% if puede_privilegios %}
+    <div class="card" style="padding: 16px">
+      <p class="small soft" style="margin: 0 0 10px">Acciones, alcance y grupo de Django. Se configuran aparte del formulario general.</p>
+      <a class="btn btn-block btn-primary" href="{% url 'organizacion:rol_privilegios' obj.pk %}">Configurar privilegios</a>
+    </div>
+  {% endif %}
+{% endblock %}

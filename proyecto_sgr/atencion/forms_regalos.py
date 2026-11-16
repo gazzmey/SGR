@@ -137,7 +137,10 @@ class InscripcionForm(forms.ModelForm):
             # el RUT del niño con el del adulto al validar.
             apoderado = Solicitante.objects.filter(rut=rut).first()
             if apoderado is None:
-                apoderado = Solicitante(rut=rut, nombre=datos.get("nombre_apoderado", ""),
+                from atencion.forms import repartir_nombre
+
+                nombres, apellidos = repartir_nombre(datos.get("nombre_apoderado", ""))
+                apoderado = Solicitante(rut=rut, nombres=nombres, apellidos=apellidos,
                                         telefono=datos.get("telefono_apoderado", ""))
             self._apoderado = apoderado
             self.instance.apoderado = apoderado if apoderado.pk else None

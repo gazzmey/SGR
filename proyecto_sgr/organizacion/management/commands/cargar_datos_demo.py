@@ -20,12 +20,20 @@ crearse.
 
 Dos cosas que conviene saber antes de preguntar
 -----------------------------------------------
-1. **Las contraseñas de demostración.** Las cuentas se crean con una
-   contraseña común para poder entrar y revisar. Se puede cambiar con la
-   variable de entorno ``SGR_DEMO_PASSWORD``. Son cuentas ficticias de un
-   sistema de prueba; en una instalación real este comando no se ejecuta, y
-   las cuentas nacen sin contraseña utilizable desde el mantenedor de
-   usuarios.
+1. **Las contraseñas de demostración.** Las cuentas nuevas se crean con la
+   contraseña de la variable de entorno ``SGR_DEMO_PASSWORD``. En un equipo
+   local, con DEBUG encendido, hay una por omisión para revisar recién
+   clonado el repositorio; en un servidor el comando se niega a correr sin
+   esa variable, para que ninguna cuenta del servidor quede con una clave
+   escrita en el repositorio. ``manage.py claves_de_prueba`` cambia la de
+   las cuentas que ya existen. En una instalación real este comando no se
+   ejecuta, y las cuentas nacen sin contraseña utilizable desde el
+   mantenedor de usuarios.
+
+3. **Evaluación 3.** ``_evaluacion3.py`` suma territorios, vecinos, juntas,
+   participaciones, hitos, un segundo trimestre, registros inactivos,
+   registros desechables y las cuentas ``consulta@ejemplo.cl`` y
+   ``gestion@ejemplo.cl``.
 
 2. **Un rol por usuario.** La maqueta contemplaba personas con dos roles
    —quien verifica y a la vez conduce la delegación—. El modelo
@@ -59,9 +67,15 @@ from gestion.modelos_agenda import CambioCompromiso, Compromiso
 from gestion.modelos_ajustes import Ausencia, Reconocimiento
 from gestion.modelos_cartas import Carta
 from gestion.reglas import PROPUESTA_DEL_PLAN, ReglaCalculo
+from organizacion.management.commands import _evaluacion3 as evaluacion3
 from organizacion.models import Delegacion, PerfilUsuario, Rol
 
-CLAVE_DEMO = os.environ.get("SGR_DEMO_PASSWORD", "Demo.Sgr2026")
+#: La clave por omisión existe solo para revisar en un equipo local (con
+#: DEBUG encendido). En un servidor se define SGR_DEMO_PASSWORD en el .env:
+#: sin ella el comando se niega a crear cuentas, para que ninguna cuenta del
+#: servidor quede con una clave que está escrita en un repositorio.
+CLAVE_LOCAL = "Demo.Sgr2026"
+CLAVE_DEMO = os.environ.get("SGR_DEMO_PASSWORD") or CLAVE_LOCAL
 
 DELEGACIONES = [{'codigo': 'DEL-01',
   'nombre': 'Las Compañías',
@@ -312,7 +326,33 @@ ROLES = [{'codigo': 'ROL-01',
   'activo': False,
   'alcance': 'varias',
   'creada': '2024-05-20',
-  'desactivada': '2026-07-31'}]
+  'desactivada': '2026-07-31'},
+ # Los dos perfiles de prueba de la Evaluación 3. Entran con los permisos
+ # de Django de su grupo, no con acciones de negocio.
+ {'codigo': 'ROL-07',
+  'nombre': 'Consulta',
+  'descripcion': 'Consulta las 17 entidades del sistema sin poder crear, '
+                 'editar, desactivar ni anular nada.',
+  'permisos': [],
+  'grupo': 'Consulta',
+  'activo': True,
+  'alcance': 'todas',
+  'creada': '2026-11-16',
+  'desactivada': None},
+ {'codigo': 'ROL-08',
+  'nombre': 'Gestión',
+  'descripcion': 'Crea, edita, desactiva y anula registros de las 17 '
+                 'entidades. No administra privilegios de roles ni usuarios.',
+  'permisos': [],
+  'grupo': 'Gestión',
+  'activo': True,
+  'alcance': 'todas',
+  'creada': '2026-11-16',
+  'desactivada': None}]
+
+#: El Administrador entra también al grupo Gestión: administra las 17
+#: entidades con sus permisos de Django.
+GRUPO_DEL_ROL = {"ROL-05": "Gestión"}
 
 USUARIOS = [{'codigo': 'USR-01',
   'nombre': 'Marcela Ríos',
@@ -482,6 +522,29 @@ USUARIOS = [{'codigo': 'USR-01',
   'rol': 'Delegado o jefatura',
   'otros_roles': [],
   'creada': '2024-02-19',
+  'desactivada': None},
+ # Las dos cuentas normales de prueba que pide la Evaluación 3.
+ {'codigo': 'USR-16',
+  'nombre': 'Inés Contreras',
+  'correo': 'consulta@ejemplo.cl',
+  'cargo': 'Revisora de la Evaluación 3',
+  'delegacion': 'DEL-01',
+  'autorizadas': [],
+  'activo': True,
+  'rol': 'Consulta',
+  'otros_roles': [],
+  'creada': '2026-11-16',
+  'desactivada': None},
+ {'codigo': 'USR-17',
+  'nombre': 'Tomás Gallardo',
+  'correo': 'gestion@ejemplo.cl',
+  'cargo': 'Revisor de la Evaluación 3',
+  'delegacion': 'DEL-01',
+  'autorizadas': [],
+  'activo': True,
+  'rol': 'Gestión',
+  'otros_roles': [],
+  'creada': '2026-11-16',
   'desactivada': None}]
 
 ITEMS = [{'codigo': 'ITM-01',
@@ -1245,10 +1308,14 @@ CASOS_DEMO = [
     {"codigo": "CSO-D01", "subatencion": "SAT-05", "delegacion": "DEL-01",
      "ingreso": -25, "visita": True, "programada": -20, "realizada": -18,
      "informe": -15, "beneficio": -9, "devoluciones": 1,
-     "observacion": "El informe volvió una vez por falta de un certificado."},
+     "observacion": "El informe volvió una vez por falta de un certificado.",
+     "actuaciones": "Visita domiciliaria, informe social y coordinación con el programa de vivienda.",
+     "derivacion": "Programa de vivienda municipal",
+     "resultado": "Se entregó el subsidio de arriendo por tres meses."},
     # Abierto: la visita estaba programada para ayer y no se hizo.
     {"codigo": "CSO-D02", "subatencion": "SAT-01", "delegacion": "DEL-01",
-     "ingreso": -6, "visita": True, "programada": -1},
+     "ingreso": -6, "visita": True, "programada": -1,
+     "actuaciones": "Llamado telefónico para confirmar la visita."},
     # Abierto y al día: sin visita, el informe todavía está en plazo.
     {"codigo": "CSO-D03", "subatencion": "SAT-04", "delegacion": "DEL-02",
      "ingreso": -2, "visita": False},
@@ -1299,7 +1366,18 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **opciones):
+        from django.conf import settings
+
+        if not settings.DEBUG and not os.environ.get("SGR_DEMO_PASSWORD"):
+            from django.core.management.base import CommandError
+
+            raise CommandError(
+                "En un servidor (DEBUG apagado) define SGR_DEMO_PASSWORD en el .env "
+                "antes de cargar datos de prueba: así ninguna cuenta queda con la "
+                "clave que está escrita en el repositorio."
+            )
         delegaciones = self._delegaciones()
+        evaluacion3.territorios(self)
         roles = self._roles()
         usuarios = self._usuarios(roles, delegaciones)
         self._items()
@@ -1321,6 +1399,8 @@ class Command(BaseCommand):
             self._casos()
             self._regalos()
 
+        evaluacion3.cargar(self)
+
         if not opciones["sin_superusuario"]:
             self._superusuario()
 
@@ -1338,8 +1418,9 @@ class Command(BaseCommand):
                Evidencia.objects.count(), Compromiso.objects.count())
         ))
         self.stdout.write(
-            "Para entrar: felipe.araya@ejemplo.cl (Administrador) · "
-            "clave «%s»." % CLAVE_DEMO
+            "Cuentas de la Evaluación 3: consulta@ejemplo.cl y gestion@ejemplo.cl. "
+            "La clave es la de SGR_DEMO_PASSWORD%s." % (
+                "" if os.environ.get("SGR_DEMO_PASSWORD") else " (en local, «%s»)" % CLAVE_LOCAL)
         )
         self.stdout.write(self.style.WARNING(
             "Son cuentas y datos ficticios de demostración. No usar esta "
@@ -1370,8 +1451,26 @@ class Command(BaseCommand):
         return creadas
 
     def _roles(self):
+        from django.contrib.auth.models import Group
+
+        from organizacion.grupos import asegurar_grupos
+
+        asegurar_grupos(self.stdout.write)
+        grupos = {g.name: g for g in Group.objects.all()}
         creados = {}
+        # Un rol que la señal de migración haya creado con el código de otro
+        # rol de la demostración cede su código: se identifica por el nombre.
         for fila in ROLES:
+            otro = Rol.objects.filter(codigo=fila["codigo"]).exclude(nombre=fila["nombre"]).first()
+            if otro is not None and otro.nombre in {f["nombre"] for f in ROLES}:
+                otro.codigo = f"ROL-T{otro.pk}"
+                otro.save(update_fields=["codigo"])
+        for fila in ROLES:
+            grupo = fila.get("grupo") or GRUPO_DEL_ROL.get(fila["codigo"])
+            previo = Rol.objects.filter(nombre=fila["nombre"]).exclude(codigo=fila["codigo"]).first()
+            if previo is not None:
+                previo.codigo = fila["codigo"]
+                previo.save(update_fields=["codigo"])
             registro, nuevo = Rol.objects.update_or_create(
                 codigo=fila["codigo"],
                 defaults={
@@ -1379,6 +1478,7 @@ class Command(BaseCommand):
                     "descripcion": fila["descripcion"],
                     "alcance": fila["alcance"],
                     "permisos": fila["permisos"],
+                    "grupo": grupos.get(grupo) if grupo else None,
                     "activo": fila["activo"],
                     "desactivada": _fecha(fila["desactivada"]),
                 },
@@ -1402,7 +1502,7 @@ class Command(BaseCommand):
                 },
             )
             if nueva:
-                cuenta.set_password(CLAVE_DEMO)
+                cuenta.set_password(os.environ.get("SGR_DEMO_PASSWORD") or CLAVE_LOCAL)
                 cuenta.save(update_fields=["password"])
 
             cargo = fila["cargo"]
@@ -1413,6 +1513,7 @@ class Command(BaseCommand):
                 codigo=fila["codigo"],
                 defaults={
                     "usuario": cuenta,
+                    "rut": evaluacion3.rut_de_usuario(fila["codigo"]),
                     "cargo": cargo,
                     "rol": roles[fila["rol"]],
                     "delegacion": delegaciones[fila["delegacion"]],
@@ -1436,17 +1537,28 @@ class Command(BaseCommand):
         que la revisión funcione recién clonado el repositorio; en un
         servidor se define SGR_ADMIN_PASSWORD.
         """
+        from django.conf import settings
+
         usuario = os.environ.get("SGR_ADMIN_USER", "revisor")
-        clave = os.environ.get("SGR_ADMIN_PASSWORD", "Sgr.Revision2026")
+        clave = os.environ.get("SGR_ADMIN_PASSWORD") or None
+        if clave is None and settings.DEBUG:
+            clave = "Sgr.Revision2026"   # solo en un equipo local
         correo = os.environ.get("SGR_ADMIN_EMAIL", "revisor@ejemplo.cl")
 
+        existe = User.objects.filter(username=usuario).exists()
+        if clave is None and not existe:
+            self.stdout.write(self.style.WARNING(
+                "  Superusuario: no se creó. En un servidor define SGR_ADMIN_PASSWORD "
+                "o créalo con «manage.py createsuperuser»."))
+            return
         cuenta, nueva = User.objects.get_or_create(
             username=usuario,
             defaults={"email": correo, "is_staff": True, "is_superuser": True},
         )
         cuenta.is_staff = True
         cuenta.is_superuser = True
-        cuenta.set_password(clave)
+        if clave is not None:
+            cuenta.set_password(clave)
         cuenta.save()
         self._informar("Superusuario", cuenta, nueva)
 
@@ -1513,12 +1625,17 @@ class Command(BaseCommand):
     def _atenciones(self, subatenciones, usuarios, delegaciones):
         fichas = {}
         for fila in PERSONAS:
+            nombres, apellidos = evaluacion3.repartir(fila["nombre"])
             registro, nuevo = Solicitante.objects.update_or_create(
                 rut=fila["rut"],
                 defaults={
-                    "nombre": fila["nombre"],
+                    "nombres": nombres,
+                    "apellidos": apellidos,
                     "telefono": fila["telefono"],
-                    "territorio": fila["territorio"],
+                    "territorio": evaluacion3.territorio_por_nombre(fila["territorio"]),
+                    "direccion": evaluacion3.DIRECCIONES.get(fila["rut"], ""),
+                    "correo": evaluacion3.CORREOS.get(fila["rut"], ""),
+                    "activo": True,
                 },
             )
             fichas[fila["rut"]] = registro
@@ -1622,9 +1739,13 @@ class Command(BaseCommand):
                     "beneficio_entregado": dia(fila.get("beneficio")),
                     "devoluciones": fila.get("devoluciones", 0),
                     "observacion": fila.get("observacion", ""),
+                    "fecha_atencion": dia(fila["ingreso"]),
+                    "actuaciones": fila.get("actuaciones", ""),
+                    "derivacion": fila.get("derivacion", ""),
+                    "resultado": fila.get("resultado", ""),
                 },
             )
-            self._informar("Caso social", registro, nuevo)
+            self._informar("Gestión social", registro, nuevo)
 
     # ------------------------------------------------- período y metas
 
@@ -1662,6 +1783,8 @@ class Command(BaseCommand):
                 "nombre": f"{nombre} · {inicio:%b} a {termino:%b} {termino:%Y}",
                 "inicio": inicio,
                 "termino": termino,
+                "anio": inicio.year,
+                "numero": (inicio.month - 1) // 3 + 1,
                 "estado": Periodo.Estado.ABIERTO,
                 "observacion": (
                     "Período de demostración. Las fechas se calculan al cargar "

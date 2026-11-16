@@ -11,7 +11,11 @@
 <div class="page-head">
   <div>
     <h1>{{ obj.descripcion }}</h1>
-    <p>{{ obj.codigo }} · respalda «{{ obj.actividad.accion }}» de {{ obj.actividad.funcionario.get_full_name|default:obj.actividad.funcionario.get_username }}</p>
+    {% if obj.actividad %}
+      <p>{{ obj.codigo }} · respalda «{{ obj.actividad.accion }}» de {{ obj.actividad.funcionario.get_full_name|default:obj.actividad.funcionario.get_username }}</p>
+    {% else %}
+      <p>{{ obj.codigo }} · respalda la gestión social {{ obj.caso.codigo }} de {{ obj.caso.atencion.solicitante.nombre }}</p>
+    {% endif %}
   </div>
   <div class="actions"><a class="btn btn-ghost" href="{% url 'gestion:validar' %}">Volver a la cola</a></div>
 </div>
@@ -45,10 +49,19 @@
       </dd></div>
       <div class="par"><dt>Referencia</dt><dd>{{ obj.referencia|default:"—" }}</dd></div>
       <div class="par"><dt>Cargada</dt><dd>{{ obj.creada|date:"d-m-Y H:i" }}<span class="t2">{{ obj.autor.get_full_name|default:obj.autor.get_username }}</span></dd></div>
-      <div class="par"><dt>Actividad</dt><dd>{{ obj.actividad.codigo }}<span class="t2">{{ obj.actividad.fecha|date:"d-m-Y" }}</span></dd></div>
-      <div class="par"><dt>Ítem al que sumaría</dt><dd>{{ obj.actividad.item.nombre }}</dd></div>
-      <div class="par"><dt>Delegación</dt><dd>{{ obj.actividad.delegacion.nombre }}</dd></div>
-      <div class="par ancho"><dt>Detalle de la actividad</dt><dd>{{ obj.actividad.detalle }}</dd></div>
+      <div class="par"><dt>Tipo</dt><dd>{{ obj.get_tipo_display }}</dd></div>
+      {% if obj.actividad %}
+        <div class="par"><dt>Actividad</dt><dd>{{ obj.actividad.codigo }}<span class="t2">{{ obj.actividad.fecha|date:"d-m-Y" }}</span></dd></div>
+        <div class="par"><dt>Ítem al que sumaría</dt><dd>{{ obj.actividad.item.nombre }}</dd></div>
+        <div class="par"><dt>Delegación</dt><dd>{{ obj.actividad.delegacion.nombre }}</dd></div>
+        <div class="par ancho"><dt>Detalle de la actividad</dt><dd>{{ obj.actividad.detalle }}</dd></div>
+      {% else %}
+        <div class="par"><dt>Gestión social</dt><dd>{{ obj.caso.codigo }}<span class="t2">ingresó el {{ obj.caso.ingreso|date:"d-m-Y" }}</span></dd></div>
+        <div class="par"><dt>Beneficiario</dt><dd>{{ obj.caso.atencion.solicitante.nombre }}</dd></div>
+        <div class="par"><dt>Delegación</dt><dd>{{ obj.caso.atencion.delegacion.nombre }}</dd></div>
+        <div class="par ancho"><dt>Atención</dt><dd>{{ obj.caso.atencion.subatencion.nombre }}</dd></div>
+      {% endif %}
+      {% if obj.observacion %}<div class="par ancho"><dt>Observación</dt><dd>{{ obj.observacion }}</dd></div>{% endif %}
       {% if obj.motivo %}<div class="par ancho"><dt>Motivo del rechazo</dt><dd>{{ obj.motivo }}</dd></div>{% endif %}
       {% if obj.motivo_anulacion %}<div class="par ancho"><dt>Motivo de la anulación</dt><dd>{{ obj.motivo_anulacion }}</dd></div>{% endif %}
     </dl>

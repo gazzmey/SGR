@@ -373,6 +373,7 @@ def _casos_vencidos(delegacion, regla, hoy):
     casos = (
         CasoSocial.objects
         .filter(atencion__delegacion=delegacion)
+        .exclude(estado=CasoSocial.Estado.ANULADO)
         .select_related("atencion__solicitante", "responsable")
     )
     for caso in casos:

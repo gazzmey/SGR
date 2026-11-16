@@ -73,16 +73,16 @@ class PeriodosLista(ListaMantenedor):
     model = Periodo
     permiso = P.CONFIGURAR_PERIODO
     menu = "periodos"
-    titulo = "Períodos"
+    titulo = "Trimestres"
     bajada = (
-        "La ventana de tiempo sobre la que se mide. Todo lo que el sistema "
-        "calcula ocurre dentro de un período."
+        "Los períodos de medición, uno por trimestre. Todo lo que el sistema "
+        "calcula ocurre dentro de uno de ellos."
     )
-    singular = "período"
-    plural = "períodos"
+    singular = "trimestre"
+    plural = "trimestres"
     genero = "el"
     placeholder = "Nombre o código"
-    rotulo_nuevo = "Nuevo período"
+    rotulo_nuevo = "Nuevo trimestre"
     busca = ["codigo", "nombre", "observacion"]
     orden_inicial = "-inicio"
 
@@ -101,9 +101,11 @@ class PeriodosLista(ListaMantenedor):
     columnas = [
         Columna("codigo", "Código", clase="mono"),
         Columna(
-            "nombre", "Período", orden="nombre",
+            "nombre", "Trimestre", orden="nombre",
             celda=lambda o: enlace_nombre(o, "gestion:periodo_detalle"),
         ),
+        Columna("numero", "Año y número", orden="anio",
+                valor=lambda o: f"{o.anio} · T{o.numero}"),
         Columna("fechas", "Fechas", orden="inicio", celda=_fechas,
                 valor=lambda o: f"{o.inicio:%d-%m-%Y} al {o.termino:%d-%m-%Y}"),
         Columna("situacion", "Situación", orden="estado", celda=_chip_periodo,
@@ -128,14 +130,15 @@ class PeriodoNuevo(CrearMantenedor):
     form_class = PeriodoForm
     permiso = P.CONFIGURAR_PERIODO
     menu = "periodos"
-    singular = "período"
-    plural = "períodos"
+    singular = "trimestre"
+    plural = "trimestres"
     genero = "el"
     url_lista = "gestion:periodos"
     url_detalle = "gestion:periodo_detalle"
     lateral = "gestion/_lateral_periodo.html"
     secciones = [
-        ("Identificación", "Cómo se le llama en los informes.", ["codigo", "nombre"]),
+        ("Identificación", "Cómo se le llama en los informes, y qué trimestre del año es.",
+         ["codigo", "nombre", "anio", "numero"]),
         ("Fechas", "Definen cuántos días dura y, con eso, el avance esperado de cada día.",
          ["inicio", "termino"]),
         ("Observación", "Opcional. Queda en el historial del período.", ["observacion"]),
@@ -147,8 +150,8 @@ class PeriodoEditar(EditarMantenedor):
     form_class = PeriodoForm
     permiso = P.CONFIGURAR_PERIODO
     menu = "periodos"
-    singular = "período"
-    plural = "períodos"
+    singular = "trimestre"
+    plural = "trimestres"
     genero = "el"
     url_lista = "gestion:periodos"
     url_detalle = "gestion:periodo_detalle"
@@ -160,8 +163,8 @@ class PeriodoDetalle(DetalleMantenedor):
     model = Periodo
     permiso = P.CONFIGURAR_PERIODO
     menu = "periodos"
-    singular = "período"
-    plural = "períodos"
+    singular = "trimestre"
+    plural = "trimestres"
     genero = "el"
     url_lista = "gestion:periodos"
     url_editar = "gestion:periodo_editar"
@@ -170,6 +173,8 @@ class PeriodoDetalle(DetalleMantenedor):
     campos = [
         ("Código", "codigo", {"mono": True}),
         ("Nombre", "nombre"),
+        ("Año", "anio"),
+        ("Número de trimestre", "numero"),
         ("Situación", "estado"),
         ("Inicio", lambda o: f"{o.inicio:%d-%m-%Y}"),
         ("Término", lambda o: f"{o.termino:%d-%m-%Y}"),
@@ -193,7 +198,7 @@ class PeriodoEstado(CambiarEstado):
     model = Periodo
     permiso = P.CONFIGURAR_PERIODO
     url_lista = "gestion:periodos"
-    singular = "período"
+    singular = "trimestre"
     genero = "el"
 
 
@@ -446,6 +451,8 @@ class CargoEstado(CambiarEstado):
 
 def _celda_cumple(meta):
     """Avisa si el cargo no llega a 100 % en ese período."""
+    if meta.funcionario_id:
+        return format_html('{} %<span class="t2">meta personal</span>', meta.ponderador)
     total = meta.periodo.suma_ponderadores(meta.cargo)
     if total == 100:
         return format_html('<span class="chip ok">{} %</span>', meta.ponderador)
@@ -458,17 +465,19 @@ class MetasLista(ListaMantenedor):
     model = MetaPeriodo
     permiso = P.DEFINIR_META
     menu = "metas"
-    titulo = "Metas y ponderadores"
+    titulo = "Asignaciones de meta"
     bajada = (
-        "Cuánto se le exige a cada cargo en cada ítem, dentro de un período. "
-        "Los ponderadores de un cargo suman 100 %."
+        "Cuánto se le exige a un cargo completo o a una persona en cada meta, "
+        "dentro de un trimestre, y cuánto pesa. Las de una persona reemplazan "
+        "a las de su cargo en esa meta."
     )
-    singular = "meta"
-    plural = "metas"
+    singular = "asignación"
+    plural = "asignaciones"
     genero = "la"
-    placeholder = "Ítem, cargo o período"
-    rotulo_nuevo = "Nueva meta"
-    busca = ["item__nombre", "cargo__nombre", "periodo__nombre"]
+    placeholder = "Meta, cargo, persona o trimestre"
+    rotulo_nuevo = "Nueva asignación"
+    busca = ["item__nombre", "cargo__nombre", "periodo__nombre",
+             "funcionario__first_name", "funcionario__last_name"]
     orden_inicial = "periodo"
 
     url_lista = "gestion:metas"
@@ -491,11 +500,14 @@ class MetasLista(ListaMantenedor):
         Columna("periodo", "Período", orden="periodo__inicio",
                 valor=lambda o: o.periodo.nombre),
         Columna("cargo", "Cargo", orden="cargo__nombre", valor=lambda o: o.cargo.nombre),
-        Columna("item", "Ítem", orden="item__nombre", clase="w",
+        Columna("funcionario", "Funcionario", orden="funcionario__first_name",
+                valor=lambda o: (o.funcionario.get_full_name() or o.funcionario.get_username())
+                if o.funcionario_id else "Todo el cargo"),
+        Columna("item", "Meta", orden="item__nombre", clase="w",
                 valor=lambda o: o.item.nombre),
-        Columna("meta", "Meta", alineado="r",
+        Columna("meta", "Objetivo", alineado="r",
                 valor=lambda o: f"{o.meta} {o.item.get_unidad_display().lower()}"),
-        Columna("ponderador", "Ponderador", alineado="r", celda=_celda_cumple,
+        Columna("ponderador", "Ponderación", alineado="r", celda=_celda_cumple,
                 valor=lambda o: o.ponderador),
         Columna("estado", "Estado", orden="activo",
                 celda=lambda o: chip_estado(o, femenino=True),
@@ -506,11 +518,12 @@ class MetasLista(ListaMantenedor):
         "<b>Cada cargo suma por separado.</b> Un cargo con 100 % está "
         "configurado; uno que no llega todavía se puede completar. Pasarse de "
         "100 % no se guarda: el resultado quedaría calculado sobre una base "
-        "distinta de 100."
+        "distinta de 100. Una asignación personal reemplaza a la del cargo en "
+        "esa meta, y lo que suma la persona tampoco pasa de 100 %."
     )
 
     def base_queryset(self):
-        return MetaPeriodo.objects.select_related("periodo", "cargo", "item")
+        return MetaPeriodo.objects.select_related("periodo", "cargo", "item", "funcionario")
 
 
 class MetaNueva(CrearMantenedor):
@@ -518,22 +531,27 @@ class MetaNueva(CrearMantenedor):
     form_class = MetaPeriodoForm
     permiso = P.DEFINIR_META
     menu = "metas"
-    singular = "meta"
-    plural = "metas"
+    singular = "asignación"
+    plural = "asignaciones"
     genero = "la"
     url_lista = "gestion:metas"
     url_detalle = "gestion:meta_detalle"
     lateral = "gestion/_lateral_meta.html"
     secciones = [
-        ("A quién y cuándo", "El cruce que define la meta.", ["periodo", "cargo", "item"]),
-        ("Cuánto", "La meta va en la unidad del ítem; el ponderador, en puntos porcentuales.",
+        ("A quién y cuándo",
+         "El trimestre, la meta y a quién se asigna: un cargo completo, o una "
+         "persona (su cargo se completa solo).",
+         ["periodo", "item", "cargo", "funcionario"]),
+        ("Cuánto", "El objetivo va en la unidad de la meta y es mayor que cero; la "
+         "ponderación, entre 0 y 100.",
          ["meta", "ponderador"]),
+        ("Observación", "Opcional. Por qué se asignó así.", ["observacion"]),
     ]
 
     def get_initial(self):
         """Hereda el período y el cargo del listado filtrado."""
         inicial = super().get_initial()
-        for campo in ("periodo", "cargo"):
+        for campo in ("periodo", "cargo", "funcionario"):
             valor = self.request.GET.get(campo)
             if valor:
                 inicial[campo] = valor
@@ -548,10 +566,7 @@ class MetaNueva(CrearMantenedor):
         JavaScript no pasa nada: se escriben a mano, como antes.
         """
         ctx = super().get_context_data(**kwargs)
-        ctx["sugeridos"] = {
-            str(i.pk): {"meta": i.meta, "ponderador": i.ponderador}
-            for i in Item.objects.filter(activo=True)
-        }
+        ctx["sugeridos"] = {}
         return ctx
 
 
@@ -574,8 +589,8 @@ class MetaEditar(EditarMantenedor):
     form_class = MetaPeriodoForm
     permiso = P.DEFINIR_META
     menu = "metas"
-    singular = "meta"
-    plural = "metas"
+    singular = "asignación"
+    plural = "asignaciones"
     genero = "la"
     url_lista = "gestion:metas"
     url_detalle = "gestion:meta_detalle"
@@ -631,26 +646,29 @@ class MetaDetalle(DetalleMantenedor):
     model = MetaPeriodo
     permiso = P.DEFINIR_META
     menu = "metas"
-    singular = "meta"
-    plural = "metas"
+    singular = "asignación"
+    plural = "asignaciones"
     genero = "la"
     url_lista = "gestion:metas"
     url_editar = "gestion:meta_editar"
     url_estado = "gestion:meta_estado"
     campos = [
-        ("Período", lambda o: o.periodo.nombre),
+        ("Trimestre", lambda o: o.periodo.nombre),
+        ("Meta", lambda o: o.item.nombre, {"ancho": True}),
         ("Cargo", lambda o: o.cargo.nombre),
-        ("Ítem", lambda o: o.item.nombre, {"ancho": True}),
-        ("Meta", lambda o: f"{o.meta} {o.item.get_unidad_display().lower()}"),
-        ("Ponderador", lambda o: f"{o.ponderador} %"),
-        ("Suma del cargo en el período",
+        ("Funcionario", lambda o: o.destinatario),
+        ("Cantidad objetivo", lambda o: f"{o.meta} {o.item.get_unidad_display().lower()}"),
+        ("Ponderación", lambda o: f"{o.ponderador} %"),
+        ("Suma del cargo en el trimestre",
          lambda o: f"{o.periodo.suma_ponderadores(o.cargo)} %"),
+        ("Fecha de asignación", lambda o: o.creada.strftime("%d-%m-%Y") if o.creada else ""),
+        ("Observación", lambda o: o.observacion or "—", {"ancho": True}),
         ("Historial", lambda o: _enlace_historial(o), {"html": True}),
     ]
-    pie = "Mientras el período no se cierre, la meta se puede ajustar."
+    pie = "Mientras el trimestre no se cierre, la asignación se puede ajustar."
 
     def get_queryset(self):
-        return MetaPeriodo.objects.select_related("periodo", "cargo", "item")
+        return MetaPeriodo.objects.select_related("periodo", "cargo", "item", "funcionario")
 
     def get_context_data(self, **kwargs):
         """
@@ -671,7 +689,7 @@ class MetaEstado(CambiarEstado):
     model = MetaPeriodo
     permiso = P.DEFINIR_META
     url_lista = "gestion:metas"
-    singular = "meta"
+    singular = "asignación"
     genero = "la"
 
 

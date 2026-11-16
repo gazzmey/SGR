@@ -23,7 +23,7 @@ from datetime import date
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from gestion.evidencias import (
@@ -40,6 +40,23 @@ class Actividad(models.Model):
         APROBADA = "aprobada", "Aprobada"
         RECHAZADA = "rechazada", "Rechazada"
         ANULADA = "anulada", "Anulada"
+
+    class Tipo(models.TextChoices):
+        TERRENO = "terreno", "Terreno"
+        OFICINA = "oficina", "Oficina"
+        REUNION = "reunion", "Reunión"
+        COORDINACION = "coordinacion", "Coordinación"
+        OTRA = "otra", "Otra"
+
+    class Origen(models.TextChoices):
+        PLANIFICADA = "planificada", "Planificada por la delegación"
+        COMUNIDAD = "comunidad", "Solicitud de la comunidad"
+        MUNICIPIO = "municipio", "Encargo del municipio"
+        DERIVACION = "derivacion", "Derivación de otra unidad"
+
+    #: Los campos que deciden cuánto suma. Con la actividad aprobada ya no se
+    #: cambian: cambiarlos alteraría un puntaje que otra persona validó.
+    CAMPOS_DEL_CALCULO = ["funcionario", "asignacion", "fecha", "cantidad"]
 
     codigo = models.CharField(
         "código", max_length=12, unique=True,
@@ -87,6 +104,55 @@ class Actividad(models.Model):
         max_length=120, blank=True,
         help_text="Con quién se coordinó. Opcional.",
     )
+    asignacion = models.ForeignKey(
+        "gestion.MetaPeriodo", on_delete=models.PROTECT,
+        related_name="actividades", null=True, blank=True,
+        verbose_name="asignación de meta",
+        help_text="La meta a la que suma. Define el ítem y el período.",
+    )
+    hito = models.ForeignKey(
+        "gestion.Hito", on_delete=models.PROTECT,
+        related_name="actividades", null=True, blank=True, verbose_name="hito",
+        help_text="Opcional: el hito planificado al que corresponde.",
+    )
+    tipo = models.CharField(
+        "tipo de actividad", max_length=14, choices=Tipo.choices, default=Tipo.TERRENO,
+    )
+    origen = models.CharField(
+        max_length=12, choices=Origen.choices, default=Origen.PLANIFICADA,
+    )
+    solicitante = models.ForeignKey(
+        "atencion.Solicitante", on_delete=models.PROTECT,
+        related_name="actividades", null=True, blank=True, verbose_name="solicitante",
+        help_text="El vecino que la pidió, si vino de la comunidad.",
+    )
+    territorio = models.ForeignKey(
+        "organizacion.Territorio", on_delete=models.PROTECT,
+        related_name="actividades", null=True, blank=True, verbose_name="territorio",
+        help_text="Dónde ocurrió. Tiene que ser de la misma delegación.",
+    )
+    responsable = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="actividades_a_cargo", null=True, blank=True,
+        verbose_name="responsable",
+        help_text="Quién responde por el seguimiento. Por omisión, quien la registra.",
+    )
+    fecha_compromiso = models.DateField(
+        "fecha de compromiso", null=True, blank=True,
+        help_text="Hasta cuándo hay plazo para el seguimiento. No puede ser anterior a la fecha de la actividad.",
+    )
+    apoyo = models.CharField(
+        max_length=160, blank=True,
+        help_text="Quién o qué apoyó: otra unidad, un vehículo, materiales.",
+    )
+    avance = models.PositiveSmallIntegerField(
+        "avance (%)", default=100,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Cuánto del trabajo está hecho, de 0 a 100.",
+    )
+    resultado = models.TextField(
+        blank=True, help_text="Qué se logró. Opcional.",
+    )
     estado = models.CharField(
         max_length=10, choices=Estado.choices, default=Estado.BORRADOR,
     )
@@ -104,6 +170,34 @@ class Actividad(models.Model):
     def __str__(self):
         return f"{self.codigo} — {self.accion}"
 
+    @property
+    def nombre(self):
+        return self.accion
+
+    @property
+    def anulada(self):
+        return self.estado == self.Estado.ANULADA
+
+    def save(self, *args, **kwargs):
+        # La asignación decide a qué ítem y período suma: si viene, manda.
+        # Si no viene —el registro de «Mis actividades» elige el ítem—, se
+        # busca la que mide a esa persona: la suya o la de su cargo.
+        if self.asignacion_id:
+            self.item_id = self.asignacion.item_id
+            self.periodo_id = self.asignacion.periodo_id
+        elif self.funcionario_id and self.periodo_id and self.item_id:
+            from gestion.models import MetaPeriodo
+
+            asignacion = MetaPeriodo.vigente_para(self.funcionario, self.periodo, self.item)
+            if asignacion is not None:
+                self.asignacion = asignacion
+        if not self.responsable_id and self.funcionario_id:
+            self.responsable_id = self.funcionario_id
+        campos = kwargs.get("update_fields")
+        if campos is not None:
+            kwargs["update_fields"] = list(set(campos) | {"asignacion", "responsable"})
+        super().save(*args, **kwargs)
+
     # --- validación ------------------------------------------------------
 
     def clean(self):
@@ -115,6 +209,33 @@ class Actividad(models.Model):
         período ya cerrado, que es justo lo que el cierre impide.
         """
         super().clean()
+
+        errores = {}
+        if self.asignacion_id:
+            motivo = self.asignacion.motivo_no_aplica(
+                self.funcionario if self.funcionario_id else None)
+            if motivo:
+                errores["asignacion"] = motivo
+            else:
+                self.item_id = self.asignacion.item_id
+                self.periodo_id = self.asignacion.periodo_id
+        if self.fecha and self.fecha_compromiso and self.fecha_compromiso < self.fecha:
+            errores["fecha_compromiso"] = (
+                "La fecha de compromiso no puede ser anterior a la fecha de la "
+                "actividad (%s)." % self.fecha.strftime("%d-%m-%Y")
+            )
+        if (self.territorio_id and self.delegacion_id
+                and self.territorio.delegacion_id != self.delegacion_id):
+            errores["territorio"] = "«%s» es de %s, no de %s." % (
+                self.territorio.nombre, self.territorio.delegacion.nombre,
+                self.delegacion.nombre)
+        if self.hito_id and self.delegacion_id and self.hito.delegacion_id != self.delegacion_id:
+            errores["hito"] = "El hito «%s» es de %s, no de %s." % (
+                self.hito.nombre, self.hito.delegacion.nombre, self.delegacion.nombre)
+        if self.avance is not None and self.avance > 100:
+            errores["avance"] = "El avance va de 0 a 100."
+        if errores:
+            raise ValidationError(errores)
 
         # Cero no es «no hizo nada»: es una actividad que no acredita nada y
         # que solo ensucia el conteo. Si no hubo nada que acreditar, la
@@ -207,13 +328,29 @@ class Evidencia(models.Model):
         APROBADA = "aprobada", "Aprobada"
         RECHAZADA = "rechazada", "Rechazada"
 
+    class Tipo(models.TextChoices):
+        ACTA = "acta", "Acta"
+        FOTOGRAFIA = "fotografia", "Fotografía"
+        LISTA = "lista", "Lista de asistencia"
+        INFORME = "informe", "Informe"
+        OFICIO = "oficio", "Oficio o carta"
+        OTRO = "otro", "Otro documento"
+
     codigo = models.CharField(
         "código", max_length=12, unique=True,
         help_text="Se asigna al crearla y no cambia nunca.",
     )
     actividad = models.ForeignKey(
-        Actividad, on_delete=models.PROTECT,
+        Actividad, on_delete=models.PROTECT, null=True, blank=True,
         related_name="evidencias", verbose_name="actividad",
+    )
+    caso = models.ForeignKey(
+        "atencion.CasoSocial", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="evidencias", verbose_name="gestión social",
+        help_text="Si respalda una gestión social en vez de una actividad.",
+    )
+    tipo = models.CharField(
+        max_length=12, choices=Tipo.choices, default=Tipo.ACTA,
     )
     descripcion = models.CharField(
         "qué respalda", max_length=160,
@@ -252,6 +389,10 @@ class Evidencia(models.Model):
         "motivo del rechazo", blank=True,
         help_text="Obligatorio al rechazar: es lo que la persona tiene que corregir.",
     )
+    observacion = models.TextField(
+        "observación", blank=True,
+        help_text="Lo que conviene saber al revisarla. Opcional.",
+    )
     anulada = models.BooleanField(default=False)
     motivo_anulacion = models.TextField("motivo de la anulación", blank=True)
 
@@ -259,12 +400,60 @@ class Evidencia(models.Model):
         verbose_name = "evidencia"
         verbose_name_plural = "evidencias"
         ordering = ["-creada"]
+        constraints = [
+            # Cada evidencia respalda exactamente un registro de origen: una
+            # actividad o una gestión social, nunca las dos ni ninguna.
+            models.CheckConstraint(
+                check=(models.Q(actividad__isnull=False, caso__isnull=True)
+                       | models.Q(actividad__isnull=True, caso__isnull=False)),
+                name="evidencia_de_un_solo_origen",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.codigo} — {self.descripcion}"
 
+    @property
+    def nombre(self):
+        return self.descripcion
+
+    @property
+    def origen(self):
+        """La actividad o la gestión social que respalda."""
+        return self.actividad if self.actividad_id else self.caso
+
+    @property
+    def origen_texto(self):
+        if self.actividad_id:
+            return f"Actividad {self.actividad.codigo} · {self.actividad.accion}"
+        if self.caso_id:
+            return f"Gestión social {self.caso.codigo} · {self.caso.atencion.solicitante.nombre}"
+        return "—"
+
+    @property
+    def delegacion_id_origen(self):
+        if self.actividad_id:
+            return self.actividad.delegacion_id
+        if self.caso_id:
+            return self.caso.atencion.delegacion_id
+        return None
+
+    @property
+    def responsable_id_origen(self):
+        """Quién hizo el trabajo que la evidencia respalda."""
+        if self.actividad_id:
+            return self.actividad.funcionario_id
+        if self.caso_id:
+            return self.caso.responsable_id
+        return None
+
     def clean(self):
         super().clean()
+        if bool(self.actividad_id) == bool(self.caso_id):
+            raise ValidationError(
+                "La evidencia respalda una actividad o una gestión social: "
+                "elige exactamente una de las dos."
+            )
         if self.decision == self.Decision.RECHAZADA and not self.motivo.strip():
             raise ValidationError({
                 "motivo": (

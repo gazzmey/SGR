@@ -49,6 +49,7 @@ AREAS = {
     "gestion": ("Mi gestión", "a-rojo", "resultado"),
     "comunidad": ("Comunidad", "a-bordo", "agenda"),
     "supervision": ("Supervisión", "a-ocre", "tablero"),
+    "registros": ("Registros", "a-cafe", "registro_actividades"),
     "periodo": ("Período", "a-granate", "periodos"),
     "configuracion": ("Configuración", "a-grafito", "items"),
     "administracion": ("Administración", "a-tinta", "delegaciones"),
@@ -84,11 +85,28 @@ ICONOS = {
     "usuarios": '<circle cx="12" cy="8" r="3.8"/><path d="M4.5 20c.7-4 3.6-6 7.5-6s6.8 2 7.5 6"/>',
     "roles": '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.1 7.5 9.5 4.3-1.4 7.5-4.9 7.5-9.5V6z"/><path d="M12 9.5v5M9.5 12h5"/>',
     "auditoria": '<path d="M6 3.5h8l4.5 4.5v12.5H6z"/><path d="M14 3.5V8h4.5"/><path d="M9 13h6M9 16.5h4"/>',
+    "vecinos": '<circle cx="9" cy="8" r="3.3"/><path d="M3 20c.6-3.6 3-5.5 6-5.5s5.4 1.9 6 5.5"/><path d="M16 4.8a3.2 3.2 0 0 1 0 6.4M21 20c-.4-2.6-1.8-4.3-3.8-5"/>',
+    "juntas": '<path d="M3 21h18M5 21V10l7-5 7 5v11"/><circle cx="12" cy="13" r="2.2"/><path d="M8.5 21c.4-2.2 1.8-3.4 3.5-3.4s3.1 1.2 3.5 3.4"/>',
+    "participaciones": '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+    "territorios": '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
+    "hitos": '<path d="M5 21V4"/><path d="M5 4.5h11l-2 3.5 2 3.5H5"/>',
+    "registro_actividades": '<rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    "gestiones": '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+    "registro_evidencias": '<path d="M20 12.5 12.6 20a5 5 0 0 1-7.1-7.1l8-8a3.3 3.3 0 0 1 4.7 4.7l-8 8a1.7 1.7 0 0 1-2.4-2.4l7.3-7.3"/>',
 }
 
 
 def _todos(t):
     return True
+
+
+def _ver(clave):
+    """Condición de una de las 17 entidades: su acción de negocio o su permiso de Django."""
+    from comun.entidades import POR_CLAVE
+
+    entidad = POR_CLAVE[clave]
+    return lambda t: (bool(entidad.clave_negocio) and t(entidad.clave_negocio)) or t(
+        entidad.permiso("view"))
 
 
 #: (clave, área, título, qué hace, url, permiso, nuevo). ``permiso`` recibe
@@ -106,7 +124,7 @@ MODULOS = (
      "gestion:agenda", _todos, False),
     ("observaciones", "comunidad", "Observaciones",
      "Consultas en compromisos, casos y cartas.",
-     "comun:observaciones", _todos, True),
+     "comun:observaciones", _todos, False),
     ("cartas", "comunidad", "Tubo de cartas",
      "Las cartas de oficina de partes.",
      "gestion:cartas", lambda t: t(P.REGISTRAR_ATENCION) or t(P.VER_TABLERO), False),
@@ -119,6 +137,15 @@ MODULOS = (
     ("regalos", "comunidad", "Regalos para niños",
      "Inscripción por RUT en cada campaña.",
      "atencion:regalos", lambda t: t(P.REGISTRAR_ATENCION) or t(P.VER_TABLERO), False),
+    ("vecinos", "comunidad", "Vecinos",
+     "RUT, contacto y territorio de cada vecino.",
+     "atencion:vecinos", _ver("vecino"), True),
+    ("juntas", "comunidad", "Juntas de vecinos",
+     "Las organizaciones de cada territorio.",
+     "atencion:juntas", _ver("junta"), True),
+    ("participaciones", "comunidad", "Participaciones en juntas",
+     "Quién integra cada junta y con qué cargo.",
+     "atencion:participaciones", _ver("participacion"), True),
 
     ("validar", "supervision", "Validar evidencias",
      "Aprueba o rechaza con motivo lo registrado.",
@@ -139,44 +166,60 @@ MODULOS = (
      "Seis informes, incluido el de brechas.",
      "gestion:informes", lambda t: t(P.VER_INFORMES), False),
 
-    ("periodos", "periodo", "Períodos",
+    ("registro_actividades", "registros", "Actividades",
+     "Todas las actividades, con sus antecedentes.",
+     "gestion:registro_actividades", _ver("actividad"), True),
+    ("gestiones", "registros", "Gestiones sociales",
+     "Beneficiario, visita, informe y resultado.",
+     "atencion:gestiones", _ver("gestion_social"), True),
+    ("registro_evidencias", "registros", "Evidencias",
+     "El respaldo de actividades y gestiones.",
+     "gestion:registro_evidencias", _ver("evidencia"), True),
+    ("hitos", "registros", "Hitos",
+     "Lo planificado, con fechas y responsables.",
+     "gestion:hitos", _ver("hito"), True),
+
+    ("periodos", "periodo", "Trimestres",
      "Abrir, cerrar y reabrir.",
-     "gestion:periodos", lambda t: t(P.CONFIGURAR_PERIODO), False),
+     "gestion:periodos", _ver("trimestre"), False),
     ("cargos", "periodo", "Cargos",
      "Las funciones que deciden las metas.",
-     "gestion:cargos", lambda t: t(P.DEFINIR_META), False),
-    ("metas", "periodo", "Metas y ponderadores",
-     "Cuánto se pide y cuánto pesa.",
-     "gestion:metas", lambda t: t(P.DEFINIR_META), False),
+     "gestion:cargos", _ver("cargo"), False),
+    ("metas", "periodo", "Asignaciones de meta",
+     "Cuánto se pide, a quién y cuánto pesa.",
+     "gestion:metas", _ver("asignacion"), False),
     ("reglas", "periodo", "Reglas de cálculo",
      "Tope, umbrales y plazos.",
      "gestion:reglas", lambda t: t(P.CONFIGURAR_PERIODO), False),
     ("historial", "periodo", "Historial de parámetros",
      "Cada versión, con su autor.",
-     "gestion:historial", lambda t: t(P.CONFIGURAR_PERIODO), True),
+     "gestion:historial", lambda t: t(P.CONFIGURAR_PERIODO), False),
     ("campanas", "periodo", "Campañas de regalos",
      "Navidad, Día del Niño, Aniversario.",
      "atencion:campanas", lambda t: t(P.CONFIGURAR_PERIODO), False),
 
-    ("items", "configuracion", "Ítems y metas",
-     "Lo que se mide y cómo se mide.",
-     "catalogos:items", lambda t: t(P.GESTIONAR_CATALOGO), False),
+    ("items", "configuracion", "Metas (ítems)",
+     "Lo que se mide, cómo y con qué evidencia.",
+     "catalogos:items", _ver("meta"), False),
     ("tipos", "configuracion", "Tipos de atención",
      "Cómo se clasifica lo que se atiende.",
-     "catalogos:tipos", lambda t: t(P.GESTIONAR_CATALOGO), False),
-    ("subatenciones", "configuracion", "Subatenciones",
+     "catalogos:tipos", _ver("tipo"), False),
+    ("subatenciones", "configuracion", "Subtipos de atención",
      "El detalle de cada tipo de atención.",
-     "catalogos:subatenciones", lambda t: t(P.GESTIONAR_CATALOGO), False),
+     "catalogos:subatenciones", _ver("subtipo"), False),
 
     ("delegaciones", "administracion", "Delegaciones",
      "Las unidades territoriales.",
-     "organizacion:delegaciones", lambda t: t(P.GESTIONAR_USUARIO), False),
+     "organizacion:delegaciones", _ver("delegacion"), False),
+    ("territorios", "administracion", "Territorios",
+     "Los sectores de cada delegación.",
+     "organizacion:territorios", _ver("territorio"), True),
     ("usuarios", "administracion", "Usuarios",
      "Quién entra, con qué rol y dónde.",
-     "organizacion:usuarios", lambda t: t(P.GESTIONAR_USUARIO), False),
+     "organizacion:usuarios", _ver("usuario"), False),
     ("roles", "administracion", "Roles",
      "Qué puede hacer cada rol.",
-     "organizacion:roles", lambda t: t(P.GESTIONAR_USUARIO), False),
+     "organizacion:roles", _ver("rol"), False),
     ("auditoria", "administracion", "Auditoría",
      "Quién hizo qué y cuándo.",
      "gestion:auditoria", lambda t: t(P.VER_AUDITORIA), False),
@@ -288,6 +331,7 @@ def _casos(ctx):
     if ctx["activa"] is None or not (ctx["tiene"](P.REGISTRAR_ATENCION) or ctx["supervisa"]):
         return []
     casos = (CasoSocial.objects.filter(atencion__delegacion=ctx["activa"])
+             .exclude(estado=CasoSocial.Estado.ANULADO)
              .select_related("atencion__subatencion"))
     if not ctx["supervisa"]:
         casos = casos.filter(responsable=ctx["usuario"])
@@ -372,9 +416,12 @@ def _evidencias(ctx):
 
     if not ctx["tiene"](P.VALIDAR_EVIDENCIA):
         return []
-    pendientes = Evidencia.objects.filter(decision=Evidencia.Decision.PENDIENTE)
+    from django.db.models import Q
+
+    pendientes = Evidencia.objects.filter(decision=Evidencia.Decision.PENDIENTE, anulada=False)
     if ctx["visibles"] is not None:
-        pendientes = pendientes.filter(actividad__delegacion_id__in=ctx["visibles"])
+        pendientes = pendientes.filter(Q(actividad__delegacion_id__in=ctx["visibles"])
+                                       | Q(caso__atencion__delegacion_id__in=ctx["visibles"]))
     cuantas = pendientes.count()
     if not cuantas:
         return []

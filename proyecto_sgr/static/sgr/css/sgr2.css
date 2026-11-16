@@ -1151,6 +1151,7 @@
 .pn-mod.a-granate { --banda: var(--g900) }
 .pn-mod.a-grafito { --banda: var(--tinta2) }
 .pn-mod.a-tinta { --banda: var(--tinta) }
+.pn-mod.a-cafe { --banda: #7A4E2D }
 .pn-mod .ico { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--banda); color: #fff }
 .pn-mod .tx { flex: 1; min-width: 0 }
 .pn-mod small { display: block; font-size: 12px; font-weight: 600; color: var(--banda); margin-bottom: 1px }
@@ -1289,3 +1290,10 @@
 }
 @media print { .inf-modal { display: none } }
 @media (prefers-reduced-motion: reduce) { .inf-modal[open] { animation: none } }
+
+/* Avisos flotantes de error o advertencia: el ícono no puede ser un visto bueno */
+.toast .ok-ic.bad { background: var(--rojo-bar) }
+.toast .ok-ic.warn { background: var(--ambar-bar) }
+
+/* Sin JavaScript, el resultado de la operación se lee en el aviso de <noscript> */
+main.content > noscript > .notice { margin-bottom: 20px }

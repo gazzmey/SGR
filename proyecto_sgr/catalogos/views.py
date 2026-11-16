@@ -48,16 +48,17 @@ class ItemsLista(ListaMantenedor):
     model = Item
     permiso = PERMISO
     menu = "items"
-    titulo = "Ítems y metas"
+    titulo = "Metas (ítems)"
     bajada = (
-        "Lo que se puede medir, con la meta y el peso que se proponen al "
-        "asignarlo a un cargo."
+        "Lo que se puede medir: cómo se mide, en qué unidad y con qué "
+        "evidencia. Cuánto se pide y cuánto pesa se define en cada "
+        "asignación de meta."
     )
-    singular = "ítem"
-    plural = "ítems"
-    genero = "el"
+    singular = "meta"
+    plural = "metas"
+    genero = "la"
     placeholder = "Nombre, código o descripción"
-    rotulo_nuevo = "Nuevo ítem"
+    rotulo_nuevo = "Nueva meta"
     busca = ["codigo", "nombre", "descripcion"]
     orden_inicial = "codigo"
 
@@ -71,15 +72,15 @@ class ItemsLista(ListaMantenedor):
         filtro_area(),
         Filtro("unidad", "Unidad", Item.Unidad.choices, vacio="Todas"),
         Filtro("medicion", "Cómo se mide", Item.Medicion.choices, vacio="Todas"),
-        filtro_estado(),
+        filtro_estado(femenino=True),
     ]
 
     columnas = [
         Columna("codigo", "Código", clase="mono"),
         Columna(
-            "nombre", "Ítem", orden="nombre", clase="w",
+            "nombre", "Meta", orden="nombre", clase="w",
             celda=lambda o: enlace_nombre(
-                o, "catalogos:item_detalle",
+                o, "catalogos:item_detalle", femenino=True,
                 extra=format_html(
                     '<span class="t2">{}{}</span>', o.get_area_display(),
                     "" if o.medicion == Item.Medicion.ACTIVIDADES
@@ -88,24 +89,19 @@ class ItemsLista(ListaMantenedor):
             ),
         ),
         Columna("unidad", "Unidad", valor=lambda o: o.get_unidad_display()),
-        Columna("meta", "Meta sugerida", alineado="r"),
-        Columna(
-            "ponderador", "Ponderador sugerido", alineado="r",
-            celda=lambda o: format_html("{} %", o.ponderador),
-            valor=lambda o: o.ponderador,
-        ),
+        Columna("evidencia", "Evidencia", orden="requiere_evidencia",
+                valor=lambda o: o.evidencia_requerida if o.requiere_evidencia else "No requiere"),
         Columna(
             "estado", "Estado", orden="activo",
-            celda=chip_estado,
-            valor=lambda o: "Activo" if o.activo else "Inactivo",
+            celda=lambda o: chip_estado(o, femenino=True),
+            valor=lambda o: "Activa" if o.activo else "Inactiva",
         ),
     ]
 
     nota = (
-        "<b>La meta y el ponderador de esta lista son sugeridos.</b> Se "
-        "proponen al asignar el ítem a un cargo. El peso que usa el cálculo "
-        "se define por período y cargo en Metas y ponderadores, donde los "
-        "ítems de cada cargo suman 100 %."
+        "<b>La meta no lleva cantidad ni ponderación.</b> Las dos se definen "
+        "en la asignación de meta, por trimestre y por cargo o persona: un "
+        "inspector y una asistente social no se miden con la misma vara."
     )
 
 
@@ -114,9 +110,9 @@ class ItemNuevo(CrearMantenedor):
     form_class = ItemForm
     permiso = PERMISO
     menu = "items"
-    singular = "ítem"
-    plural = "ítems"
-    genero = "el"
+    singular = "meta"
+    plural = "metas"
+    genero = "la"
     url_lista = "catalogos:items"
     url_detalle = "catalogos:item_detalle"
     lateral = "catalogos/_lateral_item.html"
@@ -125,8 +121,10 @@ class ItemNuevo(CrearMantenedor):
          ["codigo", "nombre", "area"]),
         ("Qué se considera", "El criterio que se aplica al revisar los registros.",
          ["descripcion"]),
-        ("Medición", "Cómo se mide, en qué unidad, y qué meta y peso se proponen al asignarlo a un cargo.",
-         ["medicion", "unidad", "meta", "ponderador"]),
+        ("Medición", "Cómo se mide y en qué unidad. Cuánto se pide se define al asignarla.",
+         ["medicion", "unidad"]),
+        ("Evidencia", "Qué respaldo exige el verificador para que una actividad sume.",
+         ["requiere_evidencia", "evidencia_requerida"]),
     ]
 
 
@@ -135,9 +133,9 @@ class ItemEditar(EditarMantenedor):
     form_class = ItemForm
     permiso = PERMISO
     menu = "items"
-    singular = "ítem"
-    plural = "ítems"
-    genero = "el"
+    singular = "meta"
+    plural = "metas"
+    genero = "la"
     url_lista = "catalogos:items"
     url_detalle = "catalogos:item_detalle"
     lateral = "catalogos/_lateral_item.html"
@@ -148,9 +146,9 @@ class ItemDetalle(DetalleMantenedor):
     model = Item
     permiso = PERMISO
     menu = "items"
-    singular = "ítem"
-    plural = "ítems"
-    genero = "el"
+    singular = "meta"
+    plural = "metas"
+    genero = "la"
     url_lista = "catalogos:items"
     url_editar = "catalogos:item_editar"
     url_estado = "catalogos:item_estado"
@@ -161,21 +159,20 @@ class ItemDetalle(DetalleMantenedor):
         ("Cómo se mide", "medicion"),
         ("Historial", lambda o: _enlace_historial(o), {"html": True}),
         ("Unidad de medida", "unidad"),
-        ("Meta sugerida", lambda o: f"{o.meta} {o.get_unidad_display().lower()}"),
-        ("Ponderador sugerido", lambda o: f"{o.ponderador} %"),
+        ("Requiere evidencia", lambda o: "Sí" if o.requiere_evidencia else "No"),
+        ("Evidencia que se exige", lambda o: o.evidencia_requerida or "—"),
         ("Qué se considera", "descripcion", {"ancho": True}),
     ]
     kpis = [
-        ("En metas vigentes",
+        ("Asignaciones vigentes",
          lambda o: o.metas.filter(activo=True).exclude(periodo__estado="cerrado").count(),
-         "De períodos abiertos o en preparación"),
-        ("Ponderador sugerido", lambda o: f"{o.ponderador} %",
-         "Se propone al crear una meta con este ítem"),
+         "En trimestres abiertos o en preparación"),
+        ("Asignaciones en total", lambda o: o.metas.count(),
+         "Incluye trimestres cerrados"),
     ]
     pie = (
-        "La meta y el ponderador que usa el cálculo se definen por período y "
-        "cargo, en Metas y ponderadores. Cambiar los sugeridos no altera "
-        "ninguna meta ya creada."
+        "La cantidad objetivo y la ponderación se definen en cada asignación "
+        "de meta, por trimestre y por cargo o persona."
     )
 
 
@@ -183,8 +180,8 @@ class ItemEstado(CambiarEstado):
     model = Item
     permiso = PERMISO
     url_lista = "catalogos:items"
-    singular = "ítem"
-    genero = "el"
+    singular = "meta"
+    genero = "la"
 
 
 # =========================================================================
@@ -338,16 +335,16 @@ class SubatencionesLista(ListaMantenedor):
     model = SubAtencion
     permiso = PERMISO
     menu = "subatenciones"
-    titulo = "Subatenciones"
+    titulo = "Subtipos de atención"
     bajada = (
         "El detalle de cada tipo. Es lo que se elige al registrar una "
         "atención, y lo que define si hace falta documento de respaldo."
     )
-    singular = "subatención"
-    plural = "subatenciones"
-    genero = "la"
+    singular = "subtipo de atención"
+    plural = "subtipos de atención"
+    genero = "el"
     placeholder = "Nombre, código o descripción"
-    rotulo_nuevo = "Nueva subatención"
+    rotulo_nuevo = "Nuevo subtipo"
     busca = ["codigo", "nombre", "descripcion", "tipo_atencion__nombre"]
     orden_inicial = "codigo"
 
@@ -369,15 +366,15 @@ class SubatencionesLista(ListaMantenedor):
             consulta=lambda v: Q(documento=(v == "si")),
             vacio="Todas",
         ),
-        filtro_estado(femenino=True),
+        filtro_estado(femenino=False),
     ]
 
     columnas = [
         Columna("codigo", "Código", clase="mono"),
         Columna(
-            "nombre", "Subatención", orden="nombre", clase="w",
+            "nombre", "Subtipo", orden="nombre", clase="w",
             celda=lambda o: enlace_nombre(
-                o, "catalogos:subatencion_detalle", femenino=True,
+                o, "catalogos:subatencion_detalle", femenino=False,
                 extra=format_html('<span class="t2">{}</span>', o.descripcion),
             ),
         ),
@@ -392,8 +389,8 @@ class SubatencionesLista(ListaMantenedor):
         ),
         Columna(
             "estado", "Estado", orden="activo",
-            celda=lambda o: chip_estado(o, femenino=True),
-            valor=lambda o: "Activa" if o.activo else "Inactiva",
+            celda=lambda o: chip_estado(o, femenino=False),
+            valor=lambda o: "Activo" if o.activo else "Inactivo",
         ),
     ]
 
@@ -419,9 +416,9 @@ class SubatencionNueva(CrearMantenedor):
     form_class = SubAtencionForm
     permiso = PERMISO
     menu = "subatenciones"
-    singular = "subatención"
-    plural = "subatenciones"
-    genero = "la"
+    singular = "subtipo de atención"
+    plural = "subtipos de atención"
+    genero = "el"
     url_lista = "catalogos:subatenciones"
     url_detalle = "catalogos:subatencion_detalle"
     lateral = "catalogos/_lateral_subatencion.html"
@@ -438,9 +435,9 @@ class SubatencionEditar(EditarMantenedor):
     form_class = SubAtencionForm
     permiso = PERMISO
     menu = "subatenciones"
-    singular = "subatención"
-    plural = "subatenciones"
-    genero = "la"
+    singular = "subtipo de atención"
+    plural = "subtipos de atención"
+    genero = "el"
     url_lista = "catalogos:subatenciones"
     url_detalle = "catalogos:subatencion_detalle"
     lateral = "catalogos/_lateral_subatencion.html"
@@ -451,9 +448,9 @@ class SubatencionDetalle(DetalleMantenedor):
     model = SubAtencion
     permiso = PERMISO
     menu = "subatenciones"
-    singular = "subatención"
-    plural = "subatenciones"
-    genero = "la"
+    singular = "subtipo de atención"
+    plural = "subtipos de atención"
+    genero = "el"
     url_lista = "catalogos:subatenciones"
     url_editar = "catalogos:subatencion_editar"
     url_estado = "catalogos:subatencion_estado"
@@ -485,5 +482,5 @@ class SubatencionEstado(CambiarEstado):
     model = SubAtencion
     permiso = PERMISO
     url_lista = "catalogos:subatenciones"
-    singular = "subatención"
-    genero = "la"
+    singular = "subtipo de atención"
+    genero = "el"

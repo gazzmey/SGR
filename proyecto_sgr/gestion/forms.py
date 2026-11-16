@@ -41,11 +41,13 @@ class PeriodoForm(_Base):
 
     class Meta:
         model = Periodo
-        fields = ["codigo", "nombre", "inicio", "termino", "observacion"]
+        fields = ["codigo", "nombre", "anio", "numero", "inicio", "termino", "observacion"]
         widgets = {
             "nombre": forms.TextInput(attrs={"placeholder": "Por ejemplo: Jul – Sep 2026"}),
             "inicio": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "termino": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "anio": forms.NumberInput(attrs={"min": 2000, "max": 2100, "step": 1}),
+            "numero": forms.NumberInput(attrs={"min": 1, "max": 4, "step": 1}),
             "observacion": forms.Textarea(attrs={
                 "rows": 3, "ancho": True,
                 "placeholder": "Opcional. Queda en el historial del período.",
@@ -58,6 +60,18 @@ class PeriodoForm(_Base):
         # muestran en otro formato y el campo aparece vacío.
         for campo in ("inicio", "termino"):
             self.fields[campo].input_formats = ["%Y-%m-%d"]
+        if not self.instance.pk:
+            from datetime import date
+
+            hoy = date.today()
+            self.initial.setdefault("anio", hoy.year)
+            self.initial.setdefault("numero", (hoy.month - 1) // 3 + 1)
+
+    def clean_numero(self):
+        numero = self.cleaned_data.get("numero")
+        if numero is not None and not 1 <= numero <= 4:
+            raise forms.ValidationError("El número de trimestre va del 1 al 4.")
+        return numero
 
     def clean_nombre(self):
         nombre = (self.cleaned_data["nombre"] or "").strip()
@@ -105,11 +119,17 @@ class MetaPeriodoForm(forms.ModelForm):
 
     class Meta:
         model = MetaPeriodo
-        fields = ["periodo", "cargo", "item", "meta", "ponderador"]
+        fields = ["periodo", "item", "cargo", "funcionario", "meta", "ponderador", "observacion"]
         widgets = {
             "meta": forms.NumberInput(attrs={"min": 1, "step": 1}),
             "ponderador": forms.NumberInput(attrs={"min": 0, "max": 100, "step": 1}),
+            "observacion": forms.Textarea(attrs={
+                "rows": 3, "ancho": True,
+                "placeholder": "Opcional. Por qué se asignó así.",
+            }),
         }
+        labels = {"periodo": "Trimestre", "item": "Meta", "meta": "Cantidad objetivo",
+                  "ponderador": "Ponderación (%)"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -147,6 +167,27 @@ class MetaPeriodoForm(forms.ModelForm):
         for nombre in ("periodo", "cargo", "item"):
             self.fields[nombre].empty_label = "Elige una opción"
 
+        # A quién: un cargo completo o una persona. Con persona, el cargo
+        # se completa solo desde su ficha.
+        from django.contrib.auth import get_user_model
+
+        Usuario = get_user_model()
+        actual = getattr(self.instance, "funcionario_id", None)
+        personas = Usuario.objects.filter(is_active=True, perfil__activo=True,
+                                          perfil__cargo_asignado__isnull=False)
+        if actual:
+            personas = Usuario.objects.filter(
+                models.Q(pk__in=personas.values("pk")) | models.Q(pk=actual))
+        self.fields["funcionario"].queryset = personas.order_by("first_name", "last_name")
+        self.fields["funcionario"].label_from_instance = (
+            lambda u: "%s · %s" % (u.get_full_name() or u.get_username(),
+                                   u.perfil.cargo_asignado.nombre if u.perfil.cargo_asignado_id else "sin cargo"))
+        self.fields["funcionario"].empty_label = "Todo el cargo (sin persona)"
+        self.fields["cargo"].required = False
+        self.fields["cargo"].help_text = (
+            "Si asignas a una persona, se usa su cargo y puedes dejar este vacío."
+        )
+
         # Período, cargo e ítem son la identidad de la meta, no datos suyos:
         # son justamente las tres cosas que la restricción de unicidad usa
         # para distinguirla. Cambiarlos no edita esta meta, la convierte en
@@ -158,7 +199,7 @@ class MetaPeriodoForm(forms.ModelForm):
         # envío y vuelve a usar el valor guardado, así que mandar otro a mano
         # tampoco sirve.
         if editando:
-            for nombre in ("periodo", "cargo", "item"):
+            for nombre in ("periodo", "cargo", "item", "funcionario"):
                 self.fields[nombre].disabled = True
             self.fields["item"].help_text = (
                 "El período, el cargo y el ítem no se cambian después de "
@@ -184,19 +225,37 @@ class MetaPeriodoForm(forms.ModelForm):
         explica en palabras antes de llegar a eso.
         """
         datos = super().clean()
+        funcionario = datos.get("funcionario")
+        if funcionario is not None:
+            perfil = getattr(funcionario, "perfil", None)
+            if perfil is not None and perfil.cargo_asignado_id:
+                if datos.get("cargo") and datos["cargo"].pk != perfil.cargo_asignado_id:
+                    self.add_error("cargo", forms.ValidationError(
+                        "%(persona)s es %(suyo)s, no %(elegido)s. Deja el cargo vacío "
+                        "o elige el suyo.",
+                        params={"persona": perfil.nombre, "suyo": perfil.cargo_asignado.nombre,
+                                "elegido": datos["cargo"].nombre}))
+                else:
+                    datos["cargo"] = perfil.cargo_asignado
+        elif not datos.get("cargo") and "cargo" not in self.errors:
+            self.add_error("cargo", forms.ValidationError(
+                "Elige el cargo, o una persona para asignarle la meta solo a ella."))
+
         periodo, cargo, item = datos.get("periodo"), datos.get("cargo"), datos.get("item")
         if periodo and cargo and item:
             repetida = (
                 MetaPeriodo.objects
-                .filter(periodo=periodo, cargo=cargo, item=item)
+                .filter(periodo=periodo, cargo=cargo, item=item, funcionario=funcionario)
                 .exclude(pk=self.instance.pk)
                 .exists()
             )
             if repetida:
+                quien = (funcionario.get_full_name() or funcionario.get_username()
+                         if funcionario else "todo el cargo %s" % cargo.nombre)
                 self.add_error("item", forms.ValidationError(
-                    "«%(item)s» ya tiene meta para %(cargo)s en %(periodo)s. "
+                    "«%(item)s» ya está asignada a %(quien)s en %(periodo)s. "
                     "Edita la que existe en vez de crear otra.",
-                    params={"item": item.nombre, "cargo": cargo.nombre,
+                    params={"item": item.nombre, "quien": quien,
                             "periodo": periodo.nombre},
                 ))
         return datos

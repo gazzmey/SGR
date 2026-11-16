@@ -9,8 +9,15 @@ Sobre esta entrega
 ------------------
 A los tres modelos de la Unidad 2 se les agregan los campos que la segunda
 entrega del Proyecto Integrado necesita para sus mantenedores: el área y la
-unidad de medida del ítem con su meta y ponderador, la descripción del tipo
-de atención, y si una subatención exige documento de respaldo.
+unidad de medida del ítem, la descripción del tipo de atención, y si una
+subatención exige documento de respaldo.
+
+En la Evaluación 3 el ítem es la entidad **Meta**: código, nombre,
+descripción, tipo (área y cómo se mide), unidad de medida, requisito de
+evidencia y estado. La cantidad objetivo y la ponderación no son de la meta
+sino de su **asignación** (``gestion.MetaPeriodo``). Los campos ``meta`` y
+``ponderador`` del ítem quedan en la base por compatibilidad con las
+entregas anteriores, pero ya no se muestran ni se editan.
 """
 
 from django.core.validators import MinValueValidator
@@ -100,13 +107,22 @@ class Item(models.Model):
             "define por período y cargo, en Metas y ponderadores."
         ),
     )
+    requiere_evidencia = models.BooleanField(
+        "requiere evidencia", default=True,
+        help_text="Si las actividades de esta meta necesitan una evidencia aprobada para sumar.",
+    )
+    evidencia_requerida = models.CharField(
+        "evidencia que se exige", max_length=160, blank=True,
+        default="Acta, fotografía o lista de asistencia que respalde la actividad",
+        help_text="Qué documento respalda el registro. Por ejemplo: acta firmada y fotografía.",
+    )
     activo = models.BooleanField(default=True)
     creada = models.DateField("creado el", auto_now_add=True)
     desactivada = models.DateField("desactivado el", null=True, blank=True)
 
     class Meta:
-        verbose_name = "ítem"
-        verbose_name_plural = "ítems"
+        verbose_name = "meta"
+        verbose_name_plural = "metas"
         ordering = ["codigo"]
 
     def __str__(self):
@@ -123,8 +139,8 @@ class Item(models.Model):
             "Área": self.get_area_display(),
             "Cómo se mide": self.get_medicion_display(),
             "Unidad": self.get_unidad_display(),
-            "Meta sugerida": str(self.meta),
-            "Ponderador sugerido": f"{self.ponderador} %",
+            "Requiere evidencia": ("Sí: " + self.evidencia_requerida
+                                   if self.requiere_evidencia else "No"),
             "Estado": "Activo" if self.activo else "Inactivo",
         }
 
@@ -172,12 +188,19 @@ class Item(models.Model):
 
     def motivo_bloqueo(self):
         """
-        Un ítem con registros en el período abierto no se desactiva.
+        Una meta asignada en un trimestre que no está cerrado no se desactiva.
 
-        En esta entrega no existe todavía el modelo de actividades, así que
-        no hay nada que contar: el método queda escrito y devuelve vacío.
-        Cuando el módulo de actividades entre, basta con contar aquí.
+        Las asignaciones de un trimestre cerrado son historia y no estorban;
+        las de uno abierto o en preparación todavía miden a alguien.
         """
+        cuantas = (self.metas.filter(activo=True)
+                   .exclude(periodo__estado="cerrado").count())
+        if cuantas:
+            return (
+                f"Está en {cuantas} "
+                f"{'asignación activa' if cuantas == 1 else 'asignaciones activas'} "
+                "de trimestres no cerrados. Desactiva esas asignaciones antes."
+            )
         return ""
 
     @property
@@ -254,8 +277,8 @@ class SubAtencion(models.Model):
     desactivada = models.DateField("desactivada el", null=True, blank=True)
 
     class Meta:
-        verbose_name = "subatención"
-        verbose_name_plural = "subatenciones"
+        verbose_name = "subtipo de atención"
+        verbose_name_plural = "subtipos de atención"
         ordering = ["tipo_atencion__codigo", "codigo"]
 
     def __str__(self):

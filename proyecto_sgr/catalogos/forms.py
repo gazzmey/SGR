@@ -54,7 +54,7 @@ class ItemForm(_Base):
         model = Item
         fields = [
             "codigo", "nombre", "area", "descripcion",
-            "medicion", "unidad", "meta", "ponderador",
+            "medicion", "unidad", "requiere_evidencia", "evidencia_requerida",
         ]
         widgets = {
             "nombre": forms.TextInput(attrs={
@@ -64,9 +64,11 @@ class ItemForm(_Base):
                 "rows": 4, "ancho": True,
                 "placeholder": "Qué cuenta como registro válido para este ítem",
             }),
-            "meta": forms.NumberInput(attrs={"min": 1, "step": 1}),
-            "ponderador": forms.NumberInput(attrs={"min": 0, "max": 100, "step": 1}),
+            "evidencia_requerida": forms.TextInput(attrs={
+                "placeholder": "Por ejemplo: acta firmada y fotografía", "ancho": True,
+            }),
         }
+        labels = {"area": "Área", "medicion": "Tipo (cómo se mide)"}
 
     def clean_descripcion(self):
         texto = (self.cleaned_data.get("descripcion") or "").strip()
@@ -77,27 +79,16 @@ class ItemForm(_Base):
             )
         return texto
 
-    def clean_meta(self):
-        """
-        La meta tiene que ser mayor que cero.
+    def clean_evidencia_requerida(self):
+        return (self.cleaned_data.get("evidencia_requerida") or "").strip()
 
-        El validador del modelo ya lo exige —vale desde el administrador y
-        desde cualquier script—; aquí se repite el mensaje para que explique
-        el porqué en la pantalla donde se escribe el número.
-        """
-        meta = self.cleaned_data.get("meta")
-        if meta is not None and meta < 1:
-            raise forms.ValidationError(
-                "La meta tiene que ser mayor que cero: con meta cero no se "
-                "puede calcular el cumplimiento."
-            )
-        return meta
-
-    def clean_ponderador(self):
-        valor = self.cleaned_data.get("ponderador") or 0
-        if valor > 100:
-            raise forms.ValidationError("Un ponderador no puede pasar de 100 %.")
-        return valor
+    def clean(self):
+        datos = super().clean()
+        if datos.get("requiere_evidencia") and not datos.get("evidencia_requerida"):
+            self.add_error("evidencia_requerida",
+                           "Si la meta requiere evidencia, indica cuál: es lo que el "
+                           "verificador va a exigir.")
+        return datos
 
 
 # =========================================================================

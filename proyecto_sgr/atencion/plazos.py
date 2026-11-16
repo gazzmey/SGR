@@ -167,6 +167,9 @@ def resumen(casos, regla, hoy=None):
     abiertos = vencidos = cerrados = a_tiempo = con_devolucion = 0
     duraciones = []
     for caso in casos:
+        # Una gestión anulada no tiene plazos que cumplir.
+        if getattr(caso, "estado", "") == "anulado":
+            continue
         clave, _, _ = situacion(caso, regla, hoy)
         if caso.cerrado:
             cerrados += 1

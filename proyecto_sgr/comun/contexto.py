@@ -60,9 +60,20 @@ def sesion_sgr(request):
         "sgr_delegaciones": disponibles,
         "sgr_puede_cambiar_delegacion": len(disponibles) > 1,
         "sgr_permisos": _permisos_de(request.user),
+        # Qué entidades de la Evaluación 3 puede consultar: por la acción
+        # de negocio o por el permiso de Django de su grupo.
+        "sgr_ver": _entidades_de(request.user),
         # El resultado de la última operación, que se consume al mostrarlo.
         "sgr_resultado": tomar_resultado(request),
     }
+
+
+def _entidades_de(usuario):
+    from comun.entidades import ENTIDADES, visibles
+
+    if not getattr(usuario, "is_authenticated", False):
+        return {e.clave: False for e in ENTIDADES}
+    return visibles(usuario)
 
 
 def _permisos_de(usuario):

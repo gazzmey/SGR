@@ -18,9 +18,11 @@ class AtencionInline(admin.TabularInline):
 
 @admin.register(Solicitante)
 class SolicitanteAdmin(admin.ModelAdmin):
-    list_display = ("rut", "nombre", "territorio", "telefono", "total_atenciones")
-    search_fields = ("rut", "nombre", "territorio")
-    ordering = ("nombre",)
+    list_display = ("rut", "nombres", "apellidos", "territorio", "telefono", "activo",
+                    "total_atenciones")
+    list_filter = ("activo",)
+    search_fields = ("rut", "nombres", "apellidos", "territorio__nombre", "sector")
+    ordering = ("apellidos", "nombres")
     inlines = [AtencionInline]
 
     @admin.display(description="atenciones")
@@ -44,7 +46,7 @@ class AtencionAdmin(admin.ModelAdmin):
     )
     list_filter = ("delegacion", "subatencion__tipo_atencion", "subatencion")
     search_fields = (
-        "solicitante__rut", "solicitante__nombre",
+        "solicitante__rut", "solicitante__nombres", "solicitante__apellidos",
         "subatencion__nombre", "detalle", "documento",
     )
     ordering = ("-registrada",)
@@ -73,7 +75,7 @@ class CasoSocialAdmin(admin.ModelAdmin):
 
     list_display = ("codigo", "atencion", "responsable", "ingreso",
                     "visita_realizada", "informe_entregado", "beneficio_entregado")
-    search_fields = ("codigo", "atencion__solicitante__nombre", "observacion")
+    search_fields = ("codigo", "atencion__solicitante__nombres", "atencion__solicitante__apellidos", "observacion")
     list_select_related = ("atencion__solicitante", "atencion__subatencion", "responsable")
     readonly_fields = ("codigo", "atencion", "creado", "actualizado")
 

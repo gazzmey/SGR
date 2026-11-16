@@ -11,8 +11,10 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from comun import permisos as P
+from comun.formularios import ConAlcance, activos_mas, nombre_de_usuario
+from comun.rut import limpiar_rut, rut_valido
 from comun.utilidades import proximo_codigo
-from organizacion.models import Delegacion, PerfilUsuario, Rol
+from organizacion.models import Delegacion, PerfilUsuario, Rol, Territorio
 
 Usuario = get_user_model()
 
@@ -56,7 +58,7 @@ class DelegacionForm(_Base):
         model = Delegacion
         fields = [
             "codigo", "nombre", "zona", "comuna", "direccion",
-            "telefono", "horario",
+            "telefono", "horario", "delegado",
         ]
         widgets = {
             "nombre": forms.TextInput(attrs={"placeholder": "Por ejemplo: Las Compañías"}),
@@ -67,6 +69,19 @@ class DelegacionForm(_Base):
             "telefono": forms.TextInput(attrs={"placeholder": "51 2 200 000", "inputmode": "tel"}),
             "horario": forms.TextInput(attrs={"placeholder": "Lun a vie · 09:00 a 14:00"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        actual = getattr(self.instance, "delegado_id", None)
+        consulta = Usuario.objects.filter(is_active=True, perfil__activo=True)
+        if actual:
+            from django.db.models import Q
+
+            consulta = Usuario.objects.filter(
+                Q(pk__in=consulta.values("pk")) | Q(pk=actual))
+        self.fields["delegado"].queryset = consulta.order_by("first_name", "last_name")
+        self.fields["delegado"].label_from_instance = nombre_de_usuario
+        self.fields["delegado"].empty_label = "Sin delegado asignado"
 
     def clean_nombre(self):
         nombre = (self.cleaned_data["nombre"] or "").strip()
@@ -90,24 +105,68 @@ class DelegacionForm(_Base):
 
 
 # =========================================================================
+# Territorios
+# =========================================================================
+
+
+class TerritorioForm(ConAlcance, _Base):
+    prefijo = "TER"
+
+    class Meta:
+        model = Territorio
+        fields = ["codigo", "nombre", "delegacion", "descripcion"]
+        widgets = {
+            "nombre": forms.TextInput(attrs={"placeholder": "Por ejemplo: Unidad vecinal 7 · Las Rosas"}),
+            "descripcion": forms.Textarea(attrs={
+                "rows": 3, "ancho": True,
+                "placeholder": "Calles, poblaciones o sectores que comprende",
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["delegacion"].queryset = self.delegaciones(
+            getattr(self.instance, "delegacion_id", None))
+        self.fields["delegacion"].empty_label = "Elige la delegación"
+
+    def clean_nombre(self):
+        nombre = (self.cleaned_data["nombre"] or "").strip()
+        if len(nombre) < 3:
+            raise forms.ValidationError("El nombre debe tener al menos 3 caracteres.")
+        return nombre
+
+    def clean(self):
+        datos = super().clean()
+        nombre, delegacion = datos.get("nombre"), datos.get("delegacion")
+        if nombre and delegacion:
+            repetido = (Territorio.objects.filter(delegacion=delegacion, nombre__iexact=nombre)
+                        .exclude(pk=self.instance.pk).exists())
+            if repetido:
+                self.add_error("nombre", "%s ya tiene un territorio con ese nombre."
+                               % delegacion.nombre)
+        return datos
+
+
+# =========================================================================
 # Roles
 # =========================================================================
 
 
 class RolForm(_Base):
-    prefijo = "ROL"
+    """
+    El formulario general del rol: código, nombre y descripción.
 
-    permisos = forms.MultipleChoiceField(
-        label="Acciones habilitadas",
-        choices=P.OPCIONES,
-        widget=forms.CheckboxSelectMultiple,
-        required=True,
-        help_text="Hay que marcar al menos una.",
-    )
+    Los privilegios —acciones, alcance y grupo de Django— no están aquí: los
+    configura quien administra el acceso en una pantalla aparte
+    (``RolPrivilegiosForm``). Así el perfil Gestión puede mantener los roles
+    sin poder darse a sí mismo, ni a nadie, más permisos.
+    """
+
+    prefijo = "ROL"
 
     class Meta:
         model = Rol
-        fields = ["codigo", "nombre", "descripcion", "alcance", "permisos"]
+        fields = ["codigo", "nombre", "descripcion"]
         widgets = {
             "nombre": forms.TextInput(attrs={"placeholder": "Por ejemplo: Verificador"}),
             "descripcion": forms.Textarea(attrs={
@@ -125,6 +184,42 @@ class RolForm(_Base):
                 f"Describe el rol con un poco más de detalle. Debe tener al menos 20 caracteres (escribiste {len(texto)})."
             )
         return texto
+
+
+
+class RolPrivilegiosForm(forms.ModelForm):
+    """
+    Los privilegios de un rol. Solo lo usa quien administra el acceso.
+
+    Se edita por separado del formulario general a propósito: la Evaluación
+    3 pide mantener la asignación de permisos fuera de los formularios
+    generales.
+    """
+
+    permisos = forms.MultipleChoiceField(
+        label="Acciones habilitadas",
+        choices=P.OPCIONES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        help_text="Las acciones de negocio del SGR. Un rol puede no tener ninguna si su grupo de Django le da acceso.",
+    )
+
+    class Meta:
+        model = Rol
+        fields = ["alcance", "grupo", "permisos"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["grupo"].empty_label = "Sin grupo de Django"
+
+    def clean(self):
+        datos = super().clean()
+        if not datos.get("permisos") and not datos.get("grupo"):
+            raise forms.ValidationError(
+                "Un rol sin acciones y sin grupo no puede hacer nada. Marca al "
+                "menos una acción o elige un grupo de Django."
+            )
+        return datos
 
     def clean_permisos(self):
         """Separación de funciones: quien registra actividades no las valida."""
@@ -160,9 +255,13 @@ class UsuarioForm(_Base):
 
     prefijo = "USR"
 
-    nombre = forms.CharField(
-        label="Nombre y apellido", max_length=120,
-        widget=forms.TextInput(attrs={"placeholder": "Por ejemplo: Marcela Ríos"}),
+    nombres = forms.CharField(
+        label="Nombres", max_length=150,
+        widget=forms.TextInput(attrs={"placeholder": "Por ejemplo: Marcela Andrea"}),
+    )
+    apellidos = forms.CharField(
+        label="Apellidos", max_length=150,
+        widget=forms.TextInput(attrs={"placeholder": "Por ejemplo: Ríos Contreras"}),
     )
     correo = forms.EmailField(
         label="Correo institucional",
@@ -176,16 +275,21 @@ class UsuarioForm(_Base):
     class Meta:
         model = PerfilUsuario
         fields = [
-            "codigo", "nombre", "correo", "cargo", "cargo_asignado",
+            "codigo", "rut", "nombres", "apellidos", "correo", "cargo", "cargo_asignado",
             "delegacion", "delegaciones_autorizadas", "rol",
         ]
         widgets = {
             "delegaciones_autorizadas": forms.CheckboxSelectMultiple,
             "cargo": forms.TextInput(attrs={"placeholder": "Por ejemplo: Encargado territorial"}),
+            "rut": forms.TextInput(attrs={"placeholder": "12.345.678-5", "class": "mono"}),
         }
 
-    def __init__(self, *args, **kwargs):
+    #: Lo que nadie cambia de su propia cuenta: decide qué puede hacer.
+    CAMPOS_DE_PRIVILEGIO = ("rol", "delegacion", "delegaciones_autorizadas")
+
+    def __init__(self, *args, editor=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.editor = editor
 
         # Los selectores solo ofrecen lo activo, más lo que ya tenga el
         # registro que se edita: no se ofrece un inactivo, pero tampoco se
@@ -215,9 +319,31 @@ class UsuarioForm(_Base):
         self.fields["cargo_asignado"].required = False
         self.fields["cargo_asignado"].empty_label = "Sin cargo con metas"
 
+        self.fields["rut"].required = True
+        self.fields["rut"].help_text = "Ficticio, con dígito verificador. No se repite entre usuarios."
+
         if self.instance.pk:
-            self.initial.setdefault("nombre", self.instance.usuario.get_full_name())
+            self.initial.setdefault("nombres", self.instance.usuario.first_name)
+            self.initial.setdefault("apellidos", self.instance.usuario.last_name)
             self.initial.setdefault("correo", self.instance.usuario.email)
+
+        # Nadie se asigna privilegios a sí mismo: en la propia ficha, el rol
+        # y las delegaciones quedan bloqueados. ``disabled`` hace que Django
+        # ignore lo que llegue en el envío y conserve lo guardado.
+        if editor is not None and self.instance.pk and self.instance.usuario_id == editor.pk:
+            for nombre in self.CAMPOS_DE_PRIVILEGIO:
+                self.fields[nombre].disabled = True
+            self.fields["rol"].help_text = (
+                "Es tu propia cuenta: tu rol y tus delegaciones los cambia otra "
+                "persona con permiso para administrar usuarios."
+            )
+        elif editor is not None:
+            # Quien no administra el acceso solo asigna roles que no dan más
+            # de lo que él mismo tiene (ver roles_asignables).
+            actual = getattr(self.instance, "rol_id", None)
+            asignables = [r.pk for r in roles_asignables(editor)]
+            self.fields["rol"].queryset = Rol.objects.filter(
+                pk__in=asignables + ([actual] if actual else [])).distinct()
 
     @staticmethod
     def _activas(modelo, *incluir):
@@ -229,11 +355,37 @@ class UsuarioForm(_Base):
             consulta = modelo._default_manager.filter(Q(activo=True) | Q(pk__in=pks))
         return consulta.distinct()
 
-    def clean_nombre(self):
-        nombre = (self.cleaned_data["nombre"] or "").strip()
-        if len(nombre) < 5:
-            raise forms.ValidationError("Escribe el nombre completo.")
-        return nombre
+    def clean_nombres(self):
+        valor = (self.cleaned_data["nombres"] or "").strip()
+        if len(valor) < 2:
+            raise forms.ValidationError("Escribe al menos un nombre.")
+        return valor
+
+    def clean_apellidos(self):
+        valor = (self.cleaned_data["apellidos"] or "").strip()
+        if len(valor) < 2:
+            raise forms.ValidationError("Escribe al menos un apellido.")
+        return valor
+
+    def clean_rut(self):
+        valor = limpiar_rut(self.cleaned_data.get("rut"))
+        if not rut_valido(valor):
+            raise forms.ValidationError(
+                "Ese RUT no es válido: revisa el número y el dígito verificador.")
+        otro = PerfilUsuario.objects.filter(rut=valor).exclude(pk=self.instance.pk).first()
+        if otro is not None:
+            raise forms.ValidationError("Ese RUT ya es de %s." % otro.nombre)
+        return valor
+
+    def clean_rol(self):
+        rol = self.cleaned_data.get("rol")
+        editor = self.editor
+        if (rol and editor is not None and not (self.instance.pk and self.instance.usuario_id == editor.pk)
+                and rol.pk != getattr(self.instance, "rol_id", None)
+                and rol not in roles_asignables(editor)):
+            raise forms.ValidationError(
+                "No puedes asignar «%s»: da permisos que tú no tienes." % rol.nombre)
+        return rol
 
     def clean_correo(self):
         correo = (self.cleaned_data["correo"] or "").strip().lower()
@@ -250,9 +402,7 @@ class UsuarioForm(_Base):
     @transaction.atomic
     def save(self, commit=True):
         """Guarda el usuario de Django y su perfil como una sola operación."""
-        nombre = self.cleaned_data["nombre"]
         correo = self.cleaned_data["correo"]
-        partes = nombre.split(" ", 1)
 
         if self.instance.pk:
             usuario = self.instance.usuario
@@ -265,8 +415,8 @@ class UsuarioForm(_Base):
 
         usuario.username = correo[:150]
         usuario.email = correo
-        usuario.first_name = partes[0][:150]
-        usuario.last_name = (partes[1] if len(partes) > 1 else "")[:150]
+        usuario.first_name = self.cleaned_data["nombres"][:150]
+        usuario.last_name = self.cleaned_data["apellidos"][:150]
         usuario.is_active = True
         usuario.save()
 
@@ -275,3 +425,40 @@ class UsuarioForm(_Base):
         perfil.save()
         self.save_m2m()
         return perfil
+
+
+# =========================================================================
+# Quién puede asignar qué rol
+# =========================================================================
+
+
+def privilegios_de_rol(rol):
+    """Las acciones de negocio y los permisos de Django que entrega un rol."""
+    permisos = set()
+    if rol.grupo_id:
+        permisos = {f"{p.content_type.app_label}.{p.codename}"
+                    for p in rol.grupo.permissions.select_related("content_type")}
+    return set(rol.permisos or []), permisos
+
+
+def roles_asignables(editor):
+    """
+    Los roles activos que esa persona puede asignar a otra.
+
+    Quien administra el acceso (la acción «Gestionar usuarios y roles», o el
+    superusuario) asigna cualquiera. Quien solo gestiona registros —el
+    perfil Gestión— asigna únicamente roles que no le dan a otro más de lo
+    que tiene él: sin acciones de negocio que no tenga y sin permisos de
+    Django que no tenga. Así no puede fabricarse una cuenta con más poder
+    que la suya.
+    """
+    activos = list(Rol.objects.filter(activo=True).select_related("grupo"))
+    if P.tiene_permiso(editor, P.GESTIONAR_USUARIO):
+        return activos
+    propios = editor.get_all_permissions() if editor.is_active else set()
+    permitidos = []
+    for rol in activos:
+        acciones, de_django = privilegios_de_rol(rol)
+        if all(P.tiene_permiso(editor, a) for a in acciones) and de_django <= propios:
+            permitidos.append(rol)
+    return permitidos

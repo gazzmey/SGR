@@ -136,7 +136,9 @@
     if (!caja || !window.sgrToast) return;
     caja.querySelectorAll('.notice').forEach(function (aviso, i) {
       var texto = (aviso.querySelector('div') || aviso).textContent.trim();
-      if (texto) setTimeout(function () { window.sgrToast(texto); }, 120 * i);
+      var tipo = aviso.classList.contains('bad') ? 'bad'
+        : aviso.classList.contains('warn') ? 'warn' : '';
+      if (texto) setTimeout(function () { window.sgrToast(texto, null, tipo); }, 120 * i);
     });
   });
 

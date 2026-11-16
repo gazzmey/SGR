@@ -138,7 +138,8 @@ def registradas(request):
         from django.db.models import Q
 
         atenciones = atenciones.filter(
-            Q(solicitante__nombre__icontains=termino)
+            Q(solicitante__nombres__icontains=termino)
+            | Q(solicitante__apellidos__icontains=termino)
             | Q(solicitante__rut__icontains=limpiar_rut(termino))
             | Q(subatencion__nombre__icontains=termino)
             | Q(detalle__icontains=termino)
@@ -179,6 +180,6 @@ def buscar_solicitante(request):
         "encontrado": True,
         "nombre": solicitante.nombre,
         "telefono": solicitante.telefono,
-        "territorio": solicitante.territorio,
+        "territorio": solicitante.territorio_id or "",
         "atenciones": solicitante.atenciones.count(),
     })

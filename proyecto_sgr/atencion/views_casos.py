@@ -57,6 +57,7 @@ def _nombre(usuario):
 class CasosLista(ListaMantenedor):
     model = CasoSocial
     campo_delegacion = "atencion__delegacion_id"
+    accion_django = None
     menu = "casos"
     titulo = "Casos sociales"
     bajada = (
@@ -67,7 +68,7 @@ class CasosLista(ListaMantenedor):
     plural = "casos"
     genero = "el"
     placeholder = "Código, solicitante, subatención u observación"
-    busca = ["codigo", "atencion__solicitante__nombre",
+    busca = ["codigo", "atencion__solicitante__nombres", "atencion__solicitante__apellidos",
              "atencion__subatencion__nombre", "observacion"]
     orden_inicial = "-ingreso"
     url_lista = "atencion:casos"
@@ -83,7 +84,7 @@ class CasosLista(ListaMantenedor):
 
     columnas = [
         Columna("codigo", "Código", clase="mono"),
-        Columna("solicitante", "Caso", orden="atencion__solicitante__nombre", clase="w",
+        Columna("solicitante", "Caso", orden="atencion__solicitante__apellidos", clase="w",
                 celda=lambda o: format_html(
                     '<a class="link" href="{}">{}</a><span class="t2">{}</span>',
                     reverse("atencion:caso", args=[o.pk]),
@@ -138,7 +139,9 @@ class CasosLista(ListaMantenedor):
         return super().dispatch(request, *args, **kwargs)
 
     def base_queryset(self):
-        consulta = CasoSocial.objects.select_related(
+        # Los anulados salen del seguimiento de plazos: se consultan en
+        # Registros › Gestiones sociales, con su motivo.
+        consulta = CasoSocial.objects.exclude(estado=CasoSocial.Estado.ANULADO).select_related(
             "atencion__solicitante", "atencion__subatencion", "atencion__delegacion",
             "responsable")
         situacion = self.request.GET.get("situacion")
@@ -182,7 +185,7 @@ class CasosLista(ListaMantenedor):
         return contexto
 
     def base_queryset_sin_filtros(self):
-        return CasoSocial.objects.all()
+        return CasoSocial.objects.exclude(estado=CasoSocial.Estado.ANULADO)
 
     def _exportar(self):
         filas = list(self.get_queryset())
@@ -228,6 +231,7 @@ def caso_abrir(request, atencion_pk):
         codigo=proximo_codigo(CasoSocial, "CSO", ancho=3),
         responsable=responsable,
         ingreso=timezone.localtime(atencion.registrada).date(),
+        fecha_atencion=timezone.localtime(atencion.registrada).date(),
     )
     auditar(request, "crear", caso, entidad="Caso social",
             despues=f"atención Nº {atencion.pk}")
@@ -252,7 +256,7 @@ def caso_detalle(request, pk):
         consulta = consulta.filter(atencion__delegacion_id__in=visibles)
     caso = get_object_or_404(consulta, pk=pk)
 
-    puede_editar = tiene_permiso(request.user, P.REGISTRAR_ATENCION)
+    puede_editar = tiene_permiso(request.user, P.REGISTRAR_ATENCION) and not caso.anulado
     huella = concurrencia.huella(caso)
     formulario = CasoSocialForm(request.POST or None, instance=caso)
     conflicto, cambios = False, []

@@ -674,6 +674,27 @@ def reconocimientos_de(perfil, periodo):
     return felicitaciones, reclamos
 
 
+def metas_de(perfil, periodo):
+    """
+    Las asignaciones que miden a una persona en un período.
+
+    Las de su cargo completo, salvo en las metas donde tiene una asignación
+    personal: ahí manda la suya (Evaluación 3, asignación por funcionario).
+    """
+    cargo = getattr(perfil, "cargo_asignado", None)
+    por_item = {}
+    if cargo is not None:
+        for meta in (MetaPeriodo.objects
+                     .filter(periodo=periodo, cargo=cargo, funcionario__isnull=True, activo=True)
+                     .select_related("item")):
+            por_item[meta.item_id] = meta
+    for meta in (MetaPeriodo.objects
+                 .filter(periodo=periodo, funcionario_id=perfil.usuario_id, activo=True)
+                 .select_related("item")):
+        por_item[meta.item_id] = meta
+    return sorted(por_item.values(), key=lambda m: m.item.codigo)
+
+
 def de_perfil(perfil, periodo, al_dia=None, regla=None):
     """
     El resultado de una persona en un período.
@@ -712,12 +733,7 @@ def de_perfil(perfil, periodo, al_dia=None, regla=None):
             "Asígnale uno en su ficha de usuario."
         ))
 
-    metas = list(
-        MetaPeriodo.objects
-        .filter(periodo=periodo, cargo=cargo, activo=True)
-        .select_related("item")
-        .order_by("item__codigo")
-    )
+    metas = metas_de(perfil, periodo)
     base["cargo"] = cargo
 
     if not metas:

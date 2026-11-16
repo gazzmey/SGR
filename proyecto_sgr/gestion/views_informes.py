@@ -215,7 +215,8 @@ def brecha(request):
     for indice, comparado in enumerate(analisis.periodos):
         tramo = linea.tramos[indice] if linea else None
         meta = MetaPeriodo.objects.filter(
-            periodo=comparado.periodo, cargo=cargo, item=item, activo=True).first()
+            periodo=comparado.periodo, cargo=cargo, item=item, activo=True,
+            funcionario__isnull=True).first()
         tramos.append({
             "comparado": comparado,
             "tramo": tramo,

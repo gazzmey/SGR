@@ -12,11 +12,37 @@ from gestion import (
     views_alertas as al,
     views_informes as inf,
     views_tablero as vt,
+    views_registros as rg,
 )
 
 app_name = "gestion"
 
 urlpatterns = [
+    # --- Evaluación 3: hitos, y actividades y evidencias como registros ---
+    path("hitos/", rg.HitosLista.as_view(), name="hitos"),
+    path("hitos/nuevo/", rg.HitoNuevo.as_view(), name="hito_nuevo"),
+    path("hitos/<int:pk>/", rg.HitoDetalle.as_view(), name="hito_detalle"),
+    path("hitos/<int:pk>/editar/", rg.HitoEditar.as_view(), name="hito_editar"),
+    path("hitos/<int:pk>/estado/", rg.HitoEstado.as_view(), name="hito_estado"),
+    path("registros/actividades/", rg.RegistroActividades.as_view(), name="registro_actividades"),
+    path("registros/actividades/nueva/", rg.RegistroActividadNueva.as_view(),
+         name="registro_actividad_nueva"),
+    path("registros/actividades/<int:pk>/", rg.RegistroActividadDetalle.as_view(),
+         name="registro_actividad"),
+    path("registros/actividades/<int:pk>/editar/", rg.RegistroActividadEditar.as_view(),
+         name="registro_actividad_editar"),
+    path("registros/actividades/<int:pk>/anular/", rg.RegistroActividadAnular.as_view(),
+         name="registro_actividad_anular"),
+    path("registros/evidencias/", rg.RegistroEvidencias.as_view(), name="registro_evidencias"),
+    path("registros/evidencias/nueva/", rg.RegistroEvidenciaNueva.as_view(),
+         name="registro_evidencia_nueva"),
+    path("registros/evidencias/<int:pk>/", rg.RegistroEvidenciaDetalle.as_view(),
+         name="registro_evidencia"),
+    path("registros/evidencias/<int:pk>/editar/", rg.RegistroEvidenciaEditar.as_view(),
+         name="registro_evidencia_editar"),
+    path("registros/evidencias/<int:pk>/anular/", rg.RegistroEvidenciaAnular.as_view(),
+         name="registro_evidencia_anular"),
+
     # --- resultado y tablero ---
     path("mi-resultado/", vt.mi_resultado, name="mi_resultado"),
     path("tablero/", vt.tablero, name="tablero"),

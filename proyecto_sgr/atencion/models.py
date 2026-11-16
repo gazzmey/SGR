@@ -1,86 +1,97 @@
 """
 Atención ciudadana: quién consulta y qué se le resolvió.
 
-El documento de la segunda entrega pide registrar la atención sin exigir un
-mantenedor de vecinos. Por eso ``Solicitante`` existe como entidad —hace
-falta para no repetir los datos de la persona en cada atención— pero no tiene
-pantalla propia: se crea o se reutiliza desde el mismo formulario de ingreso.
+``Solicitante`` es el **vecino** de la Evaluación 3: la persona que acude a
+la delegación. En la segunda entrega no tenía pantalla propia y se creaba
+desde el ingreso de atención; desde esta entrega tiene su propio
+mantenedor (Comunidad › Vecinos) y se relaciona con un **territorio** del
+catálogo en lugar de un texto libre. El ingreso de atención sigue
+creándolo o reutilizándolo por RUT, como antes.
 
-Las dos relaciones que importan usan ``PROTECT``: una atención conserva a
+La clase conserva su nombre para no reescribir la tabla ni las
+migraciones; en pantalla se llama «vecino».
+
+Las relaciones que importan usan ``PROTECT``: una atención conserva a
 quién se atendió y qué subatención se usó, aunque después esa subatención se
-desactive.
+desactive. Un vecino no se borra: se desactiva.
 """
-
-import re
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
 
-def limpiar_rut(valor):
-    """Deja el RUT en formato 12345678-5, sin puntos ni espacios."""
-    return re.sub(r"[.\s]", "", str(valor or "")).upper()
-
-
-def rut_valido(valor):
-    """
-    Comprueba el dígito verificador con el módulo 11.
-
-    Se valida en el servidor a propósito: el navegador puede saltarse, el
-    servidor no. La misma comprobación está en el formulario para avisar
-    antes de enviar, pero la que manda es esta.
-    """
-    limpio = limpiar_rut(valor)
-    if not re.fullmatch(r"\d{7,8}-[\dK]", limpio):
-        return False
-
-    cuerpo, dv = limpio.split("-")
-    suma = 0
-    factor = 2
-    for digito in reversed(cuerpo):
-        suma += int(digito) * factor
-        factor = 2 if factor == 7 else factor + 1
-
-    resto = 11 - (suma % 11)
-    esperado = "0" if resto == 11 else "K" if resto == 10 else str(resto)
-    return dv == esperado
-
-
-def validar_rut(valor):
-    """Validador de modelo: lanza ValidationError si el RUT no cuadra."""
-    if not rut_valido(valor):
-        raise ValidationError(
-            "Ese RUT no es válido: revisa el número y el dígito verificador."
-        )
+# El RUT se valida en comun/rut.py. Se reexporta con los mismos nombres
+# porque las migraciones de esta app apuntan a atencion.models.validar_rut.
+from comun.rut import limpiar_rut, rut_valido, validar_rut  # noqa: E402,F401
 
 
 class Solicitante(models.Model):
-    """Persona que acude a la delegación."""
+    """El vecino: persona que acude a la delegación."""
 
     rut = models.CharField(
         "RUT", max_length=12, unique=True, validators=[validar_rut],
-        help_text="Con dígito verificador, por ejemplo 11111111-1.",
+        help_text="Ficticio, con dígito verificador. Por ejemplo 11111111-1.",
     )
-    nombre = models.CharField(max_length=120)
+    nombres = models.CharField(max_length=120)
+    apellidos = models.CharField(max_length=120, blank=True)
     telefono = models.CharField("teléfono", max_length=20, blank=True)
-    territorio = models.CharField(
-        max_length=80, blank=True,
-        help_text="Unidad vecinal o sector al que pertenece.",
+    correo = models.EmailField("correo", max_length=150, blank=True)
+    direccion = models.CharField("dirección", max_length=160, blank=True)
+    territorio = models.ForeignKey(
+        "organizacion.Territorio", on_delete=models.PROTECT,
+        related_name="vecinos", null=True, blank=True,
+        verbose_name="territorio",
+        help_text="La unidad vecinal donde vive. Define a qué junta puede integrarse.",
     )
+    sector = models.CharField(
+        "sector registrado antes", max_length=80, blank=True,
+        help_text=(
+            "El texto libre de la segunda entrega, antes del catálogo de "
+            "territorios. Se conserva como referencia histórica."
+        ),
+    )
+    activo = models.BooleanField(default=True)
     creada = models.DateField("registrado el", auto_now_add=True)
+    desactivada = models.DateField("desactivado el", null=True, blank=True)
 
     class Meta:
-        verbose_name = "solicitante"
-        verbose_name_plural = "solicitantes"
-        ordering = ["nombre"]
+        verbose_name = "vecino"
+        verbose_name_plural = "vecinos"
+        ordering = ["apellidos", "nombres"]
 
     def __str__(self):
         return f"{self.rut} — {self.nombre}"
 
+    @property
+    def nombre(self):
+        """Nombres y apellidos juntos, como se muestra en pantalla."""
+        return " ".join(p for p in (self.nombres, self.apellidos) if p).strip()
+
     def save(self, *args, **kwargs):
         self.rut = limpiar_rut(self.rut)
         super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        if self.territorio_id and not self.pk and not self.territorio.activo:
+            raise ValidationError({"territorio": "Ese territorio está inactivo."})
+
+    def motivo_bloqueo(self):
+        """Un vecino que integra una junta no se desactiva sin terminar esa participación."""
+        cuantas = self.participaciones.filter(activo=True).count()
+        if cuantas:
+            return (
+                f"Participa en {cuantas} "
+                f"{'junta de vecinos' if cuantas == 1 else 'juntas de vecinos'}. "
+                "Termina esas participaciones antes de desactivarlo."
+            )
+        return ""
+
+    def motivo_bloqueo_activar(self):
+        if self.territorio_id and not self.territorio.activo:
+            return "Su territorio está inactivo. Actívalo primero o cámbiale el territorio."
+        return ""
 
 
 class Atencion(models.Model):
@@ -166,11 +177,26 @@ class CasoSocial(models.Model):
     resultado: la matriz las anota sin fórmula.
     """
 
+    class Estado(models.TextChoices):
+        EN_CURSO = "en_curso", "En curso"
+        CERRADO = "cerrado", "Cerrado"
+        ANULADO = "anulado", "Anulado"
+
     atencion = models.OneToOneField(
         Atencion, on_delete=models.PROTECT, related_name="caso",
         verbose_name="atención",
     )
     codigo = models.CharField("código", max_length=12, unique=True)
+    fecha_atencion = models.DateField(
+        "fecha de atención", null=True, blank=True,
+        help_text="Cuándo se atendió a la persona. No puede ser posterior al ingreso del caso.",
+    )
+    asignacion = models.ForeignKey(
+        "gestion.MetaPeriodo", on_delete=models.PROTECT,
+        related_name="gestiones_sociales", null=True, blank=True,
+        verbose_name="asignación de meta",
+        help_text="La meta a la que aporta esta gestión. Opcional.",
+    )
     responsable = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name="casos_sociales", verbose_name="profesional a cargo",
@@ -196,17 +222,50 @@ class CasoSocial(models.Model):
         "devoluciones del informe", default=0,
         help_text="Cuántas veces el informe volvió para corregir antes de aceptarse.",
     )
+    actuaciones = models.TextField(
+        blank=True,
+        help_text="Lo que se hizo en el caso: llamados, coordinaciones, trámites.",
+    )
+    derivacion = models.CharField(
+        "derivación", max_length=160, blank=True,
+        help_text="A qué institución o programa se derivó, si corresponde.",
+    )
+    resultado = models.TextField(
+        blank=True, help_text="Cómo terminó el caso para la persona.",
+    )
+    estado = models.CharField(
+        max_length=10, choices=Estado.choices, default=Estado.EN_CURSO,
+        help_text="Se calcula solo: cerrado cuando se entrega lo último que falta. Anulado no se revierte.",
+    )
+    motivo_anulacion = models.TextField("motivo de la anulación", blank=True)
     observacion = models.TextField("observaciones", blank=True)
     creado = models.DateTimeField("abierto el", auto_now_add=True)
     actualizado = models.DateTimeField("actualizado el", auto_now=True)
 
     class Meta:
-        verbose_name = "caso social"
-        verbose_name_plural = "casos sociales"
+        verbose_name = "gestión social"
+        verbose_name_plural = "gestiones sociales"
         ordering = ["-ingreso", "-codigo"]
 
     def __str__(self):
         return f"{self.codigo} — {self.atencion.solicitante.nombre}"
+
+    @property
+    def nombre(self):
+        return f"{self.atencion.solicitante.nombre} · {self.atencion.subatencion.nombre}"
+
+    @property
+    def anulado(self):
+        return self.estado == self.Estado.ANULADO
+
+    def save(self, *args, **kwargs):
+        # El estado sale de las fechas, salvo que el caso esté anulado.
+        if self.estado != self.Estado.ANULADO:
+            self.estado = self.Estado.CERRADO if self.cierre else self.Estado.EN_CURSO
+        campos = kwargs.get("update_fields")
+        if campos is not None and "estado" not in campos:
+            kwargs["update_fields"] = list(campos) + ["estado"]
+        super().save(*args, **kwargs)
 
     # --- validación ------------------------------------------------------
 
@@ -221,12 +280,14 @@ class CasoSocial(models.Model):
             if fecha and referencia and fecha < referencia:
                 errores[campo] = texto
 
-        for campo in ("ingreso", "visita_realizada", "informe_entregado",
-                      "beneficio_entregado"):
+        for campo in ("ingreso", "fecha_atencion", "visita_realizada",
+                      "informe_entregado", "beneficio_entregado"):
             fecha = getattr(self, campo)
             if fecha and fecha > hoy:
                 errores[campo] = "Es algo que ya ocurrió: no puede tener fecha futura."
 
+        no_antes("ingreso", self.ingreso, self.fecha_atencion,
+                 "El caso no puede ingresar antes de que se atendiera a la persona.")
         no_antes("visita_programada", self.visita_programada, self.ingreso,
                  "La visita no puede programarse antes del ingreso del caso.")
         no_antes("visita_realizada", self.visita_realizada, self.ingreso,
@@ -253,6 +314,11 @@ class CasoSocial(models.Model):
             )
         if self.devoluciones is not None and self.devoluciones > 9:
             errores["devoluciones"] = "Más de nueve devoluciones no es un dato creíble."
+        if self.asignacion_id and "asignacion" not in errores:
+            motivo = self.asignacion.motivo_no_aplica(self.responsable if self.responsable_id else None,
+                                                      fecha=self.ingreso)
+            if motivo:
+                errores["asignacion"] = motivo
         if errores:
             raise ValidationError(errores)
 
@@ -286,3 +352,4 @@ class CasoSocial(models.Model):
 # Los regalos para niños van en su propio archivo; se importan aquí para que
 # Django los registre en esta aplicación.
 from atencion.modelos_regalos import CampanaRegalos, InscripcionRegalo  # noqa: E402,F401
+from atencion.modelos_comunidad import JuntaVecinos, ParticipacionJunta  # noqa: E402,F401

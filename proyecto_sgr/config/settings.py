@@ -160,6 +160,16 @@ STORAGES = {
     },
 }
 
+# «manage.py test» corre con DEBUG apagado y sin haber ejecutado
+# collectstatic: con el almacenamiento con manifiesto, cada plantilla que
+# pide un estático fallaría. En las pruebas se usa el almacenamiento simple.
+import sys  # noqa: E402
+
+if len(sys.argv) > 1 and sys.argv[1] == "test":
+    STORAGES["staticfiles"] = {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    }
+
 # --- Archivos de las evidencias ------------------------------------------
 # Se guardan fuera de static/ y no tienen dirección pública: Nginx no los
 # sirve y no se define MEDIA_URL. Los entrega la vista

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% comment %}
+  Confirmación de anulación. Mostrar esta página no cambia nada; anular es
+  el POST del formulario, con su token CSRF y un motivo obligatorio.
+  «Cancelar» es un enlace de vuelta a la ficha: no envía nada.
+{% endcomment %}
+
+{% block titulo %}Anular {{ singular }}{% endblock %}
+
+{% block ruta %}
+  <a href="{% url url_lista %}">Listado</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <a href="{% url url_detalle obj.pk %}">Ficha</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Anular</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="page-head">
+  <div>
+    <h1>Anular {{ singular }}</h1>
+    <p>{{ obj }}</p>
+  </div>
+</div>
+
+<section class="card" style="max-width: 720px">
+  {% if bloqueo %}
+    <div class="notice warn">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+      <div><b>No se puede anular</b>{{ bloqueo }}</div>
+    </div>
+    <div class="row mt20"><a class="btn btn-secondary" href="{% url url_detalle obj.pk %}">Volver a la ficha</a></div>
+  {% else %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <p>{{ consecuencia }} El registro no se borra: queda en el listado como anulado, con el motivo que escribas.</p>
+      <div class="field{% if error %} err{% endif %}">
+        <label for="id_motivo">Motivo de la anulación<span class="req">*</span></label>
+        <textarea class="input" name="motivo" id="id_motivo" rows="4" required minlength="{{ minimo }}"
+                  placeholder="Por qué se anula. Queda en el historial.">{{ motivo }}</textarea>
+        {% if error %}<span class="msg"><svg class="i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>{{ error }}</span>{% endif %}
+      </div>
+      <div class="row mt20">
+        <a class="btn btn-secondary" href="{% url url_detalle obj.pk %}">Cancelar</a>
+        <button type="submit" class="btn btn-primary">Anular {{ singular }}</button>
+      </div>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

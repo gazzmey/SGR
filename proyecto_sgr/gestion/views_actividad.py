@@ -74,12 +74,17 @@ class MisActividades(ListaMantenedor):
     """
     Lo que registró quien está mirando.
 
+    Es el flujo de trabajo de cada funcionario, no el CRUD de la entidad
+    Actividad (ese está en Registros › Actividades): no se abre con
+    permisos de Django.
+
     No es «todas las actividades»: cada persona ve las suyas. Quien supervisa
     tiene el tablero y la cola de validación, que son otra cosa.
     """
 
     model = Actividad
     permiso = P.REGISTRAR_ACTIVIDAD
+    accion_django = None
     menu = "actividades"
     titulo = "Mis actividades"
     bajada = (
@@ -262,15 +267,17 @@ def evidencia_archivo(request, pk):
         return redirect_al_login(request)
 
     evidencia = get_object_or_404(
-        Evidencia.objects.select_related("actividad"), pk=pk,
+        Evidencia.objects.select_related("actividad", "caso__atencion"), pk=pk,
     )
-    propia = request.user.id in {evidencia.actividad.funcionario_id, evidencia.autor_id}
+    propia = request.user.id in {evidencia.responsable_id_origen, evidencia.autor_id}
     if not propia:
-        if not tiene_permiso(request.user, P.VALIDAR_EVIDENCIA):
+        if not (tiene_permiso(request.user, P.VALIDAR_EVIDENCIA)
+                or tiene_permiso(request.user, "gestion.view_evidencia")):
             raise PermissionDenied("No tienes acceso a esa evidencia.")
         perfil = P.perfil_de(request.user)
-        if perfil is not None and not perfil.delegaciones_visibles().filter(
-                pk=evidencia.actividad.delegacion_id).exists():
+        if (perfil is not None and perfil.rol.alcance != "todas"
+                and not perfil.delegaciones_visibles().filter(
+                    pk=evidencia.delegacion_id_origen).exists()):
             raise PermissionDenied("Esa evidencia es de otra delegación.")
 
     if not evidencia.archivo:
@@ -307,6 +314,8 @@ class ColaValidacion(ListaMantenedor):
 
     model = Evidencia
     permiso = P.VALIDAR_EVIDENCIA
+    # Es un flujo de trabajo, no el CRUD: solo lo abre quien valida.
+    accion_django = None
     menu = "validar"
     titulo = "Validar evidencias"
     bajada = (
@@ -340,14 +349,15 @@ class ColaValidacion(ListaMantenedor):
 
     columnas = [
         Columna("codigo", "Código", clase="mono"),
-        Columna("actividad", "Actividad", orden="actividad__accion", clase="w",
+        Columna("actividad", "Respalda", orden="actividad__accion", clase="w",
                 celda=lambda o: format_html(
                     '<a class="link" href="{}">{}</a><span class="t2">{} · {}</span>',
                     reverse("gestion:evidencia_detalle", args=[o.pk]),
-                    o.actividad.accion, o.descripcion,
-                    o.actividad.item.nombre,
+                    o.actividad.accion if o.actividad_id else "Gestión social " + o.caso.codigo,
+                    o.descripcion,
+                    o.actividad.item.nombre if o.actividad_id else o.caso.atencion.solicitante.nombre,
                 ),
-                valor=lambda o: o.actividad.accion),
+                valor=lambda o: o.origen_texto),
         Columna("quien", "Quién la cargó", orden="autor__first_name",
                 valor=lambda o: o.autor.get_full_name() or o.autor.get_username()),
         Columna("creada", "Cargada", valor=lambda o: f"{o.creada:%d-%m-%Y %H:%M}"),
@@ -365,7 +375,8 @@ class ColaValidacion(ListaMantenedor):
     def base_queryset(self):
         consulta = (
             Evidencia.objects
-            .select_related("actividad", "actividad__item", "autor", "verificador")
+            .select_related("actividad", "actividad__item", "autor", "verificador",
+                            "caso__atencion__solicitante")
             .filter(anulada=False)
         )
 
@@ -377,11 +388,13 @@ class ColaValidacion(ListaMantenedor):
 
         perfil = P.perfil_de(self.request.user)
         if perfil is not None:
-            visibles = perfil.delegaciones_visibles().values_list("pk", flat=True)
-            consulta = consulta.filter(actividad__delegacion_id__in=list(visibles))
+            visibles = list(perfil.delegaciones_visibles().values_list("pk", flat=True))
+            consulta = consulta.filter(Q(actividad__delegacion_id__in=visibles)
+                                       | Q(caso__atencion__delegacion_id__in=visibles))
         # Lo propio no entra en la cola: lo decide otra persona.
         usuario = self.request.user
-        return consulta.exclude(actividad__funcionario=usuario).exclude(autor=usuario)
+        return (consulta.exclude(actividad__funcionario=usuario)
+                .exclude(caso__responsable=usuario).exclude(autor=usuario))
 
 
 def _chip_decision(evidencia):
@@ -403,7 +416,7 @@ def es_propia(evidencia, usuario):
     Nadie decide sobre su propio trabajo, tenga el rol que tenga —tampoco un
     superusuario—. Si se pudiera, la validación dejaría de ser un control.
     """
-    return usuario.pk in (evidencia.actividad.funcionario_id, evidencia.autor_id)
+    return usuario.pk in (evidencia.responsable_id_origen, evidencia.autor_id)
 
 
 def _en_alcance(request, evidencia):
@@ -412,7 +425,7 @@ def _en_alcance(request, evidencia):
     if perfil is None:
         return
     visibles = set(perfil.delegaciones_visibles().values_list("pk", flat=True))
-    if evidencia.actividad.delegacion_id not in visibles:
+    if evidencia.delegacion_id_origen not in visibles:
         raise PermissionDenied("Esa evidencia es de una delegación que no tienes autorizada.")
 
 
@@ -425,7 +438,8 @@ def evidencia_detalle(request, pk):
     evidencia = get_object_or_404(
         Evidencia.objects.select_related(
             "actividad", "actividad__item", "actividad__funcionario",
-            "actividad__delegacion", "autor", "verificador"),
+            "actividad__delegacion", "autor", "verificador",
+            "caso__atencion__solicitante", "caso__atencion__delegacion"),
         pk=pk,
     )
     _en_alcance(request, evidencia)
@@ -454,8 +468,11 @@ class DecidirEvidencia(View):
             return desvio
 
         evidencia = get_object_or_404(Evidencia, pk=pk)
-        actividad = evidencia.actividad
+        actividad = evidencia.actividad  # None si respalda una gestión social
         _en_alcance(request, evidencia)
+        from organizacion.models import Delegacion
+
+        delegacion = Delegacion.objects.filter(pk=evidencia.delegacion_id_origen).first()
         if es_propia(evidencia, request.user):
             raise PermissionDenied(
                 "Es tu propia actividad: la decide otro verificador o el "
@@ -477,20 +494,22 @@ class DecidirEvidencia(View):
             evidencia.decidida = timezone.now()
             evidencia.motivo = ""
             evidencia.save(update_fields=["decision", "verificador", "decidida", "motivo"])
-            actividad.estado = Actividad.Estado.APROBADA
-            actividad.save(update_fields=["estado"])
+            if actividad is not None:
+                actividad.estado = Actividad.Estado.APROBADA
+                actividad.save(update_fields=["estado"])
             registrar(request, EventoAuditoria.Accion.VALIDAR,
                       entidad="Evidencia", objeto=evidencia,
                       antes="pendiente", despues="aprobada",
-                      detalle="Actividad %s de %s." % (
-                          actividad.codigo,
-                          actividad.funcionario.get_full_name()
-                          or actividad.funcionario.get_username()),
-                      delegacion=actividad.delegacion)
-            anunciar(request, "Evidencia aprobada",
-                     "«%s» ya suma a la meta de %s." % (
-                         actividad.accion,
-                         actividad.funcionario.get_full_name() or actividad.funcionario.get_username()))
+                      detalle=evidencia.origen_texto + ".",
+                      delegacion=delegacion)
+            if actividad is not None:
+                anunciar(request, "Evidencia aprobada",
+                         "«%s» ya suma a la meta de %s." % (
+                             actividad.accion,
+                             actividad.funcionario.get_full_name() or actividad.funcionario.get_username()))
+            else:
+                anunciar(request, "Evidencia aprobada",
+                         "Queda como respaldo validado de la gestión social %s." % evidencia.caso.codigo)
 
         elif paso == "rechazar":
             formulario = RechazoForm(request.POST)
@@ -503,13 +522,14 @@ class DecidirEvidencia(View):
             evidencia.decidida = timezone.now()
             evidencia.motivo = formulario.cleaned_data["motivo"]
             evidencia.save(update_fields=["decision", "verificador", "decidida", "motivo"])
-            actividad.estado = Actividad.Estado.RECHAZADA
-            actividad.save(update_fields=["estado"])
+            if actividad is not None:
+                actividad.estado = Actividad.Estado.RECHAZADA
+                actividad.save(update_fields=["estado"])
             registrar(request, EventoAuditoria.Accion.RECHAZAR,
                       entidad="Evidencia", objeto=evidencia,
                       antes="pendiente", despues="rechazada",
                       detalle=evidencia.motivo,
-                      delegacion=actividad.delegacion)
+                      delegacion=delegacion)
             anunciar(request, "Evidencia rechazada",
                      "Se devolvió con el motivo. La actividad no suma.",
                      icono="warning")
@@ -529,13 +549,14 @@ class DecidirEvidencia(View):
             evidencia.anulada = True
             evidencia.motivo_anulacion = motivo
             evidencia.save(update_fields=["anulada", "motivo_anulacion"])
-            actividad.estado = Actividad.Estado.ANULADA
-            actividad.motivo_anulacion = motivo
-            actividad.save(update_fields=["estado", "motivo_anulacion"])
+            if actividad is not None:
+                actividad.estado = Actividad.Estado.ANULADA
+                actividad.motivo_anulacion = motivo
+                actividad.save(update_fields=["estado", "motivo_anulacion"])
             registrar(request, EventoAuditoria.Accion.ANULAR,
                       entidad="Evidencia", objeto=evidencia,
                       antes="aprobada", despues="anulada", detalle=motivo,
-                      delegacion=actividad.delegacion)
+                      delegacion=delegacion)
             anunciar(request, "Evidencia anulada",
                      "La actividad deja de sumar y queda el motivo en su historial.",
                      icono="warning")

@@ -1,19 +1,279 @@
-# Sistema de Gestión de Resultados (SGR) — Proyecto Integrado, Segunda Entrega
+# Sistema de Gestión de Resultados (SGR)
 
-Aplicación Django conectada a MariaDB para las delegaciones municipales de
-La Serena. Esta entrega incorpora las **pantallas propias** del sistema: el
-acceso con recuperación de contraseña, los seis mantenedores y el ingreso de
-atención ciudadana. Todo lo que se ve guarda en la base de datos; el
-administrador de Django se conserva, pero ya no es la única interfaz.
+Aplicación Django conectada a MySQL/MariaDB mediante mysqlclient, para las
+delegaciones municipales de La Serena. Es a la vez el **Proyecto Integrado**
+y la **tercera evaluación de Back End (CRUD y seguridad, caso SGR)**: la
+sección 0 reúne lo que pide esa evaluación; el resto documenta el sistema
+completo.
 
-
+**Aplicación en AWS:** http://35.170.29.164/
 
 ---
 
+## 0. Evaluación 3 de Back End: CRUD y seguridad
+
+Esta sección reúne lo que pide la tercera evaluación de Back End (caso SGR).
+El sistema completo del Proyecto Integrado sigue funcionando igual; lo que
+la evaluación excluye (tubos, cálculo, semáforo, informes, exportaciones,
+recuperación por correo, carga de archivos) no se tocó para esta entrega.
+
+### Las 17 entidades
+
+Cada entidad tiene listado con búsqueda y filtros, ficha, creación, edición y
+eliminación o desactivación, con pantallas propias. Django Admin se conserva
+para el superusuario, pero no reemplaza ninguna de estas pantallas.
+
+| Entidad | Modelo | Menú | Dirección | Se elimina |
+|---|---|---|---|---|
+| Delegación | `organizacion.Delegacion` | Administración › Delegaciones | `/gestion/delegaciones/` | Desactivar |
+| Territorio | `organizacion.Territorio` | Administración › Territorios | `/gestion/territorios/` | Desactivar |
+| Usuario funcionario | `auth.User` + `organizacion.PerfilUsuario` | Administración › Usuarios | `/gestion/usuarios/` | Desactivar |
+| Cargo | `gestion.Cargo` | Período › Cargos | `/periodo/cargos/` | Desactivar |
+| Rol | `organizacion.Rol` | Administración › Roles | `/gestion/roles/` | Desactivar |
+| Vecino | `atencion.Solicitante` | Comunidad › Vecinos | `/atencion/vecinos/` | Desactivar |
+| Junta de vecinos | `atencion.JuntaVecinos` | Comunidad › Juntas de vecinos | `/atencion/juntas/` | Desactivar |
+| Participación en junta | `atencion.ParticipacionJunta` | Comunidad › Participaciones en juntas | `/atencion/participaciones/` | Terminar (desactivar) |
+| Hito | `gestion.Hito` | Registros › Hitos | `/periodo/hitos/` | Desactivar |
+| Actividad | `gestion.Actividad` | Registros › Actividades | `/periodo/registros/actividades/` | Anular con motivo |
+| Gestión social | `atencion.CasoSocial` (+ su `Atencion`) | Registros › Gestiones sociales | `/atencion/gestiones/` | Anular con motivo |
+| Tipo de atención | `catalogos.TipoAtencion` | Configuración › Tipos de atención | `/catalogo/tipos-atencion/` | Desactivar |
+| Subtipo de atención | `catalogos.SubAtencion` | Configuración › Subtipos de atención | `/catalogo/subatenciones/` | Desactivar |
+| Meta | `catalogos.Item` | Configuración › Metas (ítems) | `/catalogo/items/` | Desactivar |
+| Asignación de meta | `gestion.MetaPeriodo` | Período › Asignaciones de meta | `/periodo/metas/` | Desactivar |
+| Evidencia | `gestion.Evidencia` | Registros › Evidencias | `/periodo/registros/evidencias/` | Anular con motivo |
+| Trimestre | `gestion.Periodo` | Período › Trimestres | `/periodo/periodos/` | Desactivar |
+
+Cada listado sigue el mismo patrón de rutas: `''` listado, `nuevo/` o
+`nueva/` creación, `<pk>/` ficha, `<pk>/editar/` edición, y `<pk>/estado/`
+(desactivar o activar) o `<pk>/anular/` (anular). Los nombres de las clases
+conservan los del Proyecto Integrado (`Item`, `Periodo`, `MetaPeriodo`,
+`Solicitante`, `CasoSocial`) para no reescribir tablas ni migraciones; en
+pantalla se llaman como en el enunciado.
+
+### Campos de cada entidad
+
+| Entidad | Información que guarda |
+|---|---|
+| Delegación | código único, nombre, zona, comuna, dirección, teléfono, horario, **delegado** (usuario), estado. |
+| Territorio | código único, nombre (único dentro de la delegación), descripción, delegación, estado. |
+| Usuario funcionario | usuario de Django (nombres, apellidos, correo, último acceso que registra Django) + perfil: código, **RUT ficticio** (único), cargo, cargo con metas, delegación base y autorizadas, rol, estado. La contraseña la maneja Django (`set_password`); el formulario no la pide ni la muestra. |
+| Cargo | código único, nombre, descripción, funciones, estado. |
+| Rol | código único, nombre, descripción, **grupo de Django** asociado, acciones de negocio, alcance, estado. |
+| Vecino | RUT ficticio (único, con dígito verificador), nombres, apellidos, teléfono, correo, dirección, territorio, estado. |
+| Junta de vecinos | código único, nombre, dirección, delegación, territorio, fecha de constitución, estado. |
+| Participación en junta | código, vecino, junta, condición de dirigente, cargo en la directiva, fecha de incorporación, estado. |
+| Hito | código único, nombre, descripción, periodicidad, fechas de inicio y término, delegación, territorio, responsables (varios), estado. |
+| Actividad | código, fecha, funcionario, **asignación de meta**, hito (opcional), tipo, descripción y detalle, origen, solicitante, territorio, responsable, fecha de compromiso, apoyo, avance, estado y resultado. |
+| Gestión social | código, fecha de atención y de ingreso, beneficiario, tipo y subtipo, delegación, asignación de meta, visita, actuaciones, derivación, informe, beneficio, resultado, estado. |
+| Tipo de atención | código único, nombre, área, descripción, estado. |
+| Subtipo de atención | código único, nombre, tipo, descripción, si exige documento, estado. |
+| Meta | código único, nombre, descripción, tipo (área y cómo se mide), unidad de medida, **requisito de evidencia**, estado. |
+| Asignación de meta | **funcionario** (o el cargo completo), meta, trimestre, cantidad objetivo, ponderación, fecha de asignación, observación, estado. |
+| Evidencia | código único, actividad **o** gestión social (exactamente una), tipo, ubicación o referencia, autor, fecha, estado, observación, verificador. |
+| Trimestre | código único, nombre, **año**, **número (1 a 4)**, fechas de inicio y término, estado. |
+
+**La cantidad objetivo y la ponderación son de la asignación, no de la
+meta.** El ítem conserva en la base los campos `meta` y `ponderador`
+«sugeridos» de las entregas anteriores, pero ya no se muestran ni se editan.
+
+**Asignación por funcionario.** Una asignación sin funcionario vale para todo
+el cargo, como en el Proyecto Integrado. Con funcionario vale solo para esa
+persona y reemplaza a la de su cargo en esa meta (`gestion/calculo.py`,
+`metas_de`). El cargo se completa solo desde la ficha de la persona.
+
+### Relaciones
+
+| Relación | Tipo | Al eliminar |
+|---|---|---|
+| Territorio → Delegación | Muchos a uno | `PROTECT`; una delegación con territorios activos no se desactiva. |
+| Delegación → Usuario (delegado) | Muchos a uno | `PROTECT`; el delegado tiene que trabajar en la delegación o tener alcance sobre ella. |
+| Perfil → Cargo, Rol, Delegación | Muchos a uno | `PROTECT`. |
+| Rol → Grupo de Django | Muchos a uno | `PROTECT`; al guardar, cada usuario queda en el grupo de su rol. |
+| Vecino → Territorio | Muchos a uno | `PROTECT`; un territorio con vecinos activos no se desactiva. |
+| Junta → Delegación y Territorio | Muchos a uno | `PROTECT`; el territorio tiene que ser de la misma delegación. |
+| Participación → Vecino y Junta | Muchos a uno | `PROTECT`; el vecino tiene que vivir en el territorio de la junta. Una junta con participantes vigentes, o un vecino que integra una junta, no se desactivan. |
+| Hito → Delegación y Territorio · Hito ↔ Usuarios | Muchos a uno · muchos a muchos | `PROTECT`; un hito con actividades no se desactiva. |
+| Subtipo → Tipo | Muchos a uno | `PROTECT`; un tipo con subtipos activos no se desactiva. |
+| Asignación → Meta, Trimestre, Cargo y Funcionario | Muchos a uno | `PROTECT`; una meta con asignaciones vigentes no se desactiva. |
+| Actividad → Asignación, Hito, Vecino, Territorio, Responsable | Muchos a uno | `PROTECT`; la asignación define la meta y el trimestre. |
+| Gestión social → Atención (vecino, subtipo, delegación) y Asignación | Uno a uno y muchos a uno | `PROTECT`. |
+| Evidencia → Actividad o Gestión social, Autor, Verificador | Muchos a uno | `PROTECT`, con una restricción de la base (`CheckConstraint`) que exige exactamente un origen. |
+
+### Estrategia de eliminación
+
+Nada se borra. Hay dos estrategias, y cada entidad usa la que corresponde a lo
+que es:
+
+- **Desactivar**, para catálogos y personas (14 entidades). Es un `POST` con
+  confirmación; el registro deja de ofrecerse en los formularios y se conserva
+  con su historial. Antes de desactivar se consulta `motivo_bloqueo()` del
+  modelo: si otros registros activos dependen de él, se rechaza con un
+  mensaje que dice qué hay que mover primero.
+- **Anular con motivo**, para actividades, gestiones sociales y evidencias.
+  Son hechos que ocurrieron y respaldan el resultado de un trimestre: no
+  tienen «estado activo» y no pueden desaparecer. La pantalla de anulación
+  (GET) solo muestra la confirmación; anular es el `POST` con un motivo de al
+  menos 15 caracteres. «Cancelar» es un enlace de vuelta a la ficha y no
+  envía nada.
+
+### Permisos: grupos de Django y perfiles de prueba
+
+Los permisos se configuran con **grupos y permisos de Django**. Al migrar, la
+señal `post_migrate` (`organizacion/grupos.py`) crea dos grupos con los
+permisos que Django genera para cada modelo:
+
+| Grupo | Permisos | Rol del SGR | Cuenta de prueba |
+|---|---|---|---|
+| Consulta | `view_` de las 17 entidades (17 permisos) | ROL-07 Consulta | `consulta@ejemplo.cl` |
+| Gestión | `view_`, `add_`, `change_` y `delete_` de las 17 (68 permisos) | ROL-08 Gestión, y el Administrador | `gestion@ejemplo.cl` |
+
+Cada vista del CRUD pide el permiso de Django de su operación —`view` para
+listar y ver, `add` para crear, `change` para editar, `delete` para
+desactivar o anular— **o** la acción de negocio del SGR que ya administraba
+esa entidad, para que los roles operativos del Proyecto Integrado sigan
+funcionando (`comun/entidades.py`). Sin uno de los dos, la respuesta es
+**403**, también escribiendo la dirección a mano. Los botones «Nuevo»,
+«Editar», «Desactivar» y «Anular» solo aparecen si la persona tiene el
+permiso; la vista lo vuelve a comprobar igual.
+
+**Nadie se asigna privilegios.**
+
+- El formulario general de usuarios no tiene `is_superuser`, `is_staff`,
+  grupos, permisos ni contraseña.
+- En la propia ficha, el rol y las delegaciones quedan bloqueados; nadie
+  desactiva su propia cuenta ni su propio rol.
+- Quien no administra el acceso (el perfil Gestión) solo puede asignar roles
+  que no den más permisos que los suyos, y no edita cuentas con más poder que
+  la suya.
+- Los privilegios de un rol —acciones, alcance y grupo de Django— se
+  configuran en una pantalla aparte (`/gestion/roles/<pk>/privilegios/`) que
+  pide la acción «Gestionar usuarios y roles» y nunca el rol propio. El perfil
+  Gestión no la tiene: en su CRUD de roles la asociación con permisos es de
+  solo lectura. El superusuario configura grupos y permisos en Django Admin.
+
+### Validaciones (todas en el servidor, con `ModelForm`)
+
+- Obligatorios, tipos, largos, opciones, formato de correo y RUT con dígito
+  verificador; códigos únicos generados por el sistema; RUT y nombre de
+  territorio por delegación sin repetir.
+- Fechas: término no anterior al inicio (trimestre, hito); fecha de
+  compromiso no anterior a la fecha de la actividad; ingreso de la gestión
+  social no anterior a la atención; incorporación no anterior a la
+  constitución de la junta; ninguna fecha de algo ocurrido puede ser futura.
+- Asignación: cantidad objetivo mayor que cero, ponderación entre 0 y 100,
+  número de trimestre entre 1 y 4 (y año y número sin repetir).
+- Relaciones coherentes: subtipo del tipo elegido; territorio, hito y junta
+  de la misma delegación; vecino del territorio de la junta; responsables y
+  funcionarios que trabajan en la delegación; asignación que mide a ese
+  funcionario; una evidencia con exactamente un origen.
+- Un formulario inválido muestra el error junto al campo, conserva lo escrito
+  y no guarda nada.
+
+### Datos de prueba
+
+`python manage.py cargar_datos_demo` deja al menos dos registros ficticios
+por entidad, con relaciones válidas y registros inactivos o anulados en cada
+una. Además:
+
+- **Registros desechables** para crear, editar y eliminar sin tocar nada
+  importante: «Territorio de prueba (desechable)», «Vecino de prueba
+  Desechable», «Junta de prueba (desechable)», «Hito de prueba (desechable)»,
+  «Cargo de prueba (desechable)», «Tipo de prueba (desechable)» y su subtipo,
+  y las actividades `ACT-E001` y `ACT-E002`, sin evidencia.
+- **Relaciones protegidas**: el territorio «Unidad vecinal 1 · El Mirador»
+  (con vecinos, junta e hito), la «Junta de Vecinos El Mirador» (con
+  participantes) y el hito de limpieza (con actividades) no se pueden
+  desactivar.
+
+Todos los datos son ficticios: los RUT nuevos están entre 30.000.000 y
+30.200.000, un tramo que no corresponde a personas, y los correos usan el
+dominio reservado `ejemplo.cl`.
+
+### Cuentas de prueba
+
+`consulta@ejemplo.cl` (perfil Consulta) y `gestion@ejemplo.cl` (perfil
+Gestión). **Las contraseñas no están en este repositorio**: se entregan por
+el medio de evaluación. En el servidor se asignan con
+`python manage.py claves_de_prueba`, que las pide sin mostrarlas.
+
+### Evidencias
+
+`Evidencias.pdf`, en la raíz del repositorio y del ZIP de entrega, reúne la
+matriz CRUD de las 17 entidades, el plan mínimo de comprobaciones con sus
+resultados, las validaciones, las relaciones protegidas, los datos de prueba
+y capturas de cada perfil.
+
+### Pruebas automáticas
+
+```bash
+python manage.py test pruebas
+```
+
+`pruebas/test_evaluacion3.py` recorre el plan mínimo de la sección 10 del
+enunciado sobre las 17 entidades: crear, listar, ver, editar (mismo
+identificador, sin duplicar) y desactivar o anular con el perfil Gestión;
+403 al intentar modificar con el perfil Consulta, por pantalla y por POST;
+login inválido y válido y logout por POST; redirección al login sin sesión;
+404 para identificadores inexistentes; GET que no modifica; CSRF obligatorio;
+formularios inválidos que no guardan; relaciones protegidas; y que nadie se
+asigna privilegios. Resultado: 24 pruebas, todas correctas. En MySQL o
+MariaDB el usuario de la conexión necesita permiso para crear la base de
+pruebas (`test_sgr`), que Django crea y borra.
+
+### Versiones
+
+| Componente | Versión |
+|---|---|
+| Python | 3.12 (servidor AWS) · 3.10 o superior en desarrollo |
+| Django | 5.0.14 |
+| mysqlclient | 2.2.7 |
+| Base de datos | MariaDB 10.5 en AWS (Amazon Linux 2023); MySQL 8 de Wampserver64 en desarrollo |
+| whitenoise | 6.7.0 |
+| openpyxl | 3.1.5 |
+
+Están fijadas en `requirements.txt`. En el servidor se comprueban con
+`venv/bin/pip freeze` y `mysql --version`.
+
+### Diferencias respecto de la entrega anterior
+
+- **Nuevas entidades**: Territorio, Junta de vecinos, Participación en junta
+  e Hito, con su CRUD completo.
+- **Vecino**: el solicitante pasa a tener mantenedor propio; `nombre` se
+  separa en nombres y apellidos, el sector de texto libre se convierte en
+  territorio del catálogo (se conserva como «sector registrado antes») y se
+  suman correo, dirección y estado.
+- **Usuario**: RUT, nombres y apellidos por separado y último acceso a la
+  vista. **Delegación**: delegado. **Rol**: grupo de Django y pantalla de
+  privilegios separada del formulario general.
+- **Trimestre**: año y número. **Meta**: requisito de evidencia; sin cantidad
+  ni ponderación. **Asignación**: funcionario y observación.
+- **Actividad, gestión social y evidencia**: CRUD completo como registros, con
+  anulación; la evidencia puede respaldar una gestión social.
+- **Permisos**: grupos de Django Consulta y Gestión, permisos de Django en
+  cada vista del CRUD, sin autoasignación de privilegios.
+- **Migraciones aditivas que conservan los datos**: `organizacion/0005`,
+  `atencion/0004` y `0005`, `catalogos/0007`, `gestion/0016` y `0017`. Los
+  renombres son `RenameField` (no borran datos) y las migraciones de datos
+  reparten los nombres, convierten los sectores en territorios, calculan año
+  y número de cada trimestre y enlazan cada actividad con su asignación.
+
+---
+
+
 ## 1. Integrantes y aportes
 
+### Evaluación 3
 
-| Integrante | Aporte en esta entrega |
+| Integrante | Aporte en la Evaluación 3 |
+|---|---|
+| José Alday | **Por completar antes de entregar.** |
+| José Briceño | **Por completar antes de entregar.** |
+| Adán Cuello | **Por completar antes de entregar.** |
+| Carlos Silva | **Por completar antes de entregar.** |
+
+### Entrega anterior
+
+| Integrante | Aporte en la entrega anterior |
 |---|---|
 | José Alday | Mantenedores de Delegaciones y Roles: formularios, vistas, rutas y validaciones. Tabla de permisos (`comun/permisos.py`) y el mixin que la aplica en el servidor. Configuración de `DATABASES` y del despliegue. |
 | José Briceño | Mantenedor de Usuarios: formulario sobre dos modelos (`User` + `PerfilUsuario`) en una transacción, delegaciones autorizadas y la regla que protege al último administrador. Contexto de delegación activa en la sesión. |
@@ -22,8 +282,9 @@ administrador de Django se conserva, pero ya no es la única interfaz.
 
 Los cuatro revisaron el proyecto completo y pueden explicar la configuración
 de `DATABASES`, los modelos, las migraciones, las relaciones, la
-personalización del administrador y —nuevo en esta entrega— cómo una vista de
-clase se convierte en seis mantenedores distintos.
+personalización del administrador y cómo una vista de clase se convierte en
+seis mantenedores distintos. Para la Evaluación 3, cada integrante puede
+explicar una operación CRUD, una validación y una restricción de acceso.
 
 ---
 
@@ -39,14 +300,16 @@ clase se convierte en seis mantenedores distintos.
 | 6 | Delegaciones | `/gestion/delegaciones/` | Mantenedor completo. |
 | 7 | Roles y permisos | `/gestion/roles/` | Mantenedor completo, con la tabla de permisos. |
 | 8 | Usuarios | `/gestion/usuarios/` | Mantenedor completo sobre `User` + `PerfilUsuario`. |
-| 9 | Ítems y metas | `/catalogo/items/` | Mantenedor completo, con la regla del 100 %. |
+| 9 | Metas (ítems) | `/catalogo/items/` | Mantenedor completo: qué se mide, cómo y con qué evidencia. |
 | 10 | Tipos de atención | `/catalogo/tipos-atencion/` | Mantenedor completo. |
-| 11 | Subatenciones | `/catalogo/subatenciones/` | Mantenedor completo, dependiente del tipo. |
+| 11 | Subtipos de atención | `/catalogo/subatenciones/` | Mantenedor completo, dependiente del tipo. |
 | 12 | Ingreso de atención | `/atencion/ingreso/` | Registro de atención ciudadana. |
 | 13 | Atenciones registradas | `/atencion/registradas/` | Consulta de lo registrado en la delegación. |
 
 Las once que exige la entrega son las primeras once; las dos últimas
-completan el módulo de atención ciudadana.
+completan el módulo de atención ciudadana. Las pantallas de la Evaluación 3
+(territorios, vecinos, juntas, participaciones, hitos, actividades,
+gestiones sociales y evidencias) están en la sección 0.
 
 ### Lo que se construyó después de las once
 
@@ -57,9 +320,9 @@ recorrido cortado a la mitad.
 
 | Pantalla | Dirección | Qué hace |
 |---|---|---|
-| Períodos | `/periodo/periodos/` | Mantenedor, más el ciclo abrir → cerrar → reabrir. |
+| Trimestres | `/periodo/periodos/` | Mantenedor, más el ciclo abrir → cerrar → reabrir. |
 | Cargos | `/periodo/cargos/` | Mantenedor del cargo que decide con qué metas se mide a cada persona. |
-| Metas y ponderadores | `/periodo/metas/` | La meta por período, cargo e ítem, con la regla del 100 %. |
+| Asignaciones de meta | `/periodo/metas/` | La cantidad objetivo y la ponderación por trimestre, cargo o persona, y meta, con la regla del 100 %. |
 | Reglas de cálculo | `/periodo/reglas/` | Tope, umbrales y convención de días, configurables sin tocar código. |
 | Mis actividades | `/periodo/actividades/` | Registro, listado y ficha de lo que cada persona hizo. |
 | Validar evidencias | `/periodo/validar/` | La cola del verificador: aprobar, rechazar con motivo o anular. |
@@ -149,16 +412,21 @@ colación, esa búsqueda no encontraría nada.
 | Aplicación | Modelo | Qué guarda |
 |---|---|---|
 | `organizacion` | `Delegacion` | Unidad territorial: código, nombre, zona, dirección, teléfono, horario, estado. |
-| `organizacion` | `Rol` | Función: código, nombre, descripción, alcance y **lista de permisos**. |
-| `organizacion` | `PerfilUsuario` | Datos del SGR de una persona: código, cargo, rol, delegación base y delegaciones autorizadas. |
+| `organizacion` | `Rol` | Función: código, nombre, descripción, alcance, **lista de acciones** y **grupo de Django**. |
+| `organizacion` | `Territorio` | Sector o unidad vecinal de una delegación (Evaluación 3). |
+| `organizacion` | `PerfilUsuario` | Datos del SGR de una persona: código, RUT, cargo, rol, delegación base y delegaciones autorizadas. |
 | `gestion` | `Cargo` | La función de una persona, con su descripción y **las funciones del descriptor de cargos**, una por línea. |
-| `catalogos` | `Item` | Elemento medible: área, unidad de medida, **cómo se mide**, y la meta y el ponderador **sugeridos** que se proponen al crear una meta. |
+| `catalogos` | `Item` | La **meta** de la Evaluación 3: área, unidad de medida, **cómo se mide** y **requisito de evidencia**. Conserva en la base la meta y el ponderador sugeridos de entregas anteriores, que ya no se muestran. |
 | `catalogos` | `TipoAtencion` | Clasificación general de una atención, con su área. |
-| `catalogos` | `SubAtencion` | Detalle de un tipo, y si **exige documento de respaldo**. |
-| `atencion` | `Solicitante` | Persona que acude: RUT validado, nombre, teléfono, territorio. |
+| `catalogos` | `SubAtencion` | El subtipo de atención: detalle de un tipo, y si **exige documento de respaldo**. |
+| `atencion` | `Solicitante` | El **vecino**: RUT validado, nombres, apellidos, teléfono, correo, dirección, territorio y estado. |
+| `atencion` | `JuntaVecinos` · `ParticipacionJunta` | Las juntas de vecinos y quién las integra, con su cargo en la directiva (Evaluación 3). |
 | `atencion` | `Atencion` | La atención entregada: solicitante, subatención, delegación, funcionario, detalle y respaldo. |
 | `atencion` | `CampanaRegalos` · `InscripcionRegalo` | La campaña de regalos y cada niño inscrito: solo su RUT y su tramo de edad, más el adulto que lo inscribe. |
-| `atencion` | `CasoSocial` | El seguimiento de una atención social: fechas de visita, informe y beneficio, y devoluciones del informe. |
+| `atencion` | `CasoSocial` | La **gestión social**: fechas de atención, ingreso, visita, informe y beneficio, actuaciones, derivación, resultado, estado y asignación de meta. |
+| `gestion` | `Hito` | Lo planificado de una delegación, con periodicidad, fechas, territorio y responsables (Evaluación 3). |
+| `gestion` | `Periodo` · `MetaPeriodo` | El **trimestre** (con año y número) y la **asignación de meta** (por cargo o por funcionario). |
+| `gestion` | `Actividad` · `Evidencia` | Lo que se hizo, con todos sus antecedentes, y su respaldo, que puede ser de una actividad o de una gestión social. |
 | `gestion` | `VersionParametro` | Una versión de un ítem, una meta o una regla: la foto de sus campos, lo que cambió respecto de la anterior, la vigencia, el origen y el autor. No se edita ni se borra. |
 | `comun` | `Observacion` | Una consulta o comentario sobre un compromiso, un caso social o una carta, con autor y hora. No se edita ni se borra. |
 | `cuenta` | `CodigoRecuperacion` | Código de seis dígitos de un solo uso, con vigencia e intentos. |
@@ -368,11 +636,12 @@ de Roles las muestra como casillas agrupadas. Son trece:
 | Configuración | configurar períodos · definir metas y ponderadores · gestionar catálogos |
 | Administración | gestionar usuarios y roles · consultar la auditoría |
 
-**Por qué no se usan los permisos de Django.** `django.contrib.auth` trae
-permisos por modelo (add / change / delete / view), que sirven para el
-administrador y ahí se usan. El SGR necesita permisos por *acción de negocio*
-—validar una evidencia, configurar un período— que no calzan uno a uno con un
-modelo.
+**Acciones de negocio y permisos de Django.** El SGR necesita permisos por
+*acción de negocio* —validar una evidencia, configurar un período— que no
+calzan uno a uno con un modelo. Desde la Evaluación 3 conviven con los
+**grupos y permisos de Django**: cada rol se asocia a un grupo, y las
+pantallas de las 17 entidades se abren con el permiso de Django de cada
+operación o con la acción que las administraba (ver la sección 0).
 
 **El alcance no es lo mismo que el permiso.** El permiso dice *qué* puede
 hacer; el alcance, *sobre qué delegaciones*: su delegación, varias o todas. Un
@@ -435,20 +704,28 @@ antecedentes de personas reales: los correos usan el dominio reservado
 corresponden a nadie. Los sectores de La Serena se usan como referencia
 territorial.
 
+Además de lo de esta tabla, la Evaluación 3 suma territorios, vecinos,
+juntas, participaciones, hitos, un segundo trimestre, registros inactivos y
+desechables (detalle en la sección 0).
+
 ### Cuentas para la revisión
 
-| Cuenta | Contraseña | Rol | Para qué sirve |
-|---|---|---|---|
-| `felipe.araya@ejemplo.cl` | `Demo.Sgr2026` | Administrador | Los seis mantenedores, y validar evidencias y compromisos en todas las delegaciones. |
-| `pablo.fuentes@ejemplo.cl` | `Demo.Sgr2026` | Verificador | Validar evidencias y compromisos; sin acceso a los mantenedores. |
-| `marcela.rios@ejemplo.cl` | `Demo.Sgr2026` | Funcionario | Registrar actividades, atención ciudadana y compromisos. |
-| `valentina.cortes@ejemplo.cl` | `Demo.Sgr2026` | Coordinador del sistema | Períodos, metas y reglas de cálculo; alcance en todas las delegaciones. |
-| `soledad.guerrero@ejemplo.cl` | `Demo.Sgr2026` | Delegado o jefatura | La única que puede reasignar compromisos de la agenda. |
-| `revisor` | `Sgr.Revision2026` | Superusuario | Administrador de Django. |
+| Cuenta | Rol | Para qué sirve |
+|---|---|---|
+| `consulta@ejemplo.cl` | Consulta | Perfil de prueba de la Evaluación 3: ve las 17 entidades y no modifica nada. |
+| `gestion@ejemplo.cl` | Gestión | Perfil de prueba de la Evaluación 3: crea, edita, desactiva y anula en las 17 entidades. |
+| `felipe.araya@ejemplo.cl` | Administrador | Las 17 entidades, privilegios de roles, validación y auditoría. |
+| `pablo.fuentes@ejemplo.cl` | Verificador | Validar evidencias y compromisos; sin acceso a los mantenedores. |
+| `marcela.rios@ejemplo.cl` | Funcionario | Registrar actividades, atención ciudadana, vecinos y compromisos. |
+| `valentina.cortes@ejemplo.cl` | Coordinador del sistema | Trimestres, asignaciones, hitos y reglas de cálculo; alcance en todas las delegaciones. |
+| `soledad.guerrero@ejemplo.cl` | Delegado o jefatura | La única que puede reasignar compromisos de la agenda. |
 
-Son cuentas ficticias de un sistema de prueba y existen solo para la revisión
-académica. Para usar otras, se definen `SGR_DEMO_PASSWORD`, `SGR_ADMIN_USER`,
-`SGR_ADMIN_PASSWORD` y `SGR_ADMIN_EMAIL` antes de ejecutar el comando.
+**Las contraseñas no están en el repositorio.** Se entregan por el medio de
+evaluación. `cargar_datos_demo` crea las cuentas nuevas con la clave de la
+variable `SGR_DEMO_PASSWORD` (en un servidor, con DEBUG apagado, se niega a
+correr sin ella), y `python manage.py claves_de_prueba` cambia la de las que ya
+existen pidiéndola sin mostrarla. El superusuario de revisión se crea con
+`SGR_ADMIN_USER` y `SGR_ADMIN_PASSWORD`, o con `manage.py createsuperuser`.
 
 En una instalación real este comando no se ejecuta: las cuentas se crean desde
 el mantenedor de Usuarios y nacen **sin contraseña utilizable**, de modo que
@@ -660,6 +937,23 @@ Los cuatro integrantes pueden explicar:
   estado del listado viaja en la dirección;
 - dónde se comprueban los permisos y por qué esconder el menú no es seguridad.
 
+### En la Evaluación 3
+
+El asistente escribió los modelos y las migraciones de las entidades nuevas,
+las pantallas de CRUD, la integración con los grupos de Django, los datos de
+prueba y la batería `pruebas/test_evaluacion3.py`. El equipo definió qué
+entidad del enunciado correspondía a cada modelo del Proyecto Integrado,
+decidió que la asignación de meta admitiera funcionario sin romper el cálculo
+por cargo, y revisó la entrega contra la escala de apreciación.
+
+Cómo se verificó el código: `manage.py check` y `makemigrations --check` sin
+observaciones; la batería de la Evaluación 3 (24 pruebas, con las 17
+entidades en cada una) y las trece suites anteriores del proyecto (377
+comprobaciones) sin fallas; y una simulación de actualización: una base
+creada con el código de la entrega anterior y sus datos, migrada con el
+código nuevo, conserva todo y queda con los nombres repartidos, los
+sectores convertidos en territorios y cada actividad con su asignación.
+
 ### Cómo se verificó
 
 | Qué se comprobó | Cómo |
@@ -682,6 +976,16 @@ Los cuatro integrantes pueden explicar:
 ---
 
 ## 12. Estructura del proyecto
+
+Archivos que agrega la Evaluación 3: `comun/entidades.py` (las 17 entidades y
+sus permisos), `comun/formularios.py`, `comun/rut.py`, `organizacion/grupos.py`
+(grupos Consulta y Gestión), `atencion/modelos_comunidad.py`,
+`atencion/forms_comunidad.py`, `atencion/views_comunidad.py`,
+`gestion/modelos_hitos.py`, `gestion/forms_registros.py`,
+`gestion/views_registros.py`, `organizacion/management/commands/_evaluacion3.py`,
+`organizacion/management/commands/claves_de_prueba.py`, las plantillas
+`comun/registro_detalle.html` y `comun/mantenedor_anular.html`, y la carpeta
+`pruebas/`.
 
 ```
 proyecto_sgr/

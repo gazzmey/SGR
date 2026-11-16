@@ -1,6 +1,10 @@
-Django>=5.0,<5.1
-mysqlclient>=2.2,<3.0
-whitenoise>=6.6,<7.0
+# Versiones exactas con que se desarrolló, se probó y se despliega en AWS.
+# Python 3.12 (en el servidor) · MariaDB 10.5 (Amazon Linux 2023) o MySQL 8.
+# Para comprobarlas en el servidor: venv/bin/pip freeze
+Django==5.0.14
+mysqlclient==2.2.7
+whitenoise==6.7.0
 # Exportación de los listados a Excel. Si no está instalado, el sistema
 # exporta el mismo contenido en CSV en lugar de fallar (ver comun/excel.py).
-openpyxl>=3.1,<4.0
+openpyxl==3.1.5
+# asgiref y sqlparse los instala Django con las versiones que él declara.

@@ -400,10 +400,12 @@ class Command(BaseCommand):
         for nombre, _, _, metas in CARGOS:
             for codigo_item, meta, ponderador in metas:
                 previa = MetaPeriodo.objects.filter(
-                    periodo=periodo, cargo=cargos[nombre], item=items[codigo_item]).first()
+                    periodo=periodo, cargo=cargos[nombre], item=items[codigo_item],
+                    funcionario__isnull=True).first()
                 antes = previa.datos_version() if previa else None
                 registro, nuevo = MetaPeriodo.objects.update_or_create(
                     periodo=periodo, cargo=cargos[nombre], item=items[codigo_item],
+                    funcionario=None,
                     defaults={"meta": meta, "ponderador": ponderador, "activo": True},
                 )
                 versionar(registro, antes=antes, origen=COMANDO)

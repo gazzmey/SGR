@@ -39,7 +39,7 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from comun.excel import libro_de_listado
 from comun.navegacion import desde_formulario
-from comun.permisos import RequierePermiso, perfil_de, tiene_permiso
+from comun.permisos import RequierePermiso, alternativas, autorizado, perfil_de
 from comun import concurrencia
 from comun.resultado import anunciar
 
@@ -282,6 +282,7 @@ class ListaMantenedor(RequierePermiso, AlcanceDelegacion, ListView):
     # La maqueta usaba ?p= para la página; se mantiene para que las
     # direcciones de una y otra sean las mismas.
     page_kwarg = "p"
+    accion_django = "view"
 
     # --- lo que declara cada mantenedor ---
     titulo = ""
@@ -402,6 +403,15 @@ class ListaMantenedor(RequierePermiso, AlcanceDelegacion, ListView):
                 del datos[clave]
         return urlencode(datos)
 
+    def _puede_editar(self):
+        """
+        Algunos listados usan la columna «Editar» para abrir la ficha (la cola
+        de validación, mis actividades): ese enlace no pide permiso de edición.
+        """
+        if self.url_editar and self.url_editar == self.url_detalle:
+            return True
+        return self.autoriza("change")
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
 
@@ -461,10 +471,13 @@ class ListaMantenedor(RequierePermiso, AlcanceDelegacion, ListView):
             "cola_sin_pagina": self._cola(p=None),
             "cola_exportar": self._cola(export="excel", p=None),
             "url_lista": self.url_lista,
-            "url_nueva": self.url_nueva,
-            "url_editar": self.url_editar,
+            # Los botones siguen al permiso: quien solo consulta no ve
+            # «Nuevo», «Editar» ni «Desactivar». Es cortesía; la vista de
+            # cada operación vuelve a comprobarlo y responde 403.
+            "url_nueva": self.url_nueva if self.autoriza("add") else "",
+            "url_editar": self.url_editar if self._puede_editar() else "",
             "url_detalle": self.url_detalle,
-            "url_estado": self.url_estado,
+            "url_estado": self.url_estado if self.autoriza("delete") else "",
             "rotulo_nuevo": self.rotulo_nuevo,
             "menu": self.menu,
             # «¿Hay datos?» también se pregunta dentro del alcance: si esta
@@ -492,6 +505,16 @@ class _FormMantenedor(RequierePermiso, AlcanceDelegacion):
     menu = ""
     lateral = "comun/_lateral_vacio.html"
     secciones = []          # [(número, título, bajada, [nombres de campo])]
+    #: Si es True, el formulario recibe quién está editando y qué
+    #: delegaciones puede usar, para limitar sus selectores al alcance.
+    pasa_usuario = False
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if self.pasa_usuario:
+            kwargs["usuario"] = self.request.user
+            kwargs["delegaciones"] = self.delegaciones_permitidas()
+        return kwargs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -533,6 +556,8 @@ class _FormMantenedor(RequierePermiso, AlcanceDelegacion):
 
 
 class CrearMantenedor(_FormMantenedor, CreateView):
+    accion_django = "add"
+
     def form_valid(self, form):
         # El aviso se prepara DESPUÉS de super(), que es quien guarda: si
         # guardar fallara, no habría nada que anunciar.
@@ -572,6 +597,8 @@ class EditarMantenedor(_FormMantenedor, UpdateView):
     decidir. Está en el motor para que los catorce formularios de edición
     queden cubiertos de una vez. El detalle está en ``comun/concurrencia.py``.
     """
+
+    accion_django = "change"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -644,6 +671,8 @@ class DetalleMantenedor(RequierePermiso, AlcanceDelegacion, DetailView):
     campos = []     # [(etiqueta, nombre_o_llamable, {"ancho": bool, "mono": bool})]
     kpis = []       # [(etiqueta, llamable, pie)]
     pie = ""
+    accion_django = "view"
+    url_anular = ""
 
     def get_queryset(self):
         """La ficha de un registro fuera del alcance no existe: 404."""
@@ -679,8 +708,9 @@ class DetalleMantenedor(RequierePermiso, AlcanceDelegacion, DetailView):
             "plural": self.plural,
             "genero": self.genero,
             "url_lista": self.url_lista,
-            "url_editar": self.url_editar,
-            "url_estado": self.url_estado,
+            "url_editar": self.url_editar if self.autoriza("change") else "",
+            "url_estado": self.url_estado if self.autoriza("delete") else "",
+            "url_anular": self.url_anular if self.autoriza("delete") else "",
             "menu": self.menu,
             "datos": datos,
             "kpis": tarjetas,
@@ -728,12 +758,17 @@ class CambiarEstado(AlcanceDelegacion, View):
             from comun.permisos import redirect_al_login
 
             return redirect_al_login(request)
-        if self.permiso and not tiene_permiso(request.user, self.permiso):
+        if not autorizado(request.user, alternativas(self.permiso, self.model, "delete")):
             raise PermissionDenied("No tienes permiso para cambiar ese estado.")
 
         obj = get_object_or_404(self.limitar(self.model._default_manager.all()), pk=pk)
         activar = request.POST.get("activar") == "1"
         vocal = "a" if self.genero == "la" else "o"
+
+        propio = self.motivo_propio(request, obj)
+        if propio:
+            anunciar(request, "No se puede cambiar el estado", propio, icono="error")
+            return self._volver(request)
 
         if activar and not obj.activo:
             motivo = self._motivo_para_activar(obj)
@@ -784,6 +819,14 @@ class CambiarEstado(AlcanceDelegacion, View):
         )
         return self._volver(request)
 
+    def motivo_propio(self, request, obj):
+        """
+        Por qué esta persona no puede cambiar el estado de ese registro en
+        particular, aunque tenga el permiso. Lo usan usuarios y roles: nadie
+        se desactiva a sí mismo ni a su propio rol.
+        """
+        return ""
+
     @staticmethod
     def _motivo_para_activar(obj):
         """
@@ -822,6 +865,88 @@ class CambiarEstado(AlcanceDelegacion, View):
         navegador.
         """
         return HttpResponseRedirect(desde_formulario(request, self.url_lista))
+
+
+# =========================================================================
+# Anular
+# =========================================================================
+
+
+class AnularMantenedor(RequierePermiso, AlcanceDelegacion, View):
+    """
+    Anula un registro que no se desactiva: actividades, gestiones sociales y
+    evidencias.
+
+    Esos tres no tienen «activo»: son hechos que ocurrieron y que el
+    resultado del período ya puede estar contando. Borrarlos dejaría el
+    cálculo sin respaldo; desactivarlos no dice nada. Se **anulan**, con un
+    motivo escrito, y el registro queda visible con su estado.
+
+    GET muestra la confirmación y no cambia nada; POST anula. «Cancelar»
+    es un enlace de vuelta a la ficha: no envía nada.
+    """
+
+    template_name = "comun/mantenedor_anular.html"
+    accion_django = "delete"
+    model = None
+    singular = "registro"
+    genero = "el"
+    url_detalle = ""
+    url_lista = ""
+    menu = ""
+    consecuencia = ""
+    MINIMO = 15
+
+    def get_queryset(self):
+        return self.limitar(self.model._default_manager.all())
+
+    def motivo_bloqueo(self, obj):
+        """Por qué no se puede anular, o cadena vacía. Lo define cada entidad."""
+        return ""
+
+    def anular(self, obj, motivo):
+        """Hace la anulación. Lo define cada entidad."""
+        raise NotImplementedError
+
+    def _contexto(self, obj, motivo="", error=""):
+        return {
+            "obj": obj, "singular": self.singular, "genero": self.genero,
+            "url_detalle": self.url_detalle, "url_lista": self.url_lista,
+            "menu": self.menu, "consecuencia": self.consecuencia,
+            "bloqueo": self.motivo_bloqueo(obj), "motivo": motivo,
+            "error": error, "minimo": self.MINIMO,
+        }
+
+    def get(self, request, pk):
+        from django.shortcuts import render
+
+        obj = get_object_or_404(self.get_queryset(), pk=pk)
+        return render(request, self.template_name, self._contexto(obj))
+
+    def post(self, request, pk):
+        from django.shortcuts import render
+
+        obj = get_object_or_404(self.get_queryset(), pk=pk)
+        bloqueo = self.motivo_bloqueo(obj)
+        if bloqueo:
+            anunciar(request, f"No se puede anular «{obj}»", bloqueo, icono="error")
+            return redirect(self.url_detalle, pk=obj.pk)
+        motivo = (request.POST.get("motivo") or "").strip()
+        if len(motivo) < self.MINIMO:
+            return render(request, self.template_name, self._contexto(
+                obj, motivo,
+                f"Escribe por qué se anula: queda en el historial. Debe tener al "
+                f"menos {self.MINIMO} caracteres (escribiste {len(motivo)}).",
+            ), status=200)
+        self.anular(obj, motivo)
+        auditar(request, "estado", obj,
+                entidad=self.model._meta.verbose_name.capitalize(),
+                antes="vigente", despues="anulado", detalle=motivo)
+        vocal = "a" if self.genero == "la" else "o"
+        anunciar(request, f"{self.singular.capitalize()} anulad{vocal}",
+                 f"«{obj}» quedó anulad{vocal} con su motivo. No se borró: "
+                 "sigue en el listado con su historial.")
+        return redirect(self.url_detalle, pk=obj.pk)
 
 
 # =========================================================================

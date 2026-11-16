@@ -16,7 +16,10 @@ habría invalidado la entrega anterior.
 """
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+
+from comun.rut import limpiar_rut, validar_rut
 
 
 class Delegacion(models.Model):
@@ -42,6 +45,15 @@ class Delegacion(models.Model):
     horario = models.CharField(
         "horario de atención", max_length=120, blank=True,
         help_text="Por ejemplo: Lun a vie · 08:30 a 14:00.",
+    )
+    delegado = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="delegaciones_a_cargo", null=True, blank=True,
+        verbose_name="delegado",
+        help_text=(
+            "Quien encabeza la delegación. Tiene que ser un usuario activo "
+            "que trabaje en ella o tenga alcance sobre ella."
+        ),
     )
     activo = models.BooleanField(
         "activa", default=True,
@@ -73,6 +85,111 @@ class Delegacion(models.Model):
                 f"{'perfil de usuario asignado' if cuantos == 1 else 'perfiles de usuario asignados'}. "
                 "Reasigna esos usuarios a otra delegación antes de desactivarla."
             )
+        territorios = self.territorios.filter(activo=True).count()
+        if territorios:
+            return (
+                f"Tiene {territorios} "
+                f"{'territorio activo' if territorios == 1 else 'territorios activos'}. "
+                "Desactívalos o muévelos a otra delegación antes."
+            )
+        return ""
+
+    def clean(self):
+        super().clean()
+        if self.delegado_id:
+            perfil = getattr(self.delegado, "perfil", None)
+            if not self.delegado.is_active or perfil is None or not perfil.activo:
+                raise ValidationError({
+                    "delegado": "El delegado tiene que ser un usuario activo del sistema.",
+                })
+            alcanza = perfil.rol.alcance == Rol.Alcance.TODAS or (
+                self.pk and perfil.delegaciones_visibles().filter(pk=self.pk).exists())
+            if not alcanza:
+                raise ValidationError({
+                    "delegado": (
+                        "%s no trabaja en esta delegación ni tiene alcance sobre "
+                        "ella. Asígnale la delegación en su ficha de usuario "
+                        "antes de nombrarlo delegado." % perfil.nombre
+                    ),
+                })
+
+
+class Territorio(models.Model):
+    """
+    El sector o unidad vecinal que atiende una delegación.
+
+    En la segunda entrega era un texto libre en la ficha del vecino. Como
+    entidad propia, el territorio se relaciona con su delegación y lo usan
+    los vecinos, las juntas de vecinos, los hitos y las actividades.
+    """
+
+    codigo = models.CharField(
+        "código", max_length=10, unique=True,
+        help_text="Identificador corto e irrepetible, por ejemplo TER-01.",
+    )
+    nombre = models.CharField(max_length=120)
+    descripcion = models.TextField(
+        "descripción", blank=True,
+        help_text="Qué calles, poblaciones o sectores comprende.",
+    )
+    delegacion = models.ForeignKey(
+        Delegacion, on_delete=models.PROTECT,
+        related_name="territorios", verbose_name="delegación",
+    )
+    activo = models.BooleanField(default=True)
+    creada = models.DateField("creado el", auto_now_add=True)
+    desactivada = models.DateField("desactivado el", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "territorio"
+        verbose_name_plural = "territorios"
+        ordering = ["codigo"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["delegacion", "nombre"],
+                name="un_nombre_de_territorio_por_delegacion",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.codigo} — {self.nombre}"
+
+    def clean(self):
+        super().clean()
+        # Un territorio nuevo, o uno que se cambia de delegación, no puede
+        # quedar en una delegación inactiva. Uno que ya estaba en ella se
+        # puede seguir editando.
+        if self.delegacion_id and not self.delegacion.activo:
+            anterior = (Territorio.objects.filter(pk=self.pk)
+                        .values_list("delegacion_id", flat=True).first()
+                        if self.pk else None)
+            if anterior != self.delegacion_id:
+                raise ValidationError({
+                    "delegacion": "Esa delegación está inactiva: elige una activa.",
+                })
+
+    def motivo_bloqueo(self):
+        """Lo que impide desactivarlo: quien todavía depende de él."""
+        partes = []
+        vecinos = self.vecinos.filter(activo=True).count()
+        if vecinos:
+            partes.append(f"{vecinos} {'vecino activo' if vecinos == 1 else 'vecinos activos'}")
+        juntas = self.juntas.filter(activo=True).count()
+        if juntas:
+            partes.append(f"{juntas} {'junta de vecinos activa' if juntas == 1 else 'juntas de vecinos activas'}")
+        hitos = self.hitos.filter(activo=True).count()
+        if hitos:
+            partes.append(f"{hitos} {'hito activo' if hitos == 1 else 'hitos activos'}")
+        if partes:
+            return (
+                "Tiene " + ", ".join(partes) + ". Muévelos a otro territorio o "
+                "desactívalos antes."
+            )
+        return ""
+
+    def motivo_bloqueo_activar(self):
+        if not self.delegacion.activo:
+            return "Su delegación está inactiva. Actívala primero."
         return ""
 
 
@@ -105,6 +222,16 @@ class Rol(models.Model):
         default=list, blank=True,
         help_text="Lista de claves de permiso. Ver comun/permisos.py.",
     )
+    grupo = models.ForeignKey(
+        "auth.Group", on_delete=models.PROTECT,
+        related_name="roles_sgr", null=True, blank=True,
+        verbose_name="grupo de Django",
+        help_text=(
+            "Los permisos de Django (ver, crear, editar, desactivar) que el "
+            "rol entrega sobre las 17 entidades. Lo configura el "
+            "administrador; no se edita desde el formulario general."
+        ),
+    )
     activo = models.BooleanField(default=True)
     creada = models.DateField("creado el", auto_now_add=True)
     desactivada = models.DateField("desactivado el", null=True, blank=True)
@@ -126,6 +253,13 @@ class Rol(models.Model):
             )
         return ""
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Cambiar el grupo o el estado del rol cambia lo que pueden hacer sus
+        # usuarios: se les actualiza el grupo de Django en el mismo momento.
+        for perfil in self.perfiles.select_related("usuario"):
+            perfil.sincronizar_grupos()
+
 
 class PerfilUsuario(models.Model):
     """
@@ -144,6 +278,11 @@ class PerfilUsuario(models.Model):
         on_delete=models.CASCADE,
         related_name="perfil",
         verbose_name="usuario",
+    )
+    rut = models.CharField(
+        "RUT", max_length=12, unique=True, null=True, blank=True,
+        validators=[validar_rut],
+        help_text="Ficticio, con dígito verificador. Por ejemplo 11111111-1.",
     )
     cargo = models.CharField(
         max_length=80, blank=True,
@@ -224,6 +363,37 @@ class PerfilUsuario(models.Model):
             if autorizadas.exists():
                 return autorizadas
         return Delegacion.objects.filter(pk=self.delegacion_id)
+
+    def save(self, *args, **kwargs):
+        # Un RUT vacío se guarda como NULL: la restricción de unicidad admite
+        # varios NULL, pero no dos textos vacíos.
+        self.rut = limpiar_rut(self.rut) or None
+        super().save(*args, **kwargs)
+        self.sincronizar_grupos()
+
+    def sincronizar_grupos(self):
+        """
+        Deja al usuario de Django en el grupo de su rol, y solo en ese.
+
+        Solo se tocan los grupos que algún rol administra: un grupo que el
+        administrador asignó a mano desde Django Admin no se quita. Un
+        perfil o un rol inactivo no conserva ningún grupo de rol.
+        """
+        from django.contrib.auth.models import Group
+
+        administrados = set(
+            Group.objects.filter(roles_sgr__isnull=False).values_list("pk", flat=True)
+        )
+        if not administrados:
+            return
+        actuales = set(self.usuario.groups.values_list("pk", flat=True))
+        deseado = (self.rol.grupo_id
+                   if self.activo and self.rol.activo and self.rol.grupo_id else None)
+        quitar = (actuales & administrados) - {deseado}
+        if quitar:
+            self.usuario.groups.remove(*quitar)
+        if deseado and deseado not in actuales:
+            self.usuario.groups.add(deseado)
 
     def puede(self, clave):
         """True si el rol de esta persona habilita esa acción."""

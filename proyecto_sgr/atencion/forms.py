@@ -18,16 +18,21 @@ from django.urls import reverse_lazy
 from atencion.models import Atencion, CasoSocial, Solicitante, limpiar_rut, rut_valido
 from catalogos.models import SubAtencion, TipoAtencion
 
-# Lista fija en esta entrega. Cuando exista el mantenedor de territorios
-# saldrá de la base de datos, igual que los tipos de atención.
-TERRITORIOS = [
-    "Unidad vecinal 1 · El Mirador",
-    "Unidad vecinal 2 · Los Aromos",
-    "Unidad vecinal 3 · San Juan",
-    "Unidad vecinal 4 · Villa Esperanza",
-    "Unidad vecinal 5 · El Milagro Alto",
-    "Unidad vecinal 6 · Cisternas",
-]
+
+
+def repartir_nombre(nombre):
+    """
+    «Nombre y apellido» escrito en una línea, repartido en nombres y apellidos.
+
+    Con cuatro palabras o más, las dos últimas son los apellidos; con dos o
+    tres, la última. En la ficha del vecino se corrige si hace falta.
+    """
+    partes = (nombre or "").split()
+    if len(partes) >= 4:
+        return " ".join(partes[:-2]), " ".join(partes[-2:])
+    if len(partes) >= 2:
+        return " ".join(partes[:-1]), partes[-1]
+    return (nombre or "").strip(), ""
 
 
 class AtencionForm(forms.ModelForm):
@@ -66,9 +71,13 @@ class AtencionForm(forms.ModelForm):
         }),
         help_text="Para avisarle cuando su requerimiento se resuelva.",
     )
-    territorio = forms.ChoiceField(
+    # Desde la Evaluación 3 el territorio sale del catálogo: los de la
+    # delegación activa. Si la delegación todavía no tiene territorios, el
+    # campo no es obligatorio, para no detener la atención.
+    territorio = forms.ModelChoiceField(
         label="Territorio",
-        choices=[("", "Elige el territorio")] + [(t, t) for t in TERRITORIOS],
+        queryset=None, required=False,
+        empty_label="Elige el territorio",
         widget=forms.Select(attrs={"class": "input", "data-rut-territorio": "1"}),
     )
 
@@ -110,6 +119,11 @@ class AtencionForm(forms.ModelForm):
         self.delegacion = delegacion
         self.funcionario = funcionario
 
+        from organizacion.models import Territorio
+
+        territorios = Territorio.objects.filter(activo=True, delegacion=delegacion) if delegacion else Territorio.objects.none()
+        self.fields["territorio"].queryset = territorios
+        self.fields["territorio"].required = territorios.exists()
         self.fields["tipo"].queryset = TipoAtencion.objects.filter(activo=True)
         # El selector de subatención ofrece todas las activas: el navegador
         # muestra solo las del tipo elegido, pero el campo tiene que aceptar
@@ -214,20 +228,28 @@ class AtencionForm(forms.ModelForm):
         solicitante = Solicitante.objects.filter(rut=rut).first()
         self._era_nuevo = solicitante is None
 
+        nombres, apellidos = repartir_nombre(self.cleaned_data["nombre"])
+        territorio = self.cleaned_data.get("territorio")
         if solicitante is None:
             return Solicitante.objects.create(
                 rut=rut,
-                nombre=self.cleaned_data["nombre"],
+                nombres=nombres,
+                apellidos=apellidos,
                 telefono=self.cleaned_data.get("telefono", ""),
-                territorio=self.cleaned_data.get("territorio", ""),
+                territorio=territorio,
             )
 
         cambios = []
-        for campo in ("nombre", "telefono", "territorio"):
-            nuevo = (self.cleaned_data.get(campo) or "").strip()
-            if nuevo and nuevo != getattr(solicitante, campo):
-                setattr(solicitante, campo, nuevo)
-                cambios.append(campo)
+        if self.cleaned_data["nombre"].strip() != solicitante.nombre:
+            solicitante.nombres, solicitante.apellidos = nombres, apellidos
+            cambios += ["nombres", "apellidos"]
+        telefono = (self.cleaned_data.get("telefono") or "").strip()
+        if telefono and telefono != solicitante.telefono:
+            solicitante.telefono = telefono
+            cambios.append("telefono")
+        if territorio is not None and territorio.pk != solicitante.territorio_id:
+            solicitante.territorio = territorio
+            cambios.append("territorio")
         if cambios:
             solicitante.save(update_fields=cambios)
         return solicitante
@@ -270,3 +292,13 @@ class CasoSocialForm(forms.ModelForm):
         self.fields["responsable"].label_from_instance = (
             lambda u: u.get_full_name() or u.get_username()
         )
+
+    def clean(self):
+        datos = super().clean()
+        # Esta pantalla corrige el ingreso pero no muestra la fecha de
+        # atención: si el ingreso se adelanta, la atención no puede quedar
+        # después de él, así que se adelanta con él.
+        ingreso = datos.get("ingreso")
+        if ingreso and self.instance.fecha_atencion and ingreso < self.instance.fecha_atencion:
+            self.instance.fecha_atencion = ingreso
+        return datos
