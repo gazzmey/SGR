@@ -1428,7 +1428,7 @@ class Command(BaseCommand):
             registro, nuevo = Delegacion.objects.update_or_create(
                 codigo=fila["codigo"],
                 defaults={
-                    "nombre": fila["nombre"],
+                    "nombre": evaluacion3.nombre_libre(Delegacion, fila["codigo"], fila["nombre"]),
                     "zona": fila["zona"],
                     "direccion": fila["direccion"],
                     "comuna": fila["comuna"],
@@ -1558,7 +1558,7 @@ class Command(BaseCommand):
             registro, nuevo = Item.objects.update_or_create(
                 codigo=fila["codigo"],
                 defaults={
-                    "nombre": fila["nombre"],
+                    "nombre": evaluacion3.nombre_libre(Item, fila["codigo"], fila["nombre"]),
                     "descripcion": fila["descripcion"],
                     "area": fila["area"],
                     "unidad": fila["unidad"],
@@ -1578,7 +1578,7 @@ class Command(BaseCommand):
             registro, nuevo = TipoAtencion.objects.update_or_create(
                 codigo=fila["codigo"],
                 defaults={
-                    "nombre": fila["nombre"],
+                    "nombre": evaluacion3.nombre_libre(TipoAtencion, fila["codigo"], fila["nombre"]),
                     "descripcion": fila["descripcion"],
                     "area": fila["area"],
                     "activo": fila["activo"],
@@ -1596,7 +1596,7 @@ class Command(BaseCommand):
             registro, nuevo = SubAtencion.objects.update_or_create(
                 codigo=fila["codigo"],
                 defaults={
-                    "nombre": fila["nombre"],
+                    "nombre": evaluacion3.nombre_libre(SubAtencion, fila["codigo"], fila["nombre"]),
                     "descripcion": fila["descripcion"],
                     "tipo_atencion": tipos[fila["tipo"]],
                     "documento": fila["documento"],
@@ -1702,10 +1702,14 @@ class Command(BaseCommand):
         """
         hoy = timezone.localdate()
         for fila in CASOS_DEMO:
-            atencion = (
+            # Un caso que ya existe conserva su atención. Uno nuevo toma una
+            # atención que todavía no tenga caso: cada atención abre uno solo.
+            existente = (CasoSocial.objects.filter(codigo=fila["codigo"])
+                         .select_related("atencion__funcionario").first())
+            atencion = existente.atencion if existente else (
                 Atencion.objects
                 .filter(subatencion__codigo=fila["subatencion"],
-                        delegacion__codigo=fila["delegacion"])
+                        delegacion__codigo=fila["delegacion"], caso__isnull=True)
                 .select_related("funcionario").first()
             )
             if atencion is None:
@@ -1743,7 +1747,8 @@ class Command(BaseCommand):
         for codigo, nombre, descripcion in CARGOS:
             registro, nuevo = Cargo.objects.update_or_create(
                 codigo=codigo,
-                defaults={"nombre": nombre, "descripcion": descripcion},
+                defaults={"nombre": evaluacion3.nombre_libre(Cargo, codigo, nombre),
+                          "descripcion": descripcion},
             )
             creados[codigo] = registro
             self._informar("Cargo", registro, nuevo)
@@ -1769,7 +1774,8 @@ class Command(BaseCommand):
         registro, nuevo = Periodo.objects.update_or_create(
             codigo=codigo,
             defaults={
-                "nombre": f"{nombre} · {inicio:%b} a {termino:%b} {termino:%Y}",
+                "nombre": evaluacion3.nombre_libre(
+                    Periodo, codigo, f"{nombre} · {inicio:%b} a {termino:%b} {termino:%Y}"),
                 "inicio": inicio,
                 "termino": termino,
                 "anio": inicio.year,
@@ -1791,6 +1797,7 @@ class Command(BaseCommand):
                 periodo=periodo,
                 cargo=cargos[codigo_cargo],
                 item=items[codigo_item],
+                funcionario=None,   # la del cargo, no una asignación personal
                 defaults={"meta": meta, "ponderador": ponderador},
             )
             if nuevo:
@@ -1957,7 +1964,8 @@ class Command(BaseCommand):
 
             metas = list(
                 MetaPeriodo.objects
-                .filter(periodo=periodo, cargo=perfil.cargo_asignado, activo=True)
+                .filter(periodo=periodo, cargo=perfil.cargo_asignado, activo=True,
+                        funcionario__isnull=True)
                 .select_related("item")
                 .order_by("item__codigo")
             )
@@ -2035,7 +2043,8 @@ class Command(BaseCommand):
                 continue
             meta = (
                 MetaPeriodo.objects
-                .filter(periodo=periodo, cargo=perfil.cargo_asignado, activo=True)
+                .filter(periodo=periodo, cargo=perfil.cargo_asignado, activo=True,
+                        funcionario__isnull=True)
                 .select_related("item")
                 .order_by("item__codigo")
                 .first()

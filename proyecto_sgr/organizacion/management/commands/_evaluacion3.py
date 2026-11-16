@@ -31,6 +31,27 @@ from django.utils import timezone
 from comun.rut import digito_verificador
 
 
+def nombre_libre(Modelo, codigo, nombre, campo="nombre"):
+    """
+    El nombre que puede llevar el registro de demostración ``codigo``.
+
+    El nombre es único. En una base con datos reales —por ejemplo, la
+    estructura municipal cargada con ``cargar_estructura_municipal``— otro
+    registro, con otro código, puede tenerlo ya. Entonces el de demostración
+    se rotula «(demostración)»: no pisa el real ni choca con él.
+    """
+    otros = Modelo.objects.exclude(codigo=codigo)
+    if not otros.filter(**{campo: nombre}).exists():
+        return nombre
+    largo = Modelo._meta.get_field(campo).max_length
+    sufijo = " (demostración)"
+    base = nombre[: largo - len(sufijo) - 3].rstrip() + sufijo
+    candidato, n = base, 2
+    while otros.filter(**{campo: candidato}).exists():
+        candidato, n = f"{base} {n}", n + 1
+    return candidato
+
+
 def rut_ficticio(numero):
     cuerpo = 30_000_000 + numero
     return f"{cuerpo}-{digito_verificador(cuerpo)}"
@@ -185,7 +206,8 @@ def _juntas_y_participaciones(cmd, vecinos):
     for codigo, nombre, d, t, direccion, constitucion, activo in JUNTAS:
         registro, nuevo = JuntaVecinos.objects.update_or_create(
             codigo=codigo,
-            defaults={"nombre": nombre, "delegacion": deleg[d], "territorio": terr[t],
+            defaults={"nombre": nombre_libre(JuntaVecinos, codigo, nombre),
+                      "delegacion": deleg[d], "territorio": terr[t],
                       "direccion": direccion, "fecha_constitucion": constitucion,
                       "activo": activo, "desactivada": None if activo else date(2025, 12, 31)},
         )
@@ -288,7 +310,8 @@ def _trimestres(cmd, periodo):
     if _libre(Periodo, "PER-D02", q[0], q[1], ini, fin):
         registro, nuevo = Periodo.objects.update_or_create(
             codigo="PER-D02",
-            defaults={"nombre": f"Trimestre {q[1]} de {q[0]} (en preparación)", "anio": q[0],
+            defaults={"nombre": nombre_libre(Periodo, "PER-D02", f"Trimestre {q[1]} de {q[0]} (en preparación)"),
+                      "anio": q[0],
                       "numero": q[1], "inicio": ini, "termino": fin,
                       "estado": Periodo.Estado.BORRADOR,
                       "observacion": "El trimestre siguiente, todavía sin abrir."},
@@ -297,7 +320,8 @@ def _trimestres(cmd, periodo):
     if _libre(Periodo, "PER-D00", 2025, 3, date(2025, 7, 1), date(2025, 9, 30)):
         registro, nuevo = Periodo.objects.update_or_create(
             codigo="PER-D00",
-            defaults={"nombre": "Trimestre 3 de 2025 (creado por error)", "anio": 2025, "numero": 3,
+            defaults={"nombre": nombre_libre(Periodo, "PER-D00", "Trimestre 3 de 2025 (creado por error)"),
+                      "anio": 2025, "numero": 3,
                       "inicio": date(2025, 7, 1), "termino": date(2025, 9, 30),
                       "estado": Periodo.Estado.BORRADOR, "activo": False,
                       "desactivada": date(2025, 7, 15),
@@ -318,7 +342,7 @@ def _cargos_y_asignaciones(cmd, periodo):
     ]:
         registro, nuevo = Cargo.objects.update_or_create(
             codigo=codigo,
-            defaults={"nombre": nombre, "descripcion": desc, "activo": activo,
+            defaults={"nombre": nombre_libre(Cargo, codigo, nombre), "descripcion": desc, "activo": activo,
                       "desactivada": None if activo else date(2026, 3, 31)},
         )
         cmd._informar("Cargo", registro, nuevo)
@@ -423,7 +447,9 @@ def _registros(cmd, periodo, hitos, vecinos):
     sub = SubAtencion.objects.filter(codigo="SAT-01").first()
     luis = vecinos.get(101)
     if sub is not None and luis is not None and marcela is not None:
-        atencion = Atencion.objects.filter(solicitante=luis, subatencion=sub, delegacion=del1).first()
+        existente = CasoSocial.objects.filter(codigo="CSO-D04").select_related("atencion").first()
+        atencion = existente.atencion if existente else Atencion.objects.filter(
+            solicitante=luis, subatencion=sub, delegacion=del1, caso__isnull=True).first()
         if atencion is None:
             atencion = Atencion.objects.create(
                 solicitante=luis, subatencion=sub, delegacion=del1, funcionario=marcela,
@@ -478,13 +504,15 @@ def _catalogo_desechable(cmd):
 
     tipo, nuevo = TipoAtencion.objects.update_or_create(
         codigo="TAT-D09",
-        defaults={"nombre": "Tipo de prueba (desechable)", "area": "Transversal",
+        defaults={"nombre": nombre_libre(TipoAtencion, "TAT-D09", "Tipo de prueba (desechable)"),
+                  "area": "Transversal",
                   "descripcion": "Registro para probar editar y desactivar. Tiene un subtipo."},
     )
     cmd._informar("Tipo de atención", tipo, nuevo)
     sub, nuevo = SubAtencion.objects.update_or_create(
         codigo="SAT-D25",
-        defaults={"nombre": "Subtipo de prueba (desechable)", "tipo_atencion": tipo,
+        defaults={"nombre": nombre_libre(SubAtencion, "SAT-D25", "Subtipo de prueba (desechable)"),
+                  "tipo_atencion": tipo,
                   "descripcion": "Registro para probar editar y desactivar.", "documento": False},
     )
     cmd._informar("Subtipo de atención", sub, nuevo)
