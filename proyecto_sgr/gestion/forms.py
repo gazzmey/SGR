@@ -4,6 +4,7 @@ from django import forms
 from django.db import models
 
 from catalogos.models import Item
+from comun import relleno as R
 from comun.utilidades import proximo_codigo
 from gestion.models import Cargo, MetaPeriodo, Periodo
 from gestion.reglas import ReglaCalculo
@@ -206,6 +207,21 @@ class MetaPeriodoForm(forms.ModelForm):
                 "crear la meta: son lo que la identifica. Para medir otra "
                 "combinación, crea una meta nueva."
             )
+
+        # Relleno inteligente: la persona se busca escribiendo y trae su
+        # cargo, que es el que el servidor usa de todas formas.
+        R.datos_de_opciones(self.fields["funcionario"], R.datos_persona)
+        R.buscador(self.fields["funcionario"], "Escribe el nombre de la persona")
+        R.rellena(self.fields["funcionario"], {"cargo": "cargo"}, "según la persona")
+
+    def relleno(self, request):
+        """Si hay un solo trimestre abierto, la meta nueva es de ese."""
+        if self.is_bound or self.instance.pk or self.initial.get("periodo"):
+            return
+        abiertos = list(self.fields["periodo"].queryset
+                        .filter(estado=Periodo.Estado.ABIERTO).values_list("pk", flat=True)[:2])
+        if len(abiertos) == 1:
+            self.initial["periodo"] = abiertos[0]
 
     @staticmethod
     def _con_el_actual(modelo, pk_actual):

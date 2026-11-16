@@ -16,6 +16,7 @@ from atencion.models import (
     Atencion, CasoSocial, JuntaVecinos, ParticipacionJunta, Solicitante,
 )
 from catalogos.models import SubAtencion, TipoAtencion
+from comun import relleno as R
 from comun.formularios import ConAlcance, ConCodigo, activos_mas, fecha, nombre_de_usuario
 from comun.rut import limpiar_rut, rut_valido
 from comun.utilidades import proximo_codigo
@@ -118,6 +119,17 @@ class JuntaForm(ConAlcance, ConCodigo):
         for campo in ("delegacion", "territorio"):
             self.fields[campo].empty_label = "Elige una opción"
 
+        # Relleno inteligente: la delegación limita los territorios, y el
+        # territorio elegido trae su delegación.
+        R.datos_de_opciones(self.fields["territorio"], R.datos_territorio)
+        R.filtra(self.fields["territorio"], "delegacion")
+        R.rellena(self.fields["territorio"], {"delegacion": "delegacion"}, "según el territorio")
+
+    def relleno(self, request):
+        from comun.contexto import delegacion_activa
+
+        self.proponer("delegacion", delegacion_activa(request))
+
     def clean_nombre(self):
         valor = (self.cleaned_data.get("nombre") or "").strip()
         if len(valor) < 5:
@@ -161,10 +173,25 @@ class ParticipacionForm(ConAlcance, ConCodigo):
             lambda j: f"{j.nombre} · {j.territorio.nombre}")
         for campo in ("vecino", "junta"):
             self.fields[campo].empty_label = "Elige una opción"
+
+        # Relleno inteligente: el vecino se busca escribiendo, y solo se
+        # ofrecen las juntas de su territorio (la misma regla que valida el
+        # modelo). Si hay una sola, queda elegida.
+        R.datos_de_opciones(self.fields["vecino"], R.datos_vecino)
+        R.buscador(self.fields["vecino"], "Escribe el nombre o el RUT del vecino")
+        R.datos_de_opciones(self.fields["junta"], lambda j: {
+            "territorio": j.territorio_id, "delegacion": j.delegacion_id})
+        R.filtra(self.fields["junta"], "vecino", dato="territorio", de="territorio", autoelige=True,
+                 aviso="Solo las juntas del territorio donde vive el vecino.",
+                 vacio="No hay juntas activas en el territorio de ese vecino.")
         # La persona y la junta son la identidad de la participación.
         if self.instance.pk:
             for campo in ("vecino", "junta"):
                 self.fields[campo].disabled = True
+
+    def relleno(self, request):
+        if not self.is_bound and not self.instance.pk:
+            self.initial.setdefault("fecha_incorporacion", R.hoy())
 
 
 # =========================================================================
@@ -259,6 +286,7 @@ class GestionSocialForm(ConAlcance, forms.ModelForm):
         self.fields["asignacion"].empty_label = "Sin asignación de meta"
         for campo in ("beneficiario", "tipo", "subtipo", "delegacion", "responsable"):
             self.fields[campo].empty_label = "Elige una opción"
+        self._preparar_relleno()
 
         if atencion is not None:
             self.initial.update({
@@ -271,6 +299,44 @@ class GestionSocialForm(ConAlcance, forms.ModelForm):
             })
             self.fields["delegacion"].disabled = True
             self.fields["delegacion"].help_text = "No cambia después de creada."
+
+    def _preparar_relleno(self):
+        """
+        Lo que el formulario completa solo mientras se llena.
+
+        * El beneficiario se busca por nombre o RUT y trae la delegación de
+          su territorio.
+        * El subtipo se limita al tipo elegido; si hay uno solo, queda.
+        * La asignación se limita a las que miden al responsable.
+        """
+        f = self.fields
+        self._recientes = set()
+        R.datos_de_opciones(f["beneficiario"], lambda v: dict(
+            R.datos_vecino(v), reciente=v.pk in self._recientes))
+        R.buscador(f["beneficiario"], "Escribe el nombre o el RUT del vecino")
+        R.rellena(f["beneficiario"], {"delegacion": "delegacion"}, "según el vecino")
+
+        R.datos_de_opciones(f["subtipo"], lambda s: {"tipo": s.tipo_atencion_id})
+        R.filtra(f["subtipo"], "tipo", autoelige=True, vacio="Ese tipo no tiene subtipos activos.")
+
+        R.datos_de_opciones(f["responsable"], R.datos_persona)
+        R.rellena(f["responsable"], {"delegacion": "delegacion"}, "según el responsable")
+        mide = R.quienes_mide(f["asignacion"].queryset.select_related(None))
+        R.datos_de_opciones(f["asignacion"], lambda a: {"mide": mide.get(a.pk, ())})
+        R.filtra(f["asignacion"], "responsable", dato="mide", lista=True,
+                 aviso="Solo las metas que miden al responsable.",
+                 vacio="El responsable no tiene metas en un trimestre abierto.")
+
+    def relleno(self, request):
+        """El responsable es quien registra; la delegación, la activa; la fecha, hoy."""
+        from comun.contexto import delegacion_activa
+
+        self._recientes = R.vecinos_recientes(request.user)
+        self.proponer("responsable", request.user)
+        self.proponer("delegacion", delegacion_activa(request))
+        if not self.is_bound and not self.instance.pk:
+            self.initial.setdefault("fecha_atencion", R.hoy())
+            self.initial.setdefault("ingreso", R.hoy())
 
     def clean_detalle(self):
         valor = (self.cleaned_data.get("detalle") or "").strip()

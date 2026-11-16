@@ -20,6 +20,7 @@ from comun import permisos as P
 from comun.auditoria import registrar
 from comun.models import EventoAuditoria
 from comun.mantenedor import (
+    Desde,
     CambiarEstado,
     Columna,
     CrearMantenedor,
@@ -407,6 +408,10 @@ class CargoEditar(EditarMantenedor):
 
 
 class CargoDetalle(DetalleMantenedor):
+    desde_aqui = [
+        Desde("Asignar una meta al cargo", "gestion:meta_nueva", "asignacion",
+              lambda o: {"cargo": o.pk}, cuando=lambda o: o.activo),
+    ]
     model = Cargo
     permiso = P.DEFINIR_META
     menu = "cargos"
@@ -551,7 +556,7 @@ class MetaNueva(CrearMantenedor):
     def get_initial(self):
         """Hereda el período y el cargo del listado filtrado."""
         inicial = super().get_initial()
-        for campo in ("periodo", "cargo", "funcionario"):
+        for campo in ("periodo", "cargo", "funcionario", "item"):
             valor = self.request.GET.get(campo)
             if valor:
                 inicial[campo] = valor

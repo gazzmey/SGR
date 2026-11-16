@@ -21,6 +21,7 @@ from django.utils.html import format_html
 from comun import permisos as P
 from comun.formularios import nombre_de_usuario
 from comun.mantenedor import (
+    Desde,
     AnularMantenedor, CambiarEstado, Columna, CrearMantenedor, DetalleMantenedor,
     EditarMantenedor, Filtro, ListaMantenedor, chip_estado, enlace_nombre, filtro_estado,
 )
@@ -96,6 +97,7 @@ class HitosLista(_Hito, ListaMantenedor):
 
 
 class HitoNuevo(_Hito, CrearMantenedor):
+    prellenables = ["delegacion", "territorio"]
     form_class = HitoForm
     pasa_usuario = True
     secciones = [
@@ -114,6 +116,11 @@ class HitoEditar(_Hito, EditarMantenedor):
 
 
 class HitoDetalle(_Hito, DetalleMantenedor):
+    desde_aqui = [
+        Desde("Registrar una actividad del hito", "gestion:registro_actividad_nueva", "actividad",
+              lambda o: {"hito": o.pk, "delegacion": o.delegacion_id, "territorio": o.territorio_id},
+              cuando=lambda o: o.activo, detalle="Con el hito, su delegación y su territorio"),
+    ]
     url_editar = "gestion:hito_editar"
     url_estado = "gestion:hito_estado"
     campos = [
@@ -221,6 +228,8 @@ class RegistroActividades(_Actividad, ListaMantenedor):
 
 
 class RegistroActividadNueva(_Actividad, CrearMantenedor):
+    prellenables = ["funcionario", "delegacion", "asignacion", "origen", "solicitante",
+                    "territorio", "hito"]
     form_class = ActividadRegistroForm
     pasa_usuario = True
     secciones = [
@@ -250,6 +259,11 @@ class RegistroActividadEditar(_Actividad, EditarMantenedor):
 
 
 class RegistroActividadDetalle(_Actividad, DetalleMantenedor):
+    desde_aqui = [
+        Desde("Adjuntar evidencia", "gestion:registro_evidencia_nueva", "evidencia",
+              lambda o: {"origen": "actividad", "actividad": o.pk},
+              cuando=lambda o: not o.anulada, detalle="Queda enlazada a esta actividad"),
+    ]
     template_name = "comun/registro_detalle.html"
     url_editar = "gestion:registro_actividad_editar"
     url_anular = "gestion:registro_actividad_anular"
@@ -400,6 +414,7 @@ class RegistroEvidencias(_Evidencia, ListaMantenedor):
 
 
 class RegistroEvidenciaNueva(_Evidencia, CrearMantenedor):
+    prellenables = ["origen", "actividad", "caso"]
     form_class = EvidenciaRegistroForm
     pasa_usuario = True
     secciones = [

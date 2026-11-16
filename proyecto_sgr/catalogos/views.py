@@ -14,6 +14,7 @@ from catalogos.forms import ItemForm, SubAtencionForm, TipoAtencionForm
 from catalogos.models import Area, Item, SubAtencion, TipoAtencion
 from comun import permisos as P
 from comun.mantenedor import (
+    Desde,
     CambiarEstado,
     Columna,
     CrearMantenedor,
@@ -143,6 +144,10 @@ class ItemEditar(EditarMantenedor):
 
 
 class ItemDetalle(DetalleMantenedor):
+    desde_aqui = [
+        Desde("Asignar esta meta", "gestion:meta_nueva", "asignacion",
+              lambda o: {"item": o.pk}, cuando=lambda o: o.activo),
+    ]
     model = Item
     permiso = PERMISO
     menu = "items"

@@ -4,6 +4,7 @@ from django import forms
 from django.contrib.auth.models import User
 
 from catalogos.models import Item
+from comun import relleno as R
 from comun.utilidades import proximo_codigo
 from gestion.modelos_agenda import Compromiso
 
@@ -78,6 +79,18 @@ class CompromisoForm(forms.ModelForm):
             medicion=Item.Medicion.AGENDA)
         self.fields["item"].empty_label = "No alimenta ninguna meta"
         self.fields["item"].required = False
+
+        # Relleno inteligente: quién lo pidió propone las juntas y los
+        # vecinos de la delegación, y al elegir uno se completa su
+        # territorio. El texto sigue siendo libre: se puede escribir otro.
+        R.sugerencias(self.fields["solicitante"], R.sugerencias_comunidad(self.delegacion),
+                      rellena_con={"territorio": "territorio", "origen": "origen"},
+                      motivo="según quién lo pidió")
+        R.sugerencias(self.fields["territorio"], R.sugerencias_territorios(self.delegacion))
+        # Quien ingresa el compromiso suele ser también su responsable.
+        if (not self.is_bound and not self.instance.pk and perfil is not None
+                and self.fields["responsable"].queryset.filter(pk=perfil.usuario_id).exists()):
+            self.initial.setdefault("responsable", perfil.usuario_id)
 
         if self.periodo is not None:
             self.fields["vencimiento"].help_text = (

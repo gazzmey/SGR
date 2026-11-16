@@ -14,6 +14,7 @@ from django import forms
 from django.db.models import Q
 
 from atencion.models import CasoSocial, Solicitante
+from comun import relleno as R
 from comun.formularios import ConAlcance, ConCodigo, activos_mas, fecha, nombre_de_usuario
 from gestion.modelos_actividad import Actividad, Evidencia
 from gestion.models import Hito, MetaPeriodo, Periodo
@@ -49,6 +50,17 @@ class HitoForm(ConAlcance, ConCodigo):
         self.fields["delegacion"].empty_label = "Elige la delegación"
         self.fields["responsables"].queryset = self.personas(*actuales)
         self.rotular_personas(self.fields["responsables"])
+
+        # Relleno inteligente: el territorio trae su delegación, y la
+        # delegación limita los territorios que se ofrecen.
+        R.datos_de_opciones(self.fields["territorio"], R.datos_territorio)
+        R.filtra(self.fields["territorio"], "delegacion")
+        R.rellena(self.fields["territorio"], {"delegacion": "delegacion"}, "según el territorio")
+
+    def relleno(self, request):
+        from comun.contexto import delegacion_activa
+
+        self.proponer("delegacion", delegacion_activa(request))
 
     def clean_nombre(self):
         valor = (self.cleaned_data.get("nombre") or "").strip()
@@ -149,6 +161,71 @@ class ActividadRegistroForm(ConAlcance, ConCodigo):
             for campo in Actividad.CAMPOS_DEL_CALCULO + ["delegacion"]:
                 self.fields[campo].disabled = True
                 self.fields[campo].help_text = "Aprobada: no se cambia. Anúlala si hay que corregirla."
+        self._preparar_relleno(asignaciones)
+
+    def _preparar_relleno(self, asignaciones):
+        """
+        Lo que el formulario completa solo mientras se llena.
+
+        * El funcionario se busca escribiendo y trae su delegación.
+        * La asignación se limita a las que miden a ese funcionario —la suya
+          o la de su cargo, con la regla de ``calculo.metas_de``—; si es una
+          sola, queda elegida.
+        * El vecino se busca por nombre o RUT y trae su territorio.
+        * El territorio y el hito se limitan a la delegación, y el hito
+          trae su territorio.
+        """
+        f = self.fields
+        self._recientes = {"solicitante": set(), "asignacion": set()}
+
+        R.datos_de_opciones(f["funcionario"], R.datos_persona)
+        R.buscador(f["funcionario"], "Escribe el nombre o el correo")
+        R.rellena(f["funcionario"], {"delegacion": "delegacion"}, "según el funcionario")
+
+        mide = R.quienes_mide(asignaciones)
+        R.datos_de_opciones(f["asignacion"], lambda a: {
+            "mide": mide.get(a.pk, ()),
+            "reciente": a.pk in self._recientes["asignacion"],
+        })
+        R.filtra(f["asignacion"], "funcionario", dato="mide", lista=True, autoelige=True,
+                 aviso="Solo las metas que miden a esa persona en el trimestre abierto.",
+                 vacio="Esa persona no tiene metas asignadas en el trimestre abierto.")
+
+        R.datos_de_opciones(f["solicitante"], lambda v: dict(
+            R.datos_vecino(v), reciente=v.pk in self._recientes["solicitante"],
+            origen=Actividad.Origen.COMUNIDAD))
+        R.buscador(f["solicitante"], "Escribe el nombre o el RUT del vecino")
+        R.rellena(f["solicitante"], {"territorio": "territorio", "origen": "origen"}, "según el vecino")
+
+        R.datos_de_opciones(f["territorio"], R.datos_territorio)
+        R.filtra(f["territorio"], "delegacion", vacio="Esa delegación no tiene territorios activos.")
+
+        R.datos_de_opciones(f["hito"], lambda h: {
+            "delegacion": h.delegacion_id, "territorio": h.territorio_id})
+        R.filtra(f["hito"], "delegacion", vacio="Esa delegación no tiene hitos activos.")
+        R.rellena(f["hito"], {"territorio": "territorio"}, "según el hito")
+
+        R.datos_de_opciones(f["responsable"], R.datos_persona)
+
+    def relleno(self, request):
+        """Quien registra, su delegación activa y la fecha de hoy."""
+        from comun.contexto import delegacion_activa
+
+        self._recientes["solicitante"] = R.vecinos_recientes(request.user)
+        self._recientes["asignacion"] = R.asignaciones_recientes(request.user)
+        # Quien registra se propone como funcionario solo si a esa persona
+        # la miden metas (tiene cargo): si no, el formulario espera a que se
+        # elija a quién se le registra.
+        perfil = getattr(request.user, "perfil", None)
+        if perfil is not None and perfil.cargo_asignado_id:
+            self.proponer("funcionario", request.user)
+        self.proponer("delegacion", delegacion_activa(request))
+        if not self.is_bound and not self.instance.pk:
+            self.initial.setdefault("fecha", R.hoy())
+            # El origen trae «planificada» por omisión: es una propuesta, y
+            # cambia a «solicitud de la comunidad» al elegir un vecino.
+            if not self.initial.get("origen"):
+                self.fields["origen"].widget.attrs["data-propuesto"] = "1"
 
     def clean_accion(self):
         valor = (self.cleaned_data.get("accion") or "").strip()
@@ -229,6 +306,25 @@ class EvidenciaRegistroForm(ConAlcance, ConCodigo):
         self.fields["actividad"].empty_label = "Elige la actividad"
         self.fields["caso"].empty_label = "Elige la gestión social"
         self.fields["referencia"].required = True
+
+        # Relleno inteligente: se busca escribiendo, y primero aparecen las
+        # actividades que todavía esperan su evidencia.
+        esperan = set(actividades.filter(
+            estado__in=[Actividad.Estado.BORRADOR, Actividad.Estado.RECHAZADA]
+        ).values_list("pk", flat=True)[:200])
+        R.datos_de_opciones(self.fields["actividad"], lambda a: {
+            "detalle": f"{a.fecha:%d-%m-%Y} · {a.get_estado_display()}",
+            "reciente": a.pk in esperan,
+        })
+        R.buscador(self.fields["actividad"], "Escribe el código, la descripción o el funcionario")
+        self.fields["actividad"].widget.attrs["data-recientes"] = "Esperan evidencia"
+        R.datos_de_opciones(self.fields["caso"], lambda c: {
+            "detalle": f"{R.rut_legible(c.atencion.solicitante.rut)} · {c.get_estado_display()}",
+            "busca": c.atencion.solicitante.rut,
+        })
+        R.buscador(self.fields["caso"], "Escribe el código, el nombre o el RUT")
+        R.muestra_si(self.fields["actividad"], "origen", "actividad")
+        R.muestra_si(self.fields["caso"], "origen", "caso")
         if inst.pk:
             self.initial["origen"] = "actividad" if inst.actividad_id else "caso"
             for campo in ("origen", "actividad", "caso"):

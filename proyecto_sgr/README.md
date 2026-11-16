@@ -998,6 +998,10 @@ sus permisos), `comun/formularios.py`, `comun/rut.py`, `organizacion/grupos.py`
 `comun/registro_detalle.html` y `comun/mantenedor_anular.html`, y la carpeta
 `pruebas/`.
 
+Después de la Evaluación 3 se agregó el **relleno inteligente** de los
+formularios: `comun/relleno.py`, `static/sgr/js/sgr-relleno.js` y
+`pruebas/test_relleno.py`. Ver «Relleno inteligente» más abajo.
+
 ```
 proyecto_sgr/
   manage.py
@@ -1075,7 +1079,7 @@ proyecto_sgr/
                                     mi resultado y tablero
   static/sgr/
     css/sgr.css  css/sgr2.css
-    js/sgr.js  js/sgr-app.js
+    js/sgr.js  js/sgr-app.js  js/sgr-relleno.js
     img/escudo.png  img/favicon.png
 ```
 
@@ -1086,3 +1090,30 @@ navegador filtraba, ordenaba y paginaba; aquí eso lo hace el servidor, y lo que
 queda en JavaScript solo mejora el uso. Todo funciona sin él: los formularios
 tienen su botón de enviar, los selectores su opción de cambiar, y la validación
 que manda es la del servidor.
+
+**Relleno inteligente (`sgr-relleno.js` y `comun/relleno.py`).** Los
+formularios que se relacionan con registros ya creados se completan solos
+mientras se llenan, para no tener que buscar en listas largas:
+
+- **Buscar escribiendo.** Personas, vecinos, actividades y gestiones sociales
+  se eligen escribiendo unas letras del nombre, el RUT o el código. Primero
+  aparece lo usado hace poco y, en evidencias, las actividades que todavía
+  esperan su respaldo.
+- **Completar por contexto.** Al elegir al vecino se ponen su territorio y el
+  origen «solicitud de la comunidad»; al elegir al funcionario, la lista de
+  asignaciones se reduce a las metas que lo miden (la suya o la de su cargo)
+  y, si es una sola, queda elegida. El territorio trae su delegación; el
+  vecino, solo las juntas de su territorio; el tipo de atención, sus
+  subtipos.
+- **Valores propuestos.** Quien registra, su delegación activa y la fecha de
+  hoy. En la agenda, «quién lo pidió» propone las juntas y los vecinos de la
+  delegación y completa el territorio.
+- **Registrar desde la ficha.** La ficha de un vecino, una junta, un
+  territorio, un hito, una actividad, una gestión social, un usuario, un
+  cargo o una meta ofrece crear lo relacionado con la relación ya puesta
+  (`?solicitante=6`). El botón aparece solo con permiso para crear.
+
+Lo completado lleva la nota «Completado según…», se puede cambiar, y lo que
+la persona eligió a mano nunca se pisa. El servidor arma los datos de cada
+opción dentro del alcance de quien edita y valida igual que siempre: sin
+JavaScript el formulario funciona como antes.

@@ -5,6 +5,7 @@ import os
 from django import forms
 
 from catalogos.models import Item
+from comun import relleno as R
 from comun.utilidades import proximo_codigo
 from gestion import evidencias
 from gestion.modelos_actividad import Actividad, Evidencia
@@ -78,6 +79,16 @@ class ActividadForm(forms.ModelForm):
                 % (periodo.inicio.strftime("%d-%m-%Y"),
                    periodo.termino.strftime("%d-%m-%Y"), periodo.nombre)
             )
+
+        # Relleno inteligente: la fecha es hoy (dentro del trimestre), si
+        # hay un solo ítem posible queda elegido, y «con quién se coordinó»
+        # propone las juntas y los vecinos de la delegación.
+        if not self.is_bound and not self.instance.pk and periodo is not None:
+            self.initial.setdefault(
+                "fecha", min(max(R.hoy(), periodo.inicio), periodo.termino))
+        R.elige_si_unica(self.fields["item"])
+        R.sugerencias(self.fields["contacto"],
+                      R.sugerencias_comunidad(getattr(perfil, "delegacion", None)))
 
     def _items_con_meta(self):
         """Los ítems con meta para el cargo de esta persona en este período."""

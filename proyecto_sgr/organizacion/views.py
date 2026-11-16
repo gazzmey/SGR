@@ -26,6 +26,7 @@ from django.utils.html import format_html
 from comun import permisos as P
 from comun.formularios import nombre_de_usuario
 from comun.mantenedor import (
+    Desde,
     CambiarEstado,
     Columna,
     CrearMantenedor,
@@ -162,6 +163,10 @@ class DelegacionEditar(EditarMantenedor):
 
 
 class DelegacionDetalle(DetalleMantenedor):
+    desde_aqui = [
+        Desde("Nuevo territorio", "organizacion:territorio_nuevo", "territorio",
+              lambda o: {"delegacion": o.pk}, cuando=lambda o: o.activo),
+    ]
     model = Delegacion
     campo_delegacion = "pk"
     permiso = PERMISO
@@ -269,6 +274,7 @@ class TerritoriosLista(_Territorio, ListaMantenedor):
 
 
 class TerritorioNuevo(_Territorio, CrearMantenedor):
+    prellenables = ["delegacion"]
     form_class = TerritorioForm
     pasa_usuario = True
     secciones = [
@@ -285,6 +291,12 @@ class TerritorioEditar(_Territorio, EditarMantenedor):
 
 
 class TerritorioDetalle(_Territorio, DetalleMantenedor):
+    desde_aqui = [
+        Desde("Nuevo vecino del territorio", "atencion:vecino_nuevo", "vecino",
+              lambda o: {"territorio": o.pk}, cuando=lambda o: o.activo),
+        Desde("Nueva junta de vecinos", "atencion:junta_nueva", "junta",
+              lambda o: {"territorio": o.pk, "delegacion": o.delegacion_id}, cuando=lambda o: o.activo),
+    ]
     url_editar = "organizacion:territorio_editar"
     url_estado = "organizacion:territorio_estado"
     campos = [
@@ -740,6 +752,14 @@ class UsuarioEditar(_ConEditor, EditarMantenedor):
 
 
 class UsuarioDetalle(DetalleMantenedor):
+    desde_aqui = [
+        Desde("Asignarle una meta", "gestion:meta_nueva", "asignacion",
+              lambda o: {"funcionario": o.usuario_id},
+              cuando=lambda o: o.activo and o.cargo_asignado_id, detalle="Una asignación personal"),
+        Desde("Registrar actividad a su nombre", "gestion:registro_actividad_nueva", "actividad",
+              lambda o: {"funcionario": o.usuario_id, "delegacion": o.delegacion_id},
+              cuando=lambda o: o.activo),
+    ]
     model = PerfilUsuario
     campo_delegacion = "delegacion_id"
     permiso = PERMISO

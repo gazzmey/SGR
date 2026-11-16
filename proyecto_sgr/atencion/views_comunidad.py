@@ -26,6 +26,7 @@ from atencion.models import CasoSocial, JuntaVecinos, ParticipacionJunta, Solici
 from comun import permisos as P
 from comun.formularios import nombre_de_usuario
 from comun.mantenedor import (
+    Desde,
     AnularMantenedor, CambiarEstado, Columna, CrearMantenedor, DetalleMantenedor,
     EditarMantenedor, Filtro, ListaMantenedor, chip_estado, enlace_nombre, filtro_estado,
 )
@@ -105,6 +106,7 @@ class VecinosLista(_Vecino, ListaMantenedor):
 
 
 class VecinoNuevo(_Vecino, CrearMantenedor):
+    prellenables = ["territorio"]
     form_class = VecinoForm
     pasa_usuario = True
     secciones = [
@@ -122,6 +124,19 @@ class VecinoEditar(_Vecino, EditarMantenedor):
 
 
 class VecinoDetalle(_Vecino, DetalleMantenedor):
+    desde_aqui = [
+        Desde("Registrar actividad con este vecino", "gestion:registro_actividad_nueva", "actividad",
+              lambda o: {"solicitante": o.pk, "territorio": o.territorio_id, "origen": "comunidad",
+                         "delegacion": o.territorio.delegacion_id if o.territorio_id else None},
+              cuando=lambda o: o.activo, detalle="Con el vecino y su territorio"),
+        Desde("Nueva gestión social", "atencion:gestion_nueva", "gestion_social",
+              lambda o: {"beneficiario": o.pk,
+                         "delegacion": o.territorio.delegacion_id if o.territorio_id else None},
+              cuando=lambda o: o.activo, detalle="Con el vecino como beneficiario"),
+        Desde("Agregar a una junta de vecinos", "atencion:participacion_nueva", "participacion",
+              lambda o: {"vecino": o.pk}, cuando=lambda o: o.activo,
+              detalle="Solo se ofrecen las juntas de su territorio"),
+    ]
     url_editar = "atencion:vecino_editar"
     url_estado = "atencion:vecino_estado"
     campos = [
@@ -217,6 +232,7 @@ class JuntasLista(_Junta, ListaMantenedor):
 
 
 class JuntaNueva(_Junta, CrearMantenedor):
+    prellenables = ["delegacion", "territorio"]
     form_class = JuntaForm
     pasa_usuario = True
     secciones = [
@@ -233,6 +249,13 @@ class JuntaEditar(_Junta, EditarMantenedor):
 
 
 class JuntaDetalle(_Junta, DetalleMantenedor):
+    desde_aqui = [
+        Desde("Agregar participante", "atencion:participacion_nueva", "participacion",
+              lambda o: {"junta": o.pk}, cuando=lambda o: o.activo, detalle="Con esta junta elegida"),
+        Desde("Registrar actividad con la junta", "gestion:registro_actividad_nueva", "actividad",
+              lambda o: {"delegacion": o.delegacion_id, "territorio": o.territorio_id, "origen": "comunidad"},
+              cuando=lambda o: o.activo, detalle="Con su delegación y su territorio"),
+    ]
     url_editar = "atencion:junta_editar"
     url_estado = "atencion:junta_estado"
     campos = [
@@ -332,6 +355,7 @@ class ParticipacionesLista(_Participacion, ListaMantenedor):
 
 
 class ParticipacionNueva(_Participacion, CrearMantenedor):
+    prellenables = ["vecino", "junta"]
     form_class = ParticipacionForm
     pasa_usuario = True
     secciones = [
@@ -451,6 +475,7 @@ class GestionesLista(_Gestion, ListaMantenedor):
 
 
 class GestionNueva(_Gestion, CrearMantenedor):
+    prellenables = ["beneficiario", "delegacion"]
     form_class = GestionSocialForm
     pasa_usuario = True
     secciones = [
@@ -481,6 +506,11 @@ class GestionEditar(_Gestion, EditarMantenedor):
 
 
 class GestionDetalle(_Gestion, DetalleMantenedor):
+    desde_aqui = [
+        Desde("Adjuntar evidencia", "gestion:registro_evidencia_nueva", "evidencia",
+              lambda o: {"origen": "caso", "caso": o.pk},
+              cuando=lambda o: not o.anulado, detalle="Queda enlazada a esta gestión social"),
+    ]
     template_name = "comun/registro_detalle.html"
     url_editar = "atencion:gestion_editar"
     url_anular = "atencion:gestion_anular"

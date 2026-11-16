@@ -74,6 +74,19 @@
       </div>
     {% endif %}
 
+    {% if desde_aqui %}
+      <nav class="card desde" aria-labelledby="desde-titulo">
+        <div class="desde-h" id="desde-titulo">Registrar desde esta ficha</div>
+        {% for boton in desde_aqui %}
+          <a class="desde-fila" href="{{ boton.url }}">
+            <span class="desde-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5v13M5.5 12h13"/></svg></span>
+            <span class="desde-tx"><b>{{ boton.texto }}</b>{% if boton.detalle %}<span>{{ boton.detalle }}</span>{% endif %}</span>
+            <svg class="desde-fl" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+          </a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+
     {% block avisos_estado %}
     {% if not obj.activo %}
       <div class="notice neu">

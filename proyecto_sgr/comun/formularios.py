@@ -86,6 +86,28 @@ class ConAlcance:
         for campo in campos:
             campo.label_from_instance = nombre_de_usuario
 
+    def proponer(self, nombre, valor):
+        """
+        Valor inicial sugerido para un campo (relleno inteligente).
+
+        Solo al crear, en el formulario sin enviar, y si nadie lo puso antes:
+        lo que llega por la dirección desde una ficha manda. Si el valor no
+        está entre las opciones —fuera del alcance o inactivo— no se propone.
+        """
+        if valor in (None, "") or nombre not in self.fields or self.is_bound or self.instance.pk:
+            return
+        if self.initial.get(nombre) not in (None, ""):
+            return
+        consulta = getattr(self.fields[nombre], "queryset", None)
+        if consulta is not None:
+            valor = getattr(valor, "pk", valor)
+            if not consulta.filter(pk=valor).exists():
+                return
+        self.initial[nombre] = valor
+        # Una propuesta, no una elección: el navegador la puede reemplazar
+        # cuando otro campo indique algo más preciso.
+        self.fields[nombre].widget.attrs["data-propuesto"] = "1"
+
 
 class ConCodigo(forms.ModelForm):
     """

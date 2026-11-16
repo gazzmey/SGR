@@ -1297,3 +1297,62 @@
 
 /* Sin JavaScript, el resultado de la operación se lee en el aviso de <noscript> */
 main.content > noscript > .notice { margin-bottom: 20px }
+
+/* =====================================================================
+   Relleno inteligente de formularios (sgr-relleno.js)
+   ===================================================================== */
+
+/* Buscador: el selector largo se usa escribiendo */
+.busc { position: relative; min-width: 0 }
+.busc .busc-in { padding-left: 38px; text-overflow: ellipsis }
+.busc-texto .input { padding-left: 14px }
+.busc .busc-lupa { position: absolute; left: 13px; top: 20px; margin-top: -8px; color: var(--tinta3); pointer-events: none }
+.busc-lista {
+  position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
+  background: var(--sup); border: 1px solid var(--linea2); border-radius: var(--rs);
+  box-shadow: var(--sh2); max-height: 320px; overflow-y: auto; padding: 4px;
+}
+.busc-grupo { font-size: 12px; font-weight: 600; color: var(--tinta3); padding: 9px 10px 4px }
+.busc-op { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 6px; cursor: pointer }
+.busc-op b { font-weight: 600; font-size: 14px; color: var(--tinta); line-height: 1.3 }
+.busc-op span { font-size: 12.5px; color: var(--tinta3); line-height: 1.3 }
+.busc-op.activa, .busc-op:hover { background: var(--g50) }
+.busc-op[aria-selected="true"] b { color: var(--g700) }
+.busc-op.vacia b { font-weight: 500; color: var(--tinta2) }
+.busc-nada { padding: 12px 10px; font-size: 13px; color: var(--tinta3) }
+.busc-mas { padding: 6px 10px 8px; font-size: 12px; color: var(--tinta3); border-top: 1px solid var(--linea); margin-top: 4px }
+
+/* Lo que completó el sistema: una nota junto a la etiqueta y un destello */
+.field > label .auto-nota {
+  margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--verde);
+  white-space: nowrap;
+}
+.field.auto-destello .input { animation: sgr-autocompletado 1.4s var(--ease) }
+@keyframes sgr-autocompletado {
+  0% { background-color: var(--verde-bg); border-color: var(--verde-bar) }
+  100% { background-color: var(--sup) }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field.auto-destello .input { animation: none }
+}
+
+/* Registrar desde una ficha, con la relación ya puesta */
+.desde { padding: 4px 0 }
+.desde-h { font-size: 12.5px; font-weight: 600; color: var(--tinta3); padding: 12px 16px 6px }
+.desde-fila {
+  display: flex; align-items: center; gap: 12px; padding: 11px 16px;
+  color: var(--tinta); text-decoration: none; border-top: 1px solid var(--linea);
+}
+.desde-h + .desde-fila { border-top: 0 }
+.desde-fila:hover { background: var(--sup2) }
+.desde-fila:focus-visible { outline: 2px solid var(--g700); outline-offset: -2px; border-radius: 8px }
+.desde-ic {
+  width: 30px; height: 30px; flex: none; border-radius: 9px; display: flex;
+  align-items: center; justify-content: center; background: var(--g50); color: var(--g700);
+}
+.desde-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3 }
+.desde-tx b { font-size: 14px; font-weight: 600 }
+.desde-tx span { font-size: 12.5px; color: var(--tinta3) }
+.desde-fl { flex: none; color: var(--tinta3) }
+.desde-fila:hover .desde-fl { color: var(--g700) }
+

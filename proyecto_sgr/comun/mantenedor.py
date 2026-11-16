@@ -516,6 +516,21 @@ class _FormMantenedor(RequierePermiso, AlcanceDelegacion):
             kwargs["delegaciones"] = self.delegaciones_permitidas()
         return kwargs
 
+    def get_form(self, form_class=None):
+        """
+        El formulario prepara su relleno inteligente, si lo tiene.
+
+        ``relleno(request)`` propone valores iniciales —quien registra, la
+        delegación activa, la fecha de hoy— y marca lo que se usó hace poco.
+        Va aquí y no en el ``__init__`` del formulario porque necesita la
+        sesión, que el formulario no conoce. Ver ``comun/relleno.py``.
+        """
+        formulario = super().get_form(form_class)
+        preparar = getattr(formulario, "relleno", None)
+        if callable(preparar):
+            preparar(self.request)
+        return formulario
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         formulario = ctx["form"]
@@ -557,6 +572,20 @@ class _FormMantenedor(RequierePermiso, AlcanceDelegacion):
 
 class CrearMantenedor(_FormMantenedor, CreateView):
     accion_django = "add"
+    #: Campos que se pueden dejar elegidos desde la dirección, por ejemplo
+    #: ``?solicitante=5`` al registrar una actividad desde la ficha del
+    #: vecino. Es solo el valor inicial: el formulario valida lo que llegue
+    #: igual que si se hubiera elegido a mano, y un valor fuera del alcance
+    #: no aparece entre las opciones.
+    prellenables = []
+
+    def get_initial(self):
+        inicial = super().get_initial()
+        for campo in self.prellenables:
+            valor = self.request.GET.get(campo)
+            if valor:
+                inicial[campo] = valor
+        return inicial
 
     def form_valid(self, form):
         # El aviso se prepara DESPUÉS de super(), que es quien guarda: si
@@ -658,6 +687,36 @@ class EditarMantenedor(_FormMantenedor, UpdateView):
         return respuesta
 
 
+class Desde:
+    """
+    Un registro nuevo que se crea desde una ficha, con la relación ya puesta.
+
+    Por ejemplo, desde la ficha de un vecino: «Registrar actividad» abre el
+    formulario de actividad con el vecino y su territorio elegidos. El botón
+    aparece solo si quien mira puede crear ese registro, y solo cuando
+    ``cuando(obj)`` lo permite (una actividad anulada no recibe evidencias).
+    """
+
+    def __init__(self, texto, url, entidad, parametros, *, cuando=None, detalle=""):
+        self.texto = texto
+        self.url = url
+        self.entidad = entidad
+        self.parametros = parametros
+        self.cuando = cuando
+        self.detalle = detalle
+
+    def para(self, usuario, obj):
+        from comun.entidades import puede
+
+        if self.cuando is not None and not self.cuando(obj):
+            return None
+        if not puede(usuario, self.entidad, "add"):
+            return None
+        valores = {k: v for k, v in self.parametros(obj).items() if v not in (None, "")}
+        return {"texto": self.texto, "detalle": self.detalle,
+                "url": reverse(self.url) + ("?" + urlencode(valores) if valores else "")}
+
+
 class DetalleMantenedor(RequierePermiso, AlcanceDelegacion, DetailView):
     template_name = "comun/mantenedor_detalle.html"
     context_object_name = "obj"
@@ -673,6 +732,8 @@ class DetalleMantenedor(RequierePermiso, AlcanceDelegacion, DetailView):
     pie = ""
     accion_django = "view"
     url_anular = ""
+    #: Registros que se pueden crear desde esta ficha (lista de ``Desde``).
+    desde_aqui = []
 
     def get_queryset(self):
         """La ficha de un registro fuera del alcance no existe: 404."""
@@ -716,6 +777,8 @@ class DetalleMantenedor(RequierePermiso, AlcanceDelegacion, DetailView):
             "kpis": tarjetas,
             "pie": self.pie,
             "motivo_bloqueo": obj.motivo_bloqueo() if hasattr(obj, "motivo_bloqueo") else "",
+            "desde_aqui": [boton for boton in (d.para(self.request.user, obj) for d in self.desde_aqui)
+                           if boton],
         })
         return ctx
 
