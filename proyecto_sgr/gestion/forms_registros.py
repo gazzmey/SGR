@@ -208,7 +208,8 @@ class ActividadRegistroForm(ConAlcance, ConCodigo):
         R.rellena(f["solicitante"], {"territorio": "territorio", "origen": "origen"}, "según el vecino")
 
         R.datos_de_opciones(f["territorio"], R.datos_territorio)
-        R.filtra(f["territorio"], "delegacion", vacio="Esa delegación no tiene territorios activos.")
+        R.filtra(f["territorio"], "delegacion",
+                 vacio="Esa delegación no tiene territorios activos.")
 
         R.datos_de_opciones(f["hito"], lambda h: {
             "delegacion": h.delegacion_id, "territorio": h.territorio_id})

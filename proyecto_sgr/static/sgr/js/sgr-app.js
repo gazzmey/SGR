@@ -509,7 +509,13 @@
             return;
           }
           Object.keys(destinos).forEach(function (k) {
-            if (destinos[k] && d[k]) destinos[k].value = d[k];
+            if (!destinos[k] || !d[k]) return;
+            destinos[k].value = d[k];
+            /* El territorio es un selector: se avisa el cambio para que el
+               campo visible muestre el territorio encontrado. */
+            if (destinos[k].tagName === 'SELECT') {
+              destinos[k].dispatchEvent(new Event('change', { bubbles: true }));
+            }
           });
           avisar('Ficha encontrada · ' + d.atenciones +
                  (d.atenciones === 1 ? ' atención previa' : ' atenciones previas'), 'bueno');

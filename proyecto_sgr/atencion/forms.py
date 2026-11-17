@@ -17,6 +17,7 @@ from django.urls import reverse_lazy
 
 from atencion.models import Atencion, CasoSocial, Solicitante, limpiar_rut, rut_valido
 from catalogos.models import SubAtencion, TipoAtencion
+from comun import relleno as R
 from comun.formularios import TELEFONO_FALTA, limpiar_telefono
 
 
@@ -123,8 +124,11 @@ class AtencionForm(forms.ModelForm):
 
         from organizacion.models import Territorio
 
-        territorios = Territorio.objects.filter(activo=True, delegacion=delegacion) if delegacion else Territorio.objects.none()
+        territorios = (Territorio.objects.filter(activo=True, delegacion=delegacion)
+                       .select_related("delegacion").order_by("nombre")
+                       if delegacion else Territorio.objects.none())
         self.fields["territorio"].queryset = territorios
+        R.datos_de_opciones(self.fields["territorio"], R.datos_territorio)
         self.fields["territorio"].required = territorios.exists()
         self.fields["tipo"].queryset = TipoAtencion.objects.filter(activo=True)
         # El selector de subatención ofrece todas las activas: el navegador

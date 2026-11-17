@@ -186,3 +186,50 @@ class RellenoDelFuncionario(Base):
         juntas = [s for s in sugerencias if s["detalle"].startswith("Junta de vecinos")]
         self.assertTrue(juntas)
         self.assertTrue(all(s["territorio"] and s["origen"] == "externo" for s in juntas))
+
+
+class ListaDeTerritorios(Base):
+    """
+    Lo que la lista del sistema necesita de cada territorio: el nombre corto,
+    el grupo (su delegación) y la descripción. El orden y el autoelegido de
+    la junta los decide el servidor.
+    """
+
+    def test_cada_territorio_lleva_nombre_grupo_y_detalle(self):
+        from organizacion.models import Territorio
+
+        html = self.gestion.get(reverse("atencion:junta_nueva")).content.decode()
+        atributos = opcion(html, "territorio", self.ter1.pk)
+        self.assertIn(f'data-nombre="{self.ter1.nombre}"', atributos)
+        self.assertIn(f'data-grupo="{self.del1.nombre}"', atributos)
+        self.assertIn('data-detalle="', atributos)
+        # Sin JavaScript, el texto de la opción sigue diciendo la delegación.
+        self.assertIn(f"{self.ter1.nombre} · {self.del1.nombre}", html)
+        self.assertTrue(Territorio.objects.filter(pk=self.ter1.pk).exists())
+
+    def test_la_junta_elige_sola_el_unico_territorio(self):
+        html = self.gestion.get(reverse("atencion:junta_nueva")).content.decode()
+        filtro = json.loads(re.search(r'data-filtra="([^"]+)"', atributos_del_select(html, "territorio"))
+                            .group(1).replace("&quot;", '"'))
+        self.assertEqual((filtro["segun"], filtro["autoelige"]), ("delegacion", True))
+
+    def test_ordenados_por_delegacion_y_nombre(self):
+        html = self.gestion.get(reverse("atencion:junta_nueva")).content.decode()
+        bloque = re.search(r'<select name="territorio"[^>]*>(.*?)</select>', html, re.S).group(1)
+        grupos = re.findall(r'data-grupo="([^"]+)"', bloque)
+        nombres = re.findall(r'data-nombre="([^"]+)"', bloque)
+        pares = list(zip(grupos, nombres))
+        self.assertEqual(pares, sorted(pares))
+
+    def test_el_vecino_ve_primero_los_de_su_delegacion(self):
+        html = self.gestion.get(reverse("atencion:vecino_nuevo")).content.decode()
+        bloque = re.search(r'<select name="territorio"[^>]*>(.*?)</select>', html, re.S).group(1)
+        grupos = re.findall(r'data-grupo="([^"]+)"', bloque)
+        self.assertTrue(grupos)
+        self.assertEqual(grupos[0], self.del1.nombre)
+        primero_ajeno = next(i for i, g in enumerate(grupos) if g != self.del1.nombre)
+        self.assertNotIn(self.del1.nombre, grupos[primero_ajeno:])
+
+    def test_el_script_de_la_lista_se_carga_en_todas_las_paginas(self):
+        html = self.gestion.get(reverse("atencion:junta_nueva")).content.decode()
+        self.assertIn("sgr/js/sgr-relleno.js", html)

@@ -1389,6 +1389,33 @@ main.content > noscript > .notice { margin-bottom: 20px }
 .busc-nada { padding: 12px 10px; font-size: 13px; color: var(--tinta3) }
 .busc-mas { padding: 6px 10px 8px; font-size: 12px; color: var(--tinta3); border-top: 1px solid var(--linea); margin-top: 4px }
 
+/* Selector: el desplegable de un formulario, con la lista del sistema en
+   vez de la del navegador. Se ve igual que un select cerrado. */
+.combo .busc-in { padding-left: 12px; padding-right: 38px; cursor: pointer }
+/* «readonly» es solo para que no se escriba en las listas cortas: se ve
+   como un campo normal, no como uno bloqueado. */
+.combo .busc-in[readonly] { background: #fff; color: var(--tinta); caret-color: transparent }
+.field.err .combo .busc-in[readonly] { background: #FFF8F7 }
+.combo .busc-in[readonly]::selection { background: transparent }
+.combo .busc-flecha {
+  position: absolute; right: 12px; top: 20px; margin-top: -8px;
+  color: var(--tinta2); pointer-events: none; transition: transform var(--t) var(--ease);
+}
+.combo .busc-in[aria-expanded="true"] + .busc-flecha { transform: rotate(180deg) }
+.combo .busc-in[aria-expanded="true"] { border-color: var(--g700); box-shadow: 0 0 0 3px rgba(var(--g700-rgb), .12) }
+.combo.desactivado .busc-in { cursor: not-allowed }
+.combo.desactivado .busc-flecha { opacity: .45 }
+.busc-lista.arriba { top: auto; bottom: calc(100% + 4px) }
+.busc-grupo:not(:first-child) { border-top: 1px solid var(--linea); margin-top: 4px; padding-top: 10px }
+.busc-op { position: relative }
+.busc-op[aria-selected="true"] { padding-right: 34px }
+.busc-op[aria-selected="true"]::after {
+  content: ""; position: absolute; right: 14px; top: 50%;
+  width: 5px; height: 10px; margin-top: -7px;
+  border: solid var(--g700); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: reduce) { .combo .busc-flecha { transition: none } }
+
 /* Lo que completó el sistema: una nota junto a la etiqueta y un destello */
 .field > label .auto-nota {
   margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--verde);

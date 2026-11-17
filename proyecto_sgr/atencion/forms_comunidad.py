@@ -53,6 +53,14 @@ class VecinoForm(ConAlcance, forms.ModelForm):
         self.fields["territorio"].label_from_instance = (
             lambda t: f"{t.nombre} · {t.delegacion.nombre}")
         self.fields["territorio"].empty_label = "Elige el territorio donde vive"
+        # En la lista, cada territorio va bajo su delegación y con su
+        # descripción, que es lo que ayuda a reconocerlo.
+        R.datos_de_opciones(self.fields["territorio"], R.datos_territorio)
+
+    def relleno(self, request):
+        from comun.contexto import delegacion_activa
+
+        self.territorios_de_primero(delegacion_activa(request))
 
     def clean_rut(self):
         valor = limpiar_rut(self.cleaned_data.get("rut"))
@@ -119,7 +127,8 @@ class JuntaForm(ConAlcance, ConCodigo):
         # Relleno inteligente: la delegación limita los territorios, y el
         # territorio elegido trae su delegación.
         R.datos_de_opciones(self.fields["territorio"], R.datos_territorio)
-        R.filtra(self.fields["territorio"], "delegacion")
+        R.filtra(self.fields["territorio"], "delegacion", autoelige=True,
+                 vacio="Esa delegación no tiene territorios activos.")
         R.rellena(self.fields["territorio"], {"delegacion": "delegacion"}, "según el territorio")
 
     def relleno(self, request):

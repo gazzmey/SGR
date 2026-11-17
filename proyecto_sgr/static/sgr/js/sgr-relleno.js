@@ -3,6 +3,8 @@
    El servidor deja en el HTML lo que hace falta (ver comun/relleno.py):
 
      data-buscador="ayuda"      el selector se usa escribiendo
+     data-grupo, data-detalle   en la opción: su grupo y una línea de detalle
+     data-nativo                el select se queda con la lista del navegador
      data-filtra='{…}'          las opciones dependen de otro campo
      data-rellena='{…}'         al elegir, completa otros campos
      data-muestra-si='{…}'      el campo se ve solo con cierto valor de otro
@@ -290,8 +292,13 @@
 
   /* ---------------------------------------------- lista de coincidencias */
 
-  /* La parte visible que comparten el buscador y las sugerencias: una
-     lista bajo el campo que se recorre con el teclado. */
+  /* La parte visible que comparten el buscador, el selector y las
+     sugerencias: una lista bajo el campo que se recorre con el teclado.
+
+     opciones.alEnfocar   se llama al entrar al campo
+     opciones.abreAlEnfocar  false: se abre con clic, flechas, Enter o
+                          escribiendo, como un desplegable común
+     opciones.marcaElegida  al abrir, se marca la opción ya elegida */
   function lista(input, opciones) {
     var id = (input.id || input.name) + '-lista';
     var panel = document.createElement('div');
@@ -305,7 +312,7 @@
     input.setAttribute('aria-controls', id);
     input.setAttribute('autocomplete', 'off');
 
-    var filas = [], activa = -1;
+    var filas = [], activa = -1, tecleado = '', tecleadoEspera = null;
 
     function cerrar() {
       panel.hidden = true;
@@ -321,6 +328,16 @@
         input.setAttribute('aria-activedescendant', filas[i].el.id);
         filas[i].el.scrollIntoView({ block: 'nearest' });
       }
+    }
+
+    /* Si abajo no cabe y arriba hay más espacio, la lista se abre hacia
+       arriba: así no queda cortada al final de la pantalla. */
+    function ubicar() {
+      panel.classList.remove('arriba');
+      var caja = input.getBoundingClientRect();
+      var alto = Math.min(panel.scrollHeight, 320);
+      var abajo = window.innerHeight - caja.bottom;
+      if (abajo < alto + 12 && caja.top > abajo) panel.classList.add('arriba');
     }
 
     function abrir() {
@@ -358,7 +375,7 @@
         if (g.resto) {
           var mas = document.createElement('div');
           mas.className = 'busc-mas';
-          mas.textContent = 'y ' + g.resto + (g.resto === 1 ? ' más' : ' más') + ': sigue escribiendo para acotar.';
+          mas.textContent = 'y ' + g.resto + ' más: sigue escribiendo para acotar.';
           panel.appendChild(mas);
         }
       });
@@ -370,13 +387,33 @@
       }
       panel.hidden = false;
       input.setAttribute('aria-expanded', 'true');
-      /* Solo se adelanta la primera coincidencia cuando se escribió algo:
-         así un Enter al entrar al campo no elige nada por accidente. */
+      ubicar();
+      /* Se adelanta la primera coincidencia solo cuando se escribió algo:
+         así un Enter al entrar al campo no elige nada por accidente. En un
+         selector se marca lo ya elegido, como en un desplegable común. */
       var escrito = opciones.consulta ? opciones.consulta(input.value) : input.value;
-      marcar(escrito && filas.length ? 0 : -1);
+      var elegida = -1;
+      if (!escrito && opciones.marcaElegida) {
+        filas.forEach(function (f, i) { if (f.item.elegida) elegida = i; });
+      }
+      marcar(escrito && filas.length ? 0 : elegida);
+    }
+
+    /* En un selector que no se escribe, una letra salta a la primera
+       opción que empieza así; varias seguidas, a la que empieza con esas. */
+    function saltar(letra) {
+      clearTimeout(tecleadoEspera);
+      tecleado += normalizar(letra) || letra;
+      tecleadoEspera = setTimeout(function () { tecleado = ''; }, 700);
+      var desde = tecleado.length > 1 ? Math.max(activa, 0) : activa + 1;
+      for (var k = 0; k < filas.length; k++) {
+        var i = (desde + k) % filas.length;
+        if (normalizar(filas[i].item.texto).indexOf(tecleado) === 0) { marcar(i); return; }
+      }
     }
 
     input.addEventListener('keydown', function (e) {
+      if (input.disabled) return;
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         if (panel.hidden) { abrir(); return; }
@@ -388,15 +425,30 @@
           e.preventDefault();
           opciones.elegir(filas[activa].item);
           cerrar();
+        } else if (panel.hidden && opciones.abreConEnter) {
+          e.preventDefault();
+          abrir();
         }
       } else if (e.key === 'Escape') {
         if (!panel.hidden) { e.preventDefault(); cerrar(); opciones.restaurar(); }
+      } else if (input.readOnly && e.key === ' ') {
+        e.preventDefault();
+        if (panel.hidden) abrir();
+        else if (filas[activa]) { opciones.elegir(filas[activa].item); cerrar(); }
+      } else if (input.readOnly && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (panel.hidden) abrir();
+        saltar(e.key);
+      } else if (e.key === 'Tab' && !panel.hidden) {
+        cerrar();
       }
     });
     input.addEventListener('input', abrir);
     input.addEventListener('focus', function () {
       if (opciones.alEnfocar) opciones.alEnfocar();
-      abrir();
+      if (opciones.abreAlEnfocar !== false) abrir();
+    });
+    input.addEventListener('click', function () {
+      if (panel.hidden && !input.disabled) abrir();
     });
     input.addEventListener('blur', function () {
       setTimeout(function () { cerrar(); opciones.restaurar(); }, 120);
@@ -405,23 +457,59 @@
     return panel;
   }
 
-  /* -------------------------------------------- el buscador de un select */
+  /* ------------------------------------- buscador y selector de un select */
 
+  var FLECHA = '<svg class="busc-flecha" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>';
+
+  /* Cuántas opciones aguanta un selector antes de que convenga escribir. */
+  var PARA_ESCRIBIR = 8;
+
+  /* El buscador: un selector largo (vecinos, personas) que se usa
+     escribiendo. Muestra unas pocas coincidencias a la vez. */
   function buscador(sel) {
-    if (sel.disabled || sel._buscador) return;
+    combo(sel, {
+      lupa: true, escribe: true, limite: MAXIMO,
+      ayuda: function () { return sel.dataset.buscador; },
+      sinResultados: 'Sin coincidencias. Prueba con el apellido, el RUT o el código.'
+    });
+  }
+
+  /* El selector: cualquier otro desplegable de un formulario. Se ve como
+     siempre, pero la lista la dibuja el sistema: con el detalle de cada
+     opción, agrupada si las opciones traen grupo, y con la elegida marcada.
+     Si es larga, además se puede escribir para acotarla. */
+  function selector(sel) {
+    if (sel._buscador || sel.multiple || sel.hasAttribute('data-nativo') ||
+        sel.hasAttribute('data-autoenviar') || !sel.closest('.field')) return;
+    var reales = Array.prototype.filter.call(sel.options, function (op) { return op.value; });
+    var largo = (sel._todas || reales).length > PARA_ESCRIBIR;
+    combo(sel, {
+      lupa: false, escribe: largo, limite: Infinity,
+      ayuda: function () {
+        var vacia = Array.prototype.filter.call(sel.options, function (op) { return !op.value; })[0];
+        return vacia ? vacia.textContent.trim() : 'Elige una opción';
+      },
+      sinResultados: 'Ninguna opción calza con lo que escribiste.'
+    });
+  }
+
+  function combo(sel, cfg) {
+    if (sel._buscador) return;
     var envoltura = sel.closest('.selw') || sel;
     var caja = document.createElement('div');
-    caja.className = 'busc';
-    caja.innerHTML = LUPA;
+    caja.className = cfg.lupa ? 'busc' : 'busc combo';
+    if (cfg.lupa) caja.innerHTML = LUPA;
     var input = document.createElement('input');
     input.type = 'text';
     input.className = 'input busc-in';
-    input.id = (sel.id || sel.name) + '-buscar';
-    input.placeholder = sel.dataset.buscador;
+    input.id = (sel.id || sel.name) + (cfg.lupa ? '-buscar' : '-elegir');
     input.spellcheck = false;
+    input.readOnly = !cfg.escribe;
     caja.appendChild(input);
+    /* La flecha va después del campo, para que el CSS la gire al abrir. */
+    if (!cfg.lupa) caja.insertAdjacentHTML('beforeend', FLECHA);
 
-    /* La etiqueta pasa a apuntar al campo de texto, y el select queda
+    /* La etiqueta pasa a apuntar al campo visible, y el select queda
        oculto pero dentro del formulario: es el que viaja al servidor. */
     var etiqueta = sel.id && document.querySelector('label[for="' + sel.id + '"]');
     if (etiqueta) etiqueta.htmlFor = input.id;
@@ -431,17 +519,41 @@
     sel._buscador = input;
 
     var tituloRecientes = sel.dataset.recientes || 'Usados hace poco';
-    var vacia = Array.prototype.filter.call(sel.options, function (op) { return !op.value; })[0];
+
+    function vacia() {
+      return Array.prototype.filter.call(sel.options, function (op) { return !op.value; })[0];
+    }
 
     function item(op) {
       return {
         valor: op.value,
         texto: (op.dataset.nombre || op.textContent).trim(),
         detalle: op.dataset.detalle || '',
+        grupo: op.dataset.grupo || '',
         vacia: !op.value,
         elegida: op.value === sel.value && !!op.value,
-        indice: normalizar(op.textContent + ' ' + (op.dataset.detalle || '') + ' ' + (op.dataset.busca || ''))
+        indice: normalizar(op.textContent + ' ' + (op.dataset.detalle || '') + ' ' +
+                           (op.dataset.grupo || '') + ' ' + (op.dataset.busca || ''))
       };
+    }
+
+    /* Agrupa respetando el orden en que vienen; sin grupos, una sola lista. */
+    function agrupar(items) {
+      var grupos = [], porTitulo = {};
+      items.forEach(function (it) {
+        var titulo = it.grupo;
+        if (!porTitulo[titulo]) {
+          porTitulo[titulo] = { titulo: titulo, items: [] };
+          grupos.push(porTitulo[titulo]);
+        }
+        porTitulo[titulo].items.push(it);
+      });
+      return grupos;
+    }
+
+    function recortar(items) {
+      if (cfg.limite === Infinity) return agrupar(items);
+      return [{ items: items.slice(0, cfg.limite), resto: Math.max(0, items.length - cfg.limite) }];
     }
 
     var panel = lista(input, {
@@ -449,49 +561,51 @@
         var consulta = normalizar(texto === textoElegido() ? '' : texto);
         var todas = Array.prototype.filter.call(sel.options, function (op) { return op.value; }).map(item);
         if (consulta) {
-          var hallados = todas.filter(function (it) { return coincide(it.indice, consulta); });
-          return [{ items: hallados.slice(0, MAXIMO), resto: Math.max(0, hallados.length - MAXIMO) }];
+          return recortar(todas.filter(function (it) { return coincide(it.indice, consulta); }));
         }
         var grupos = [];
-        var recientes = Array.prototype.filter.call(sel.options, function (op) {
-          return op.value && op.dataset.reciente;
-        }).map(item);
+        var recientes = todas.filter(function (it) {
+          var op = Array.prototype.filter.call(sel.options, function (o) { return o.value === it.valor; })[0];
+          return op && op.dataset.reciente;
+        });
         /* La opción vacía sirve para quitar lo elegido en un campo
            opcional; si no hay nada elegido, no hace falta ofrecerla. */
-        if (vacia && !sel.dataset.requerido && sel.value) {
-          var v = item(vacia);
-          if (/^elige/i.test(v.texto)) v.texto = 'Quitar la selección';
-          grupos.push({ items: [v] });
+        var v = vacia();
+        if (v && !sel.dataset.requerido && sel.value) {
+          var quitar = item(v);
+          if (/^elige/i.test(quitar.texto)) quitar.texto = 'Quitar la selección';
+          grupos.push({ items: [quitar] });
         }
         if (recientes.length) grupos.push({ titulo: tituloRecientes, items: recientes });
         var resto = todas.filter(function (it) {
           return !recientes.some(function (r) { return r.valor === it.valor; });
         });
-        grupos.push({
-          titulo: recientes.length ? 'Todos' : '',
-          items: resto.slice(0, MAXIMO),
-          resto: Math.max(0, resto.length - MAXIMO)
-        });
-        return grupos;
+        var cuerpo = recortar(resto);
+        if (recientes.length && cuerpo.length === 1 && !cuerpo[0].titulo) cuerpo[0].titulo = 'Todos';
+        return grupos.concat(cuerpo);
       },
       consulta: function (texto) { return texto === textoElegido() ? '' : texto.trim(); },
       elegir: elegir,
       restaurar: function () {
         /* Borrar el texto de un campo opcional y salir lo deja vacío. */
-        if (!input.value.trim() && sel.value && !sel.dataset.requerido && vacia) {
+        if (cfg.escribe && !input.value.trim() && sel.value && !sel.dataset.requerido && vacia()) {
           elegir({ valor: '' });
           return;
         }
         refrescar();
       },
-      alEnfocar: function () { input.select(); },
-      sinResultados: 'Sin coincidencias. Prueba con el apellido, el RUT o el código.'
+      alEnfocar: function () { if (cfg.escribe) input.select(); },
+      abreAlEnfocar: cfg.lupa,
+      abreConEnter: true,
+      marcaElegida: !cfg.lupa,
+      sinResultados: cfg.sinResultados
     });
     caja.appendChild(panel);
 
     function elegir(it) {
       sel.value = it.valor;
       marcarManual(sel);
+      quitarFalta(sel);
       var evento = new Event('change', { bubbles: true });
       evento.sgrUsuario = true;
       sel.dispatchEvent(evento);
@@ -504,17 +618,71 @@
     }
 
     function refrescar() {
+      input.placeholder = cfg.ayuda() || '';
       input.value = textoElegido();
+      input.title = input.value;
+      input.disabled = sel.disabled;
       caja.classList.toggle('con-valor', !!sel.value);
+      caja.classList.toggle('desactivado', sel.disabled);
     }
 
-    sel.addEventListener('change', refrescar);
+    sel.addEventListener('change', function () { quitarFalta(sel); refrescar(); });
     sel._refrescar = refrescar;
+    /* Otras partes del sistema rehacen las opciones o desactivan el select
+       (la subatención según el tipo, los filtros de arriba): el campo
+       visible se pone al día solo. */
+    if (window.MutationObserver) {
+      new MutationObserver(refrescar).observe(sel, {
+        childList: true, attributes: true, attributeFilter: ['disabled']
+      });
+    }
     refrescar();
   }
 
   function refrescarBuscador(sel) {
     if (sel._refrescar) sel._refrescar();
+  }
+
+  /* Un select obligatorio que se volvió buscador o selector deja de tener
+     «required» (está oculto), así que se revisa al enviar: sin esto, el
+     aviso llegaría recién desde el servidor. */
+  function marcarFalta(sel) {
+    var caja = contenedor(sel);
+    if (!caja) return;
+    caja.classList.add('err');
+    if (!caja.querySelector('.msg.falta-eleccion')) {
+      var msg = document.createElement('span');
+      msg.className = 'msg falta-eleccion';
+      msg.innerHTML = '<svg class="i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>Elige una opción de la lista.';
+      caja.appendChild(msg);
+    }
+  }
+
+  function quitarFalta(sel) {
+    var caja = contenedor(sel);
+    var msg = caja && caja.querySelector('.msg.falta-eleccion');
+    if (!msg) return;
+    msg.remove();
+    if (!caja.querySelector('.msg')) caja.classList.remove('err');
+  }
+
+  function exigirElegidos(formulario) {
+    if (formulario._exige) return;
+    formulario._exige = true;
+    formulario.addEventListener('submit', function (e) {
+      var primero = null;
+      formulario.querySelectorAll('select[data-requerido]').forEach(function (sel) {
+        var caja = contenedor(sel);
+        if (sel.value || sel.disabled || !sel._buscador || (caja && caja.hidden)) return;
+        marcarFalta(sel);
+        if (!primero) primero = sel;
+      });
+      if (primero) {
+        e.preventDefault();
+        e.stopPropagation();
+        primero._buscador.focus();
+      }
+    }, true);
   }
 
   /* ------------------------------------- sugerencias de un campo de texto */
@@ -570,6 +738,12 @@
       if (formulario.querySelector('[data-buscador], [data-filtra], [data-rellena], [data-muestra-si], [data-autoelige], [data-sugerencias]')) {
         preparar(formulario);
       }
+      /* Los desplegables de los formularios que guardan algo usan la lista
+         del sistema. Los filtros de los listados se quedan como están. */
+      if ((formulario.getAttribute('method') || '').toLowerCase() === 'post') {
+        formulario.querySelectorAll('.field select.input').forEach(selector);
+      }
+      if (formulario.querySelector('select[data-requerido]')) exigirElegidos(formulario);
     });
   });
 })();

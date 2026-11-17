@@ -93,7 +93,26 @@ class ConAlcance:
         consulta = Territorio.objects.select_related("delegacion")
         if self.permitidas is not None:
             consulta = consulta.filter(delegacion_id__in=self.permitidas)
-        return activos_mas(consulta, actual)
+        # Por delegación y por nombre: la lista se lee agrupada y en orden,
+        # no en el orden en que se fueron creando.
+        return activos_mas(consulta, actual).select_related("delegacion").order_by(
+            "delegacion__nombre", "nombre")
+
+    def territorios_de_primero(self, delegacion, nombre="territorio"):
+        """
+        Pone primero los territorios de ``delegacion`` (la activa, por lo
+        general). En la lista se ven agrupados por delegación, y el grupo de
+        quien está registrando queda arriba en vez de en orden alfabético.
+        """
+        from django.db.models import Case, IntegerField, Value, When
+
+        campo = self.fields.get(nombre)
+        if campo is None or delegacion is None:
+            return
+        campo.queryset = campo.queryset.order_by(
+            Case(When(delegacion=delegacion, then=Value(0)), default=Value(1),
+                 output_field=IntegerField()),
+            "delegacion__nombre", "nombre")
 
     def personas(self, *actuales):
         """Usuarios activos con perfil activo, dentro del alcance."""

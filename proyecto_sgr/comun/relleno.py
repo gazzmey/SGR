@@ -155,7 +155,20 @@ def datos_vecino(vecino):
 
 
 def datos_territorio(territorio):
-    return {"delegacion": territorio.delegacion_id, "detalle": territorio.delegacion.nombre}
+    """
+    En la lista: el nombre del territorio, agrupado bajo su delegación, y su
+    descripción como detalle. El texto de la opción sigue diciendo la
+    delegación, para quien abra el formulario sin JavaScript.
+    """
+    descripcion = " ".join((territorio.descripcion or "").split())
+    if len(descripcion) > 80:
+        descripcion = descripcion[:77].rstrip() + "…"
+    return {
+        "delegacion": territorio.delegacion_id,
+        "nombre": territorio.nombre,
+        "grupo": territorio.delegacion.nombre,
+        "detalle": descripcion,
+    }
 
 
 def datos_persona(usuario):

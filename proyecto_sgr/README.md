@@ -1151,6 +1151,18 @@ mientras se llenan, para no tener que buscar en listas largas:
   territorio, un hito, una actividad, una gestión social, un usuario, un
   cargo o una meta ofrece crear lo relacionado con la relación ya puesta
   (`?solicitante=6`). El botón aparece solo con permiso para crear.
+- **Listas del sistema en todos los formularios.** Los desplegables de los
+  formularios que guardan algo ya no abren la lista del navegador, sino una
+  propia: cada opción con su detalle en gris, agrupadas cuando corresponde
+  (los territorios, bajo su delegación y con su descripción) y la elegida
+  marcada. Si la lista tiene más de ocho opciones se puede escribir para
+  acotarla; si es corta, una letra salta a la opción que empieza así. Se
+  maneja con el teclado y se abre hacia arriba si abajo no cabe. Un campo
+  obligatorio sin elegir se avisa antes de enviar. Los territorios vienen
+  ordenados por delegación y nombre; en el vecino nuevo, los de la
+  delegación activa van primero, y en la junta nueva, si la delegación tiene
+  un solo territorio, queda elegido. Los filtros de los listados conservan
+  la lista del navegador, y un `select` con `data-nativo` también.
 
 Lo completado lleva la nota «Completado según…», se puede cambiar, y lo que
 la persona eligió a mano nunca se pisa. El servidor arma los datos de cada
