@@ -46,6 +46,7 @@ def mapa(request):
     para_el_mapa = {
         "modo": modo,
         "presencia": filtros.presencia,
+        "presencia_texto": filtros.como_texto(),
         "referencia": filtros.referencia.strftime("%d-%m-%Y"),
         "periodo": filtros.periodo.nombre if filtros.periodo else "",
         "umbral": {"verde": M.VERDE_HASTA, "ambar": M.AMBAR_HASTA},

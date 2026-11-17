@@ -146,12 +146,6 @@ de un territorio, y todo lo que se muestra son conteos.
   <div class="card-h">
     <h2 id="t-mapa">Territorios</h2>
     <span class="sub">{{ ubicados }} de {{ resumen.total }} ubicado{{ resumen.total|pluralize }} en el mapa</span>
-    <div class="end legend">
-      <span><i class="mapa-pto verde"></i>Hasta {{ verde_hasta }} días</span>
-      <span><i class="mapa-pto ambar"></i>{{ verde_hasta|add:1 }} a {{ ambar_hasta }} días</span>
-      <span><i class="mapa-pto rojo"></i>Más de {{ ambar_hasta }} o nunca</span>
-      {% if resumen.gris %}<span><i class="mapa-pto gris"></i>Desactivado</span>{% endif %}
-    </div>
   </div>
   <div class="mapa-cuerpo">
     <div class="mapa-lienzo" id="mapa-lienzo" data-ubicados="{{ ubicados }}">
@@ -187,13 +181,12 @@ de un territorio, y todo lo que se muestra son conteos.
         {% else %}
           <p class="soft">Ningún territorio lleva más de {{ ambar_hasta }} días sin presencia. Elige uno en el mapa para ver su detalle.</p>
         {% endif %}
-        <p class="small soft mapa-ayuda solo-js">Toca un círculo para ver qué pasa en ese territorio y registrar desde ahí.</p>
+        <p class="small soft mapa-ayuda solo-js">Toca un punto para ver qué pasa en ese territorio y registrar desde ahí. Arrastra el mapa para moverte y usa + y − para acercar.</p>
       </div>
     </aside>
   </div>
   <div class="card-f mapa-pie">
-    <span>El tamaño del círculo es la cantidad de actividades del trimestre ({{ filtros.como_texto }}).</span>
-    <span>La costa y el río son una referencia aproximada. Cada punto es el centro del territorio, nunca la casa de un vecino.</span>
+    <span>La costa, el río y las calles son una referencia aproximada, y la mancha de color es una zona aproximada, no el límite oficial. Cada punto es el centro del territorio, nunca la casa de un vecino.</span>
   </div>
 </section>
 

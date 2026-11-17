@@ -1434,17 +1434,19 @@ main.content > noscript > .notice { margin-bottom: 20px }
   .input, .input-sm, .deleg-select, .pager-bar .por .input { font-size: 16px }
 }
 
-
 /* =====================================================================
    Mapa de presencia territorial (gestion/mapa.html, sgr-mapa.js)
    ---------------------------------------------------------------------
-   Un croquis, no un mapa de calles: papel con una trama de puntos, el mar
-   y el río como referencia, y un círculo por territorio con el color del
-   semáforo. Hueco quiere decir «nadie fue en el trimestre».
+   Un plano de la ciudad dibujado a mano, no un mapa de calles: tierra
+   cálida con una cuadrícula de un kilómetro, el mar con sus líneas de
+   profundidad, el río y la Ruta 5 para orientarse. Encima, cada territorio
+   con su mancha de color: lo memorable es ver qué parte de la ciudad lleva
+   tiempo sin presencia. Todo lo demás se queda callado.
    ===================================================================== */
 .mapa-hoja .solo-js { display: none }
 .mapa-hoja.con-js .solo-js { display: inline-flex }
 .mapa-hoja.con-js p.solo-js { display: block }
+.mapa-hoja.con-js span.solo-js { display: inline }
 .mapa-hoja.con-js .sin-js { display: none }
 
 .mapa-filtros { border-bottom: 0 }
@@ -1457,51 +1459,122 @@ main.content > noscript > .notice { margin-bottom: 20px }
 .mapa-pto.rojo { background: var(--rojo-bar) }
 .mapa-pto.gris { background: #A89E99 }
 
-.mapa-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 420px }
+.mapa-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 420px }
 .mapa-lienzo {
-  position: relative; min-width: 0; display: flex; align-items: flex-start; justify-content: center;
-  background-color: #F8F5F1;
-  background-image: radial-gradient(rgba(111, 100, 96, .16) 1px, transparent 1.2px);
-  background-size: 22px 22px;
+  position: relative; min-width: 0; overflow: hidden;
+  display: flex; align-items: flex-start; justify-content: center;
+  background: #F1ECE4;
 }
-.mapa-svg { display: block; width: 100%; height: auto }
-.mapa-vacio { max-width: 420px }
+.mapa-svg { display: block; width: 100%; height: auto; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab }
+.mapa-svg.arrastrando { cursor: grabbing }
+.mapa-vacio { max-width: 420px; align-self: center; margin: auto }
 .mapa-vacio b { font-size: 15px }
 
-.mp-tierra { fill: transparent }
-.mp-mar { fill: #DCE6E9 }
-.mp-costa { fill: none; stroke: #A8BFC7; stroke-width: 1.5; stroke-linejoin: round }
-.mp-rio { fill: none; stroke: #86ABBC; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round }
-.mp-lugar { fill: var(--tinta3) }
-.mp-rot { font-family: inherit; font-size: 12px; fill: var(--tinta3); paint-order: stroke; stroke: rgba(248, 245, 241, .92); stroke-width: 4px; stroke-linejoin: round }
-.mp-rot-mar { font-style: italic; font-size: 13px; fill: #5F808C; stroke: none; letter-spacing: .02em }
-.mp-rot-rio { font-style: italic; fill: #4F7A8D }
-.mp-rot-lugar { font-size: 11.5px }
+/* El fondo */
+.mp-cuadricula { fill: none; stroke: rgba(84, 74, 70, .07); stroke-width: 1 }
+.mp-mar { fill: url(#mp-mar) }
+.mp-veril { fill: none; stroke: rgba(255, 255, 255, .7); stroke-width: 1 }
+.mp-veril-1 { stroke: rgba(255, 255, 255, .5) }
+.mp-veril-2 { stroke: rgba(255, 255, 255, .32); stroke-dasharray: 2 4 }
+.mp-costa { fill: none; stroke: #8EAEB9; stroke-width: 1.4; stroke-linejoin: round }
+.mp-ruta-borde { fill: none; stroke: #DCCFBF; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round }
+.mp-ruta { fill: none; stroke: #FFFDF9; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round }
+.mp-avenida-borde { fill: none; stroke: #E2D7CA; stroke-width: 4.5; stroke-linecap: round }
+.mp-avenida { fill: none; stroke: #FFFDF9; stroke-width: 2.4; stroke-linecap: round }
+.mp-rio-borde { fill: none; stroke: #CFE0E6; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round }
+.mp-rio { fill: none; stroke: #6F9DB2; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round }
+.mp-lugar { fill: var(--tinta2) }
+.mp-faro { fill: #fff; stroke: var(--tinta2); stroke-width: 2 }
+.mp-faro-luz { fill: rgba(208, 138, 16, .16) }
+.mp-escudo rect { fill: #fff; stroke: #CDBFAE; stroke-width: 1 }
+.mp-escudo text { font-size: 11px; font-weight: 600; fill: var(--tinta2) }
+
+.mp-rot { font-family: inherit; font-size: 12px; fill: var(--tinta3); paint-order: stroke; stroke: rgba(241, 236, 228, .95); stroke-width: 4px; stroke-linejoin: round; pointer-events: none }
+.mp-rot-mar { font-style: italic; font-size: 14px; fill: #557885; stroke: none; letter-spacing: .06em }
+.mp-rot-rio { font-style: italic; font-size: 12.5px; fill: #3F6E83; stroke: rgba(207, 224, 230, .9) }
+.mp-rot-lugar { font-size: 11.5px; fill: var(--tinta2) }
+.mp-rot-deleg { font-style: italic; font-size: 13.5px; fill: rgba(84, 74, 70, .62); letter-spacing: .04em }
+.mp-escala-fondo { fill: rgba(255, 255, 255, .78) }
 .mp-escala path { fill: none; stroke: var(--tinta2); stroke-width: 1.5 }
 .mp-escala text { font-size: 11px; fill: var(--tinta2) }
+.mp-norte path { fill: var(--tinta2) }
+.mp-norte text { font-size: 10.5px; font-weight: 600; fill: var(--tinta2) }
 
+/* Las zonas: la mancha de cada territorio */
+.mp-zona { pointer-events: none; transition: opacity var(--t) ease }
+.mp-con-sel .mp-zona { opacity: .5 }
+.mp-con-sel .mp-zona.sel { opacity: 1 }
+
+/* Los puntos */
 .mp-t { cursor: pointer; outline: none }
-.mp-punto { stroke: #fff; stroke-width: 2.5 }
+.mp-punto { stroke: #fff; stroke-width: 3; filter: url(#mp-sombra); transition: stroke-width var(--tf) ease }
 .mp-verde .mp-punto { fill: var(--verde-bar) }
 .mp-ambar .mp-punto { fill: var(--ambar-bar) }
 .mp-rojo .mp-punto { fill: var(--rojo-bar) }
 .mp-gris .mp-punto { fill: #A89E99 }
-.mp-cero .mp-punto { fill: #fff; stroke-width: 2.5; stroke-dasharray: 3.5 2.5 }
+.mp-cero .mp-punto { fill: #fff; stroke-width: 3.5 }
 .mp-cero.mp-verde .mp-punto { stroke: var(--verde-bar) }
 .mp-cero.mp-ambar .mp-punto { stroke: var(--ambar-bar) }
 .mp-cero.mp-rojo .mp-punto { stroke: var(--rojo-bar) }
 .mp-cero.mp-gris .mp-punto { stroke: #A89E99 }
 .mp-num { font-size: 12.5px; font-weight: 600; fill: #fff; pointer-events: none }
 .mp-rot-t { font-size: 12.5px; font-weight: 500; fill: var(--tinta) }
-.mp-anillo { fill: none; stroke: var(--tinta3); stroke-width: 2; opacity: 0; transition: opacity var(--tf) ease }
-.mp-t:hover .mp-anillo { opacity: .35 }
-.mp-t:focus-visible .mp-anillo { opacity: 1; stroke: var(--g700); stroke-dasharray: 4 3 }
+.mp-anillo { fill: none; stroke: var(--g700); stroke-width: 3; opacity: 0; transition: opacity var(--tf) ease }
+.mp-t:hover .mp-anillo, .mp-t.resalta .mp-anillo { opacity: .35; stroke: var(--tinta2); stroke-width: 2 }
+.mp-t:focus-visible .mp-anillo { opacity: 1; stroke-dasharray: 4 3 }
 .mp-t.sel .mp-anillo { opacity: 1; stroke: var(--g700); stroke-width: 3; stroke-dasharray: none }
 .mp-t.sel .mp-rot-t { font-weight: 600; fill: var(--g800) }
+.mp-con-sel .mp-t:not(.sel) .mp-rot-t { fill: var(--tinta2) }
 
-.mapa-panel { border-left: 1px solid var(--linea); padding: 20px 22px; min-width: 0; max-height: 600px; overflow: auto }
+/* Lo que va encima del dibujo */
+.mp-controles {
+  position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column;
+  background: #fff; border: 1px solid var(--linea2); border-radius: 10px; box-shadow: var(--sh1); overflow: hidden;
+}
+.mp-boton {
+  width: 38px; height: 38px; border: 0; background: #fff; color: var(--tinta2); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; font: inherit;
+}
+.mp-boton + .mp-boton { border-top: 1px solid var(--linea) }
+.mp-boton:hover { background: var(--sup2); color: var(--tinta) }
+.mp-boton:focus-visible { outline: 2px solid var(--g700); outline-offset: -2px }
+.mp-leyenda {
+  position: absolute; left: 12px; bottom: 12px; max-width: 250px;
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 12px;
+  background: rgba(255, 255, 255, .92); border: 1px solid var(--linea); border-radius: 10px;
+  box-shadow: var(--sh1); font-size: 12px; color: var(--tinta2); pointer-events: none;
+}
+.mp-ley-fila { display: flex; align-items: center; gap: 8px }
+.mp-ley-punto { width: 11px; height: 11px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px #fff, 0 1px 2px rgba(30, 23, 21, .25) }
+.mp-ley-punto.verde { background: var(--verde-bar) }
+.mp-ley-punto.ambar { background: var(--ambar-bar) }
+.mp-ley-punto.rojo { background: var(--rojo-bar) }
+.mp-ley-punto.gris { background: #A89E99 }
+.mp-ley-punto.hueco { background: #fff; box-shadow: inset 0 0 0 2.5px var(--rojo-bar), 0 1px 2px rgba(30, 23, 21, .2) }
+.mp-ley-nota { margin-top: 3px; padding-top: 6px; border-top: 1px solid var(--linea); color: var(--tinta3); line-height: 1.4 }
+.mp-tip {
+  position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none;
+  display: flex; flex-direction: column; gap: 1px; padding: 8px 11px; max-width: 240px;
+  background: var(--tinta); color: #fff; border-radius: 8px; box-shadow: var(--sh2);
+  font-size: 12.5px; line-height: 1.35; opacity: 0; transform: translateY(3px);
+  transition: opacity var(--tf) ease, transform var(--tf) ease;
+}
+.mp-tip.visible { opacity: 1; transform: none }
+.mp-tip b { font-weight: 600 }
+.mp-tip span { color: rgba(255, 255, 255, .78) }
+.mp-tip::before { content: ""; position: absolute; left: 11px; top: 11px; width: 7px; height: 7px; border-radius: 50%; display: none }
+.mp-aviso {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(30, 23, 21, .42); color: #fff; font-size: 15px; font-weight: 600; text-align: center; padding: 20px;
+  opacity: 0; pointer-events: none; transition: opacity .2s ease;
+}
+.mp-aviso.visible { opacity: 1 }
+
+/* El panel */
+.mapa-panel { border-left: 1px solid var(--linea); padding: 0 22px 20px; min-width: 0; max-height: 600px; overflow: auto; position: relative }
+.mapa-panel-inicio { padding-top: 20px }
 .mapa-panel h3 { font-size: 15px; font-weight: 600; line-height: 1.35 }
-.mapa-panel h4 { font-size: 13px; font-weight: 600; color: var(--tinta2); margin: 18px 0 8px }
+.mapa-panel h4 { font-size: 13px; font-weight: 600; color: var(--tinta2); margin: 20px 0 8px }
 .mapa-olvidados { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
 .mapa-olvidados a {
   display: flex; flex-direction: column; gap: 1px; padding: 9px 12px; border-radius: var(--rs);
@@ -1513,9 +1586,22 @@ main.content > noscript > .notice { margin-bottom: 20px }
 .mapa-olvidados .cuando { font-size: 12.5px; color: var(--tinta3) }
 .mapa-ayuda { margin-top: 14px }
 
-.mapa-detalle .mp-volver { margin: -6px 0 10px -10px }
-.mapa-detalle .mp-titulo { font-size: 18px; margin-top: 8px; outline: none }
-.mapa-detalle .mp-sub { font-size: 12.5px; color: var(--tinta3); margin-top: 2px }
+.mp-barra {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 6px;
+  margin: 0 -22px 16px; padding: 12px 22px; background: rgba(255, 255, 255, .97);
+  border-bottom: 1px solid var(--linea); backdrop-filter: blur(4px);
+}
+.mp-barra .mp-volver { padding-left: 8px; gap: 4px; border-color: var(--tinta3) }
+.mp-barra .mp-volver:hover { border-color: var(--tinta); background: var(--sup2) }
+.mp-pos { margin-left: auto; font-size: 12.5px; color: var(--tinta3); white-space: nowrap; padding-right: 2px }
+.mp-paso {
+  width: 32px; height: 32px; flex: none; border-radius: var(--rs); border: 1px solid var(--linea2);
+  background: #fff; color: var(--tinta2); display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.mp-paso:hover:not(:disabled) { border-color: var(--tinta3); color: var(--tinta) }
+.mp-paso:disabled { opacity: .4; cursor: default }
+.mapa-detalle .mp-titulo { font-size: 19px; line-height: 1.25; outline: none }
+.mapa-detalle .mp-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font-size: 12.5px; color: var(--tinta3) }
 .mp-datos { margin: 14px 0 0; display: flex; flex-direction: column; gap: 4px }
 .mp-par { display: flex; justify-content: space-between; gap: 12px; font-size: 13px }
 .mp-par dt { color: var(--tinta2) }
@@ -1538,12 +1624,15 @@ main.content > noscript > .notice { margin-bottom: 20px }
 .mp-nota { margin-top: 16px; font-size: 13px; color: var(--tinta2) }
 .mp-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-bottom: 4px }
 
-.mapa-pie { flex-direction: column; align-items: flex-start; gap: 2px; font-size: 12.5px; color: var(--tinta3) }
+.mapa-pie { font-size: 12.5px; color: var(--tinta3) }
 .mapa-sin-ubicar { list-style: none; margin: 0; padding: 6px 20px 12px }
 .mapa-sin-ubicar li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linea) }
 .mapa-sin-ubicar li:last-child { border-bottom: 0 }
 .mapa-tabla .mapa-vencido { color: var(--rojo); font-weight: 600 }
 .mapa-tabla td .btn + .btn { margin-left: 6px }
+.mapa-tabla .mapa-nombre { color: var(--tinta); text-decoration: none }
+.mapa-hoja.con-js .mapa-tabla .mapa-nombre { border-bottom: 1px dashed var(--linea2) }
+.mapa-hoja.con-js .mapa-tabla .mapa-nombre:hover { color: var(--g700); border-bottom-color: var(--g700) }
 
 @media (max-width: 1180px) {
   .mapa-cuerpo { grid-template-columns: minmax(0, 1fr) }
@@ -1552,10 +1641,17 @@ main.content > noscript > .notice { margin-bottom: 20px }
 @media (max-width: 560px) {
   .mapa-hoja .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px }
   .mapa-hoja .kpi .val { font-size: 24px }
-  .mapa-panel { padding: 16px }
+  .mapa-panel { padding: 0 16px 16px }
+  .mp-barra { margin: 0 -16px 14px; padding: 10px 16px }
   .mp-cifras { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) }
+  /* En el teléfono la leyenda va debajo del mapa: encima taparía la mitad. */
+  .mapa-lienzo { flex-wrap: wrap }
+  .mp-leyenda {
+    position: static; width: 100%; max-width: none; flex-direction: row; flex-wrap: wrap; gap: 6px 14px;
+    padding: 10px 16px; border: 0; border-top: 1px solid var(--linea); border-radius: 0; box-shadow: none; background: #fff;
+  }
+  .mp-ley-nota { width: 100%; border-top: 0; padding-top: 0; margin-top: 0 }
 }
-.mapa-tabla .mapa-nombre { color: var(--tinta); text-decoration: none }
-.mapa-hoja.con-js .mapa-tabla .mapa-nombre { border-bottom: 1px dashed var(--linea2) }
-.mapa-hoja.con-js .mapa-tabla .mapa-nombre:hover { color: var(--g700); border-bottom-color: var(--g700) }
-.mapa-hoja.con-js span.solo-js { display: inline }
+@media (prefers-reduced-motion: reduce) {
+  .mp-zona, .mp-anillo, .mp-tip, .mp-aviso { transition: none }
+}
