@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from atencion.modelos_regalos import CampanaRegalos, InscripcionRegalo
 from atencion.models import Solicitante, limpiar_rut, rut_valido
+from comun.formularios import TELEFONO_FALTA, limpiar_telefono
 from comun.utilidades import proximo_codigo
 
 FECHA = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
@@ -68,7 +69,8 @@ class InscripcionForm(forms.ModelForm):
                                       "data-rut-nombre": "1"}),
     )
     telefono_apoderado = forms.CharField(
-        label="Teléfono del adulto", max_length=20, required=False,
+        label="Teléfono del adulto", max_length=20,
+        error_messages={"required": TELEFONO_FALTA},
         widget=forms.TextInput(attrs={"class": "input", "inputmode": "tel",
                                       "placeholder": "9 1234 5678", "data-rut-telefono": "1"}),
         help_text="Para avisarle cuándo y dónde retirar el regalo.",
@@ -128,6 +130,9 @@ class InscripcionForm(forms.ModelForm):
         if len(nombre) < 5:
             raise forms.ValidationError("Escribe el nombre completo del adulto.")
         return nombre
+
+    def clean_telefono_apoderado(self):
+        return limpiar_telefono(self.cleaned_data.get("telefono_apoderado"))
 
     def clean(self):
         datos = super().clean()

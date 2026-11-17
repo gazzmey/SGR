@@ -148,12 +148,12 @@ VECINOS = [
      "TER-01", True),
     (102, "Carmen Gloria", "Díaz Tapia", "9 4411 5566", "Calle El Mirador 22",
      "TER-01", True),
-    (103, "Patricio", "Morales Leiva", "", "Calle El Mirador 48", "TER-01", True),
+    (103, "Patricio", "Morales Leiva", "9 3120 4455", "Calle El Mirador 48", "TER-01", True),
     (104, "Elena", "Pizarro Rivera", "9 6677 8899", "Calle San Juan 915", "TER-03", True),
     (105, "Hernán", "Guzmán Soto", "9 2233 4455", "Villa Esperanza, casa 31", "TER-04", True),
-    (106, "Marta", "Cisternas Olivares", "", "Villa Los Aromos, block 1, depto. 4",
+    (106, "Marta", "Cisternas Olivares", "9 6611 2040", "Villa Los Aromos, block 1, depto. 4",
      "TER-02", False),
-    (107, "Vecino de prueba", "Desechable", "", "Dirección de prueba 1", "TER-05", True),
+    (107, "Vecino de prueba", "Desechable", "9 5107 0107", "Dirección de prueba 1", "TER-05", True),
 ]
 
 

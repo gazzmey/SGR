@@ -17,6 +17,7 @@ from django.urls import reverse_lazy
 
 from atencion.models import Atencion, CasoSocial, Solicitante, limpiar_rut, rut_valido
 from catalogos.models import SubAtencion, TipoAtencion
+from comun.formularios import TELEFONO_FALTA, limpiar_telefono
 
 
 
@@ -62,7 +63,8 @@ class AtencionForm(forms.ModelForm):
         }),
     )
     telefono = forms.CharField(
-        label="Teléfono", max_length=20, required=False,
+        label="Teléfono", max_length=20,
+        error_messages={"required": TELEFONO_FALTA},
         widget=forms.TextInput(attrs={
             "class": "input",
             "inputmode": "tel",
@@ -151,6 +153,9 @@ class AtencionForm(forms.ModelForm):
         if len(nombre) < 5:
             raise forms.ValidationError("Escribe el nombre completo de quien consulta.")
         return nombre
+
+    def clean_telefono(self):
+        return limpiar_telefono(self.cleaned_data.get("telefono"))
 
     def clean_detalle(self):
         detalle = (self.cleaned_data["detalle"] or "").strip()

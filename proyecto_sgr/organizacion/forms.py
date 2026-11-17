@@ -11,7 +11,9 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from comun import permisos as P
-from comun.formularios import ConAlcance, activos_mas, nombre_de_usuario
+from comun.formularios import (
+    ConAlcance, activos_mas, limpiar_telefono, nombre_de_usuario, telefono_obligatorio,
+)
 from comun.rut import limpiar_rut, rut_valido
 from comun.utilidades import proximo_codigo
 from organizacion.models import Delegacion, PerfilUsuario, Rol, Territorio
@@ -72,6 +74,7 @@ class DelegacionForm(_Base):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        telefono_obligatorio(self.fields["telefono"])
         actual = getattr(self.instance, "delegado_id", None)
         consulta = Usuario.objects.filter(is_active=True, perfil__activo=True)
         if actual:
@@ -96,12 +99,7 @@ class DelegacionForm(_Base):
         return direccion
 
     def clean_telefono(self):
-        telefono = (self.cleaned_data.get("telefono") or "").strip()
-        if telefono and not all(c.isdigit() or c in " +()-" for c in telefono):
-            raise forms.ValidationError(
-                "El teléfono solo admite números, espacios y los signos + ( ) -"
-            )
-        return telefono
+        return limpiar_telefono(self.cleaned_data.get("telefono"))
 
 
 # =========================================================================

@@ -84,7 +84,7 @@
           {{ form.nombre }}
         </div>
         <div class="field{% if form.telefono.errors %} err{% endif %}">
-          <label for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}<span class="optn"> · opcional</span></label>
+          <label for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}<span class="req">*</span></label>
           {{ form.telefono }}
           <span class="help">{{ form.telefono.help_text }}</span>
         </div>

@@ -168,6 +168,11 @@ permiso; la vista lo vuelve a comprobar igual.
   funcionario; una evidencia con exactamente un origen.
 - Un formulario inválido muestra el error junto al campo, conserva lo escrito
   y no guarda nada.
+- Después de la evaluación: el **teléfono es obligatorio** en vecino,
+  delegación, ingreso de atención y regalos, con 8 a 12 dígitos
+  (`comun/formularios.limpiar_telefono`); y la **fecha de compromiso** de una
+  actividad, una vez puesta, no se cambia al editar (si se registró sin ella,
+  se puede poner una vez).
 
 ### Datos de prueba
 

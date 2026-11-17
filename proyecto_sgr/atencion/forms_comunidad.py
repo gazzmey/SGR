@@ -17,11 +17,12 @@ from atencion.models import (
 )
 from catalogos.models import SubAtencion, TipoAtencion
 from comun import relleno as R
-from comun.formularios import ConAlcance, ConCodigo, activos_mas, fecha, nombre_de_usuario
+from comun.formularios import (
+    ConAlcance, ConCodigo, activos_mas, fecha, limpiar_telefono, nombre_de_usuario, telefono_obligatorio,
+)
 from comun.rut import limpiar_rut, rut_valido
 from comun.utilidades import proximo_codigo
 
-TELEFONO_VALIDO = set("0123456789 +()-")
 
 
 # =========================================================================
@@ -46,6 +47,7 @@ class VecinoForm(ConAlcance, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["apellidos"].required = True
         self.fields["territorio"].required = True
+        telefono_obligatorio(self.fields["telefono"])
         self.fields["territorio"].queryset = self.territorios(
             getattr(self.instance, "territorio_id", None))
         self.fields["territorio"].label_from_instance = (
@@ -77,12 +79,7 @@ class VecinoForm(ConAlcance, forms.ModelForm):
         return valor
 
     def clean_telefono(self):
-        valor = (self.cleaned_data.get("telefono") or "").strip()
-        if valor and not set(valor) <= TELEFONO_VALIDO:
-            raise forms.ValidationError("El teléfono solo admite números, espacios y los signos + ( ) -")
-        if valor and sum(c.isdigit() for c in valor) < 8:
-            raise forms.ValidationError("El teléfono parece incompleto: tiene menos de 8 dígitos.")
-        return valor
+        return limpiar_telefono(self.cleaned_data.get("telefono"))
 
     def clean_direccion(self):
         valor = (self.cleaned_data.get("direccion") or "").strip()

@@ -32,6 +32,37 @@ def activos_mas(consulta, *actuales):
     return consulta.filter(activo=True)
 
 
+TELEFONO_VALIDO = set("0123456789 +()-")
+TELEFONO_FALTA = "El teléfono es obligatorio: es la forma de avisar cuando el trámite avance."
+
+
+def limpiar_telefono(valor):
+    """
+    Teléfono obligatorio, con 8 a 12 dígitos.
+
+    Admite espacios y los signos + ( ) -, así que «9 1234 5678», «51 2 200 101»
+    y «+56 9 1234 5678» sirven. Lo usan todos los formularios que piden
+    teléfono: vecino, delegación, ingreso de atención y regalos.
+    """
+    valor = (valor or "").strip()
+    if not valor:
+        raise forms.ValidationError(TELEFONO_FALTA)
+    if not set(valor) <= TELEFONO_VALIDO:
+        raise forms.ValidationError("El teléfono solo admite números, espacios y los signos + ( ) -")
+    digitos = sum(c.isdigit() for c in valor)
+    if digitos < 8:
+        raise forms.ValidationError(
+            f"El teléfono parece incompleto: tiene {digitos} dígitos y necesita al menos 8.")
+    if digitos > 12:
+        raise forms.ValidationError(f"El teléfono tiene {digitos} dígitos: revisa que no sobre ninguno.")
+    return valor
+
+
+def telefono_obligatorio(campo):
+    campo.required = True
+    campo.error_messages["required"] = TELEFONO_FALTA
+
+
 def nombre_de_usuario(usuario):
     return usuario.get_full_name() or usuario.get_username()
 

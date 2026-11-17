@@ -155,6 +155,16 @@ class ActividadRegistroForm(ConAlcance, ConCodigo):
         for campo in ("funcionario", "delegacion", "asignacion"):
             self.fields[campo].empty_label = "Elige una opción"
 
+        # La fecha de compromiso es un plazo acordado: una vez puesta no se
+        # mueve al editar, para que el seguimiento mida contra lo que se
+        # comprometió y no contra un plazo corrido después. Si se registró sin
+        # fecha, se puede poner una vez. ``disabled`` también ignora lo que
+        # llegue en el envío: el servidor conserva la guardada.
+        if inst.pk and inst.fecha_compromiso:
+            self.fields["fecha_compromiso"].disabled = True
+            self.fields["fecha_compromiso"].help_text = (
+                "Quedó fijada al registrar el plazo: no se cambia al editar.")
+
         # Con la actividad aprobada, lo que decide el puntaje ya fue validado
         # por otra persona y no se toca. Se puede seguir completando el resto.
         if inst.pk and inst.estado == Actividad.Estado.APROBADA:
