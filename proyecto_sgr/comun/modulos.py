@@ -461,7 +461,42 @@ def _configuracion(ctx):
     return []
 
 
-PENDIENTES = (_actividades, _compromisos, _casos, _cartas, _evidencias, _configuracion)
+def _avisos(ctx):
+    """
+    Los avisos de que un compromiso no llega a la fecha, mientras no se vean.
+
+    Le aparecen al delegado y al responsable, que son a quienes se mandan
+    (``gestion.modelos_agenda.destinatarios_del_aviso``). No dependen de la
+    delegación activa: el aviso es para la persona, no para la delegación
+    que esté mirando. Sí se limitan a las delegaciones que su perfil
+    autoriza, porque la ficha a la que llevan comprueba lo mismo.
+    """
+    from gestion.modelos_agenda import DestinatarioAviso
+
+    recibidos = (
+        DestinatarioAviso.objects
+        .filter(usuario=ctx["usuario"], visto_el__isnull=True)
+        .select_related("aviso__autor", "aviso__compromiso")
+        .order_by("-aviso__creado", "-pk")
+    )
+    if ctx["visibles"] is not None:
+        recibidos = recibidos.filter(aviso__compromiso__delegacion_id__in=ctx["visibles"])
+
+    salida = []
+    for d in recibidos[:10]:
+        aviso, compromiso = d.aviso, d.aviso.compromiso
+        autor = aviso.autor.get_full_name() or aviso.autor.get_username()
+        motivo = " ".join(aviso.motivo.split())
+        if len(motivo) > 110:
+            motivo = motivo[:107].rstrip() + "…"
+        salida.append(Pendiente(
+            "warn", f"No se llega a la fecha: {compromiso.codigo}",
+            f"{autor} avisó {aviso.cuando_texto} ({aviso.vencimiento:%d-%m-%Y}): «{motivo}»",
+            reverse("gestion:compromiso_detalle", args=[compromiso.pk]) + "#avisos"))
+    return salida
+
+
+PENDIENTES = (_actividades, _avisos, _compromisos, _casos, _cartas, _evidencias, _configuracion)
 
 
 def pendientes_de(ctx):

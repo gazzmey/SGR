@@ -552,7 +552,9 @@ from gestion.reglas import ReglaCalculo  # noqa: E402,F401
 # persona hizo, y el compromiso es una deuda de la delegación que cualquiera
 # de sus integrantes puede tener que tomar si el responsable se ausenta.
 
-from gestion.modelos_agenda import CambioCompromiso, Compromiso  # noqa: E402,F401
+from gestion.modelos_agenda import (  # noqa: E402,F401
+    AvisoCompromiso, CambioCompromiso, Compromiso, DestinatarioAviso,
+)
 
 # =========================================================================
 # Ajustes del resultado

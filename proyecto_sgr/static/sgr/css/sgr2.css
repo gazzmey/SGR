@@ -1761,3 +1761,10 @@ main.content > noscript > .notice { margin-bottom: 20px }
   .hr-notas i { display: block; border-bottom: 1px solid #bbb; height: 14px }
   .hr-cuerpo a { color: inherit; text-decoration: none }
 }
+
+/* Avisos de que un compromiso no llega a la fecha: el motivo se lee como
+   texto, no como dato secundario, y conserva los saltos de línea. */
+.list .tx > span.aviso-motivo { color: var(--tinta); font-size: 13.5px; white-space: pre-line; margin: 6px 0 4px }
+.list .tx b.aviso-sin-ver { display: inline; color: var(--ambar); font-weight: 600 }
+/* Al llegar desde Mi panel con #avisos, la tarjeta no queda bajo la barra fija. */
+#avisos { scroll-margin-top: 84px }

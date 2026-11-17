@@ -15,6 +15,10 @@ el que tiene quien trabaja en terreno.
 responsable no es parte del trabajo diario: es una decisión de quien
 supervisa, y por eso está separada.
 
+**Avisar que no se llega a la fecha** pide lo mismo que avanzar: lo hace
+quien trabaja el compromiso. El aviso le llega al delegado y al responsable
+en su *Mi panel*, y solo ellos pueden marcarlo como visto.
+
 **Validar** pide el permiso de validar evidencias. Es el mismo acto —alguien
 distinto de quien ejecuta confirma que se cumplió— y tenerlo separado del de
 avanzar es lo que impide que una persona cierre y valide su propio
@@ -39,8 +43,11 @@ from comun.mantenedor import Columna, Filtro, ListaMantenedor
 from comun.navegacion import a_donde_volver, con_vuelta, consulta_de_vuelta
 from comun.permisos import redirect_al_login, tiene_permiso
 from comun.resultado import anunciar
-from gestion.forms_agenda import CompromisoForm, ReasignarForm, TransicionForm
-from gestion.modelos_agenda import CambioCompromiso, Compromiso
+from gestion.forms_agenda import AvisoForm, CompromisoForm, ReasignarForm, TransicionForm
+from gestion.modelos_agenda import (
+    AvisoCompromiso, CambioCompromiso, Compromiso, DestinatarioAviso,
+    destinatarios_del_aviso,
+)
 from gestion.views_actividad import periodo_abierto
 
 
@@ -363,9 +370,24 @@ def compromiso_detalle(request, pk):
 
     from comun.observaciones import hilo
 
+    avisos = list(
+        compromiso.avisos.select_related("autor")
+        .prefetch_related("destinatarios__usuario")
+    )
+    for aviso in avisos:
+        aviso.mio_sin_ver = next(
+            (d for d in aviso.destinatarios.all()
+             if d.usuario_id == request.user.pk and d.visto_el is None), None)
+
+    puede_avisar = puede_avanzar and compromiso.abierto
     return render(request, "gestion/compromiso_detalle.html", {
         "menu": "agenda",
         "obj": compromiso,
+        "avisos": avisos,
+        "form_aviso": AvisoForm() if puede_avisar else None,
+        "a_quien_avisa": (
+            destinatarios_del_aviso(compromiso, request.user) if puede_avisar else []
+        ),
         "hilo": hilo(request, "compromiso", compromiso),
         "cambios": compromiso.cambios.select_related(
             "quien", "responsable_anterior", "responsable_nuevo"),
@@ -547,6 +569,109 @@ class CompromisoReasignar(View):
             ),
         )
         return redirect(con_vuelta(request, "gestion:compromiso_detalle", pk))
+
+
+class CompromisoAvisar(View):
+    """
+    Avisa que el compromiso no se va a cumplir en la fecha (guía 4.2, punto 4).
+
+    Deja el motivo en el historial y le manda el aviso al delegado y al
+    responsable, que lo ven en su *Mi panel* hasta marcarlo como visto. No
+    cambia el vencimiento ni el atraso: eso queda para otra versión.
+    """
+
+    def post(self, request, pk):
+        desvio = _exigir(request, P.REGISTRAR_ACTIVIDAD,
+                         "No tienes permiso para avisar sobre compromisos.")
+        if desvio:
+            return desvio
+
+        compromiso = get_object_or_404(
+            Compromiso.objects.select_related("delegacion__delegado", "responsable"),
+            pk=pk,
+        )
+        visibles = _visibles_para(request.user)
+        if visibles is not None and compromiso.delegacion_id not in visibles:
+            raise PermissionDenied("Ese compromiso no es de tu delegación.")
+
+        if not compromiso.abierto:
+            anunciar(request, "Ya está cerrado",
+                     "El compromiso está %s: ya no hay fecha que cumplir."
+                     % compromiso.get_estado_display().lower(), icono="error")
+            return redirect(con_vuelta(request, "gestion:compromiso_detalle", pk))
+
+        formulario = AvisoForm(request.POST)
+        if not formulario.is_valid():
+            anunciar(request, "Falta el motivo",
+                     formulario.errors["motivo"][0], icono="error")
+            return redirect(con_vuelta(request, "gestion:compromiso_detalle", pk))
+
+        motivo = formulario.cleaned_data["motivo"]
+        aviso = AvisoCompromiso.objects.create(
+            compromiso=compromiso, motivo=motivo, autor=request.user,
+            vencimiento=compromiso.vencimiento,
+        )
+        destinatarios = destinatarios_del_aviso(compromiso, request.user)
+        for usuario, por_que in destinatarios:
+            DestinatarioAviso.objects.create(aviso=aviso, usuario=usuario, por_que=por_que)
+
+        compromiso.observacion = motivo
+        compromiso.save(update_fields=["observacion"])
+        CambioCompromiso.objects.create(
+            compromiso=compromiso,
+            tipo=CambioCompromiso.Tipo.AVISO,
+            quien=request.user,
+            observacion=motivo,
+        )
+
+        nombres = [u.get_full_name() or u.get_username() for u, _ in destinatarios]
+        registrar(request, EventoAuditoria.Accion.AVISAR,
+                  entidad="Compromiso", objeto=compromiso,
+                  despues=", ".join(nombres) or "nadie",
+                  detalle=motivo)
+
+        if nombres:
+            anunciar(
+                request, "Aviso enviado",
+                "Le llegó a %s en su Mi panel. La fecha comprometida sigue "
+                "siendo el %s." % (
+                    " y ".join(nombres) if len(nombres) <= 2
+                    else ", ".join(nombres[:-1]) + " y " + nombres[-1],
+                    compromiso.vencimiento.strftime("%d-%m-%Y")),
+            )
+        else:
+            anunciar(
+                request, "El aviso quedó en la ficha, pero no le llegó a nadie",
+                "La delegación %s no tiene delegado asignado y el responsable "
+                "eres tú. Pídele al administrador que asigne el delegado en "
+                "Administración, Delegaciones." % compromiso.delegacion.nombre,
+                icono="warning",
+            )
+        return redirect(con_vuelta(request, "gestion:compromiso_detalle", pk) + "#avisos")
+
+
+class AvisoVisto(View):
+    """Marca un aviso como visto. Solo puede hacerlo a quien le llegó."""
+
+    def post(self, request, pk, aviso):
+        if not request.user.is_authenticated:
+            return redirect_al_login(request)
+
+        destinatario = (
+            DestinatarioAviso.objects
+            .select_related("aviso__compromiso")
+            .filter(aviso_id=aviso, aviso__compromiso_id=pk, usuario=request.user)
+            .first()
+        )
+        if destinatario is None:
+            raise PermissionDenied("Ese aviso no te llegó a ti.")
+
+        if destinatario.visto_el is None:
+            destinatario.visto_el = timezone.now()
+            destinatario.save(update_fields=["visto_el"])
+            anunciar(request, "Aviso visto",
+                     "Ya no aparece en tu Mi panel. Quien avisó ve que lo viste.")
+        return redirect(con_vuelta(request, "gestion:compromiso_detalle", pk) + "#avisos")
 
 
 class CompromisoValidar(View):

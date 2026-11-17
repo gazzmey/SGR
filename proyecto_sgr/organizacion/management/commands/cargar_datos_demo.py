@@ -62,7 +62,10 @@ from atencion.models import (
 from catalogos.models import Item, SubAtencion, TipoAtencion
 from gestion.models import Cargo, MetaPeriodo, Periodo
 from gestion.modelos_actividad import Actividad, Evidencia
-from gestion.modelos_agenda import CambioCompromiso, Compromiso
+from gestion.modelos_agenda import (
+    AvisoCompromiso, CambioCompromiso, Compromiso, DestinatarioAviso,
+    destinatarios_del_aviso,
+)
 from gestion.modelos_ajustes import Ausencia, Reconocimiento
 from gestion.modelos_cartas import Carta
 from gestion.reglas import PROPUESTA_DEL_PLAN, ReglaCalculo
@@ -1396,6 +1399,9 @@ class Command(BaseCommand):
             self._regalos()
 
         evaluacion3.cargar(self)
+        # Después de la Evaluación 3, que es la que nombra a los delegados:
+        # el aviso se manda al delegado que la delegación tenga en ese momento.
+        self._aviso_demo()
 
         if not opciones["sin_superusuario"]:
             self._superusuario()
@@ -2231,6 +2237,50 @@ class Command(BaseCommand):
 
         if creados:
             self.stdout.write("  Compromisos de la agenda: %d (creados)" % creados)
+
+    def _aviso_demo(self):
+        """
+        Un aviso de que un compromiso no llega a la fecha (guía 4.2, punto 4).
+
+        Lo manda la responsable del compromiso en proceso de DEL-01, así que le
+        llega a la delegada, que lo ve en su *Mi panel* al entrar. Al volver a
+        cargar los datos el aviso queda otra vez sin ver y con la fecha
+        coherente con el vencimiento de hoy, para que la demostración se
+        pueda repetir.
+        """
+        compromiso = (
+            Compromiso.objects
+            .filter(codigo__startswith="CMP-D", delegacion__codigo="DEL-01",
+                    estado=Compromiso.Estado.EN_PROCESO,
+                    responsable__email="camila.otarola@ejemplo.cl")
+            .select_related("delegacion__delegado", "responsable")
+            .first()
+        )
+        if compromiso is None:
+            return
+        autor = compromiso.responsable
+        motivo = ("La directiva cambió su asamblea al lunes siguiente al "
+                  "vencimiento, y la cuenta pública se arma con el balance "
+                  "que aprueban ese día. Quedaría lista dos días después.")
+        aviso, nuevo = AvisoCompromiso.objects.get_or_create(
+            compromiso=compromiso, autor=autor,
+            defaults={"motivo": motivo, "vencimiento": compromiso.vencimiento},
+        )
+        AvisoCompromiso.objects.filter(pk=aviso.pk).update(
+            motivo=motivo, vencimiento=compromiso.vencimiento,
+            creado=timezone.now(),
+        )
+        for usuario, por_que in destinatarios_del_aviso(compromiso, autor):
+            DestinatarioAviso.objects.update_or_create(
+                aviso=aviso, usuario=usuario,
+                defaults={"por_que": por_que, "visto_el": None},
+            )
+        if nuevo:
+            CambioCompromiso.objects.create(
+                compromiso=compromiso, tipo=CambioCompromiso.Tipo.AVISO,
+                quien=autor, observacion=motivo,
+            )
+            self.stdout.write("  Aviso de que no se llega a la fecha: %s" % compromiso.codigo)
 
     # ---------------------------------------------------------------- apoyo
 

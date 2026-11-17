@@ -51,6 +51,7 @@ class EventoAuditoria(models.Model):
         REASIGNAR = "reasignar", "Reasignó"
         REVISAR = "revisar", "Marcó una alerta como revisada"
         EXPORTAR = "exportar", "Exportó un informe"
+        AVISAR = "avisar", "Avisó que no llega a la fecha"
 
     cuando = models.DateTimeField("fecha y hora", auto_now_add=True, db_index=True)
     quien = models.ForeignKey(

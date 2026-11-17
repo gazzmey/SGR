@@ -337,7 +337,7 @@ recorrido cortado a la mitad.
 | Reglas de cálculo | `/periodo/reglas/` | Tope, umbrales y convención de días, configurables sin tocar código. |
 | Mis actividades | `/periodo/actividades/` | Registro, listado y ficha de lo que cada persona hizo. |
 | Validar evidencias | `/periodo/validar/` | La cola del verificador: aprobar, rechazar con motivo o anular. |
-| Agenda de compromisos | `/periodo/agenda/` | La agenda colectiva, con plazos, estados, reasignación e historial. |
+| Agenda de compromisos | `/periodo/agenda/` | La agenda colectiva, con plazos, estados, reasignación, historial y aviso de que no se llega a la fecha. |
 | Mi resultado | `/periodo/mi-resultado/` | Cumplimiento por ítem, aporte ponderado, avance esperado y semáforo. |
 | Tablero de delegación | `/periodo/tablero/` | El resultado de cada persona de la delegación y el indicador de la agenda. |
 | Mapa de presencia | `/periodo/mapa/` | Dónde ha estado la delegación y dónde hace tiempo que no, territorio por territorio. |
@@ -895,6 +895,11 @@ es el que puede explicarle a la persona por qué se rechazó su archivo.
   único sin `ver_tablero`. Desde Alertas solo se puede reasignar. Es una
   decisión de la matriz de permisos, no un error de código, y cambiarla ahora
   invalidaría los casos de seguridad ya ejecutados.
+- **El aviso de que no se llega a la fecha no mueve la fecha.** Avisa al
+  delegado y al responsable, pero el vencimiento y el atraso siguen iguales.
+  Reprogramar la fecha, y decidir desde cuándo cuenta el atraso cuando se
+  reprograma, queda pendiente. El aviso tampoco llega por correo: se ve en
+  *Mi panel* y en la ficha.
 - Sin copias de seguridad automáticas de la base ni certificado HTTPS propio.
 
 ---
@@ -1013,6 +1018,13 @@ El **mapa de presencia** está en `gestion/mapa.py`, `gestion/views_mapa.py`,
 `pruebas/test_mapa.py`; la ubicación de cada territorio, en la migración
 `organizacion/0006_territorio_ubicacion`. Ver «Mapa de presencia» más abajo.
 
+El **aviso de que un compromiso no llega a la fecha** está en
+`gestion/modelos_agenda.py` (`AvisoCompromiso`, `DestinatarioAviso`),
+`gestion/views_agenda.py`, `comun/modulos.py` (*Mi panel*),
+`pruebas/test_avisos.py` y las migraciones `gestion/0018_aviso_compromiso` y
+`comun/0004_auditoria_avisar`. Ver «Aviso de que no se llega a la fecha» más
+abajo.
+
 ```
 proyecto_sgr/
   manage.py
@@ -1062,7 +1074,7 @@ proyecto_sgr/
     models.py                       Periodo, Cargo, MetaPeriodo
     modelos_actividad.py            Actividad y Evidencia
     evidencias.py                   archivos: formatos, tamaño, nombre seguro
-    modelos_agenda.py               Compromiso y su historial de cambios
+    modelos_agenda.py               Compromiso, su historial y los avisos de que no llega a la fecha
     reglas.py                       ReglaCalculo: los parámetros, como dato
     calculo.py                      el motor; la única aritmética del sistema
     tablero.py                      los recuentos que acompañan al resultado
@@ -1192,3 +1204,33 @@ compromiso con el territorio ya puesto.
   cerrado (`PER-D01`), con actividades en los territorios, para que la
   comparación tenga con qué comparar. Si la base ya tiene ese trimestre, no
   inventa otro.
+
+**Aviso de que no se llega a la fecha.** Es el punto 4 del flujo 4.2 de la
+guía: «registrar observaciones de avance y comunicar cambios cuando no sea
+posible cumplir la fecha». En la ficha de un compromiso abierto, quien lo
+trabaja escribe por qué no se va a llegar y, si lo sabe, para cuándo podría
+quedar.
+
+- **Quién avisa.** Quien puede mover el compromiso de estado (registrar
+  actividades), dentro de las delegaciones que su perfil autoriza. Un
+  compromiso realizado o anulado no recibe avisos. El motivo es obligatorio,
+  de al menos 15 caracteres.
+- **A quién le llega.** Al delegado de la delegación (el que figura en su
+  ficha) y al responsable del compromiso. A quien avisa no le llega su propio
+  aviso, y si el delegado es además el responsable le llega una sola vez. La
+  ficha dice a quién le va a llegar antes de enviarlo. Si la delegación no
+  tiene delegado y avisa el mismo responsable, el aviso queda en la ficha y
+  la pantalla lo dice.
+- **Cómo le llega.** Dentro del sistema: aparece en «Para atender» de su
+  *Mi panel* hasta que lo marca con «Lo vi» en la ficha. Solo el destinatario
+  puede marcarlo. La ficha muestra cada aviso con su motivo, cuántos días
+  antes (o después) del vencimiento se dio, y si cada destinatario lo vio y
+  cuándo.
+- **Lo que no cambia.** La fecha comprometida, el estado y el atraso quedan
+  igual. El aviso guarda la fecha que había al avisar, que es el dato que
+  hará falta para decidir más adelante cómo se reprograma una fecha.
+- **Rastro.** Queda en el historial del compromiso, en su observación y en la
+  auditoría («Avisó que no llega a la fecha»).
+- **Datos de prueba.** `cargar_datos_demo` deja un aviso de Camila Otárola
+  sobre su compromiso en proceso de `DEL-01`; Soledad Guerrero lo ve en su
+  *Mi panel* al entrar. Al recargar los datos vuelve a quedar sin ver.

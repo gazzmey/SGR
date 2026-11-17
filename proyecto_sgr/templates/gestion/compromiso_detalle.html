@@ -40,7 +40,8 @@
 {% endif %}
 
 <div class="grid g-side">
-  <section class="card" style="align-self: start">
+  <div class="stack" style="align-self: start">
+  <section class="card">
     <div class="card-h">
       <h2>El compromiso</h2>
       <div class="end">
@@ -72,6 +73,45 @@
       <span class="small soft">Ingresado el {{ obj.creado|date:"d-m-Y H:i" }}{% if obj.cerrado_el %} · cerrado el {{ obj.cerrado_el|date:"d-m-Y" }}{% endif %}.</span>
     </div>
   </section>
+
+  {% if avisos %}
+    {% comment %}
+      Los avisos de que no se llega a la fecha (guía 4.2, punto 4). Cada uno
+      dice a quién le llegó y si ya lo vio; a quien le llegó y no lo ha visto
+      le aparece el botón para marcarlo. El aviso no cambia la fecha.
+    {% endcomment %}
+    <section class="card" id="avisos" aria-labelledby="t-avisos">
+      <div class="card-h"><h2 id="t-avisos">Avisos de que no se llega a la fecha</h2><span class="sub">{{ avisos|length }}</span></div>
+      <ul class="list">
+        {% for a in avisos %}
+          <li>
+            <span class="tx">
+              <b>{{ a.autor.get_full_name|default:a.autor.get_username }} avisó {{ a.cuando_texto }}</b>
+              <span>{{ a.creado|date:"d-m-Y H:i" }} · la fecha comprometida era el {{ a.vencimiento|date:"d-m-Y" }}</span>
+              <span class="aviso-motivo">{{ a.motivo }}</span>
+              {% for d in a.destinatarios.all %}
+                <span>Le llegó a {{ d.usuario.get_full_name|default:d.usuario.get_username }}, {{ d.get_por_que_display }}: {% if d.visto_el %}lo vio el {{ d.visto_el|date:"d-m-Y H:i" }}{% else %}<b class="aviso-sin-ver">sin ver</b>{% endif %}.</span>
+              {% empty %}
+                <span>No le llegó a nadie: la delegación no tenía delegado asignado.</span>
+              {% endfor %}
+            </span>
+            {% if a.mio_sin_ver %}
+              <span class="end">
+                <form method="post" action="{% url 'gestion:compromiso_aviso_visto' obj.pk a.pk %}{{ vuelta_qs }}" class="sgr-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-primary">Lo vi</button>
+                </form>
+              </span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+      <div class="card-f">
+        <span class="small soft">El aviso no cambia la fecha comprometida: el plazo y el atraso se cuentan igual.</span>
+      </div>
+    </section>
+  {% endif %}
+  </div>
 
   <aside class="stack" style="align-self: start">
     <section class="card">
@@ -135,6 +175,33 @@
         <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
         <div><b>Sin cambios posibles</b>{% if obj.cerrado %}El compromiso está cerrado y no se reabre. Si hace falta hacer algo más, ingresa uno nuevo que lo cite.{% else %}No tienes permiso para moverlo de estado.{% endif %}</div>
       </div>
+    {% endif %}
+
+    {% if form_aviso %}
+      <section class="card">
+        <div class="card-h"><h2>¿No se llega a la fecha?</h2></div>
+        <form method="post" action="{% url 'gestion:compromiso_avisar' obj.pk %}{{ vuelta_qs }}">
+          {% csrf_token %}
+          <div class="card-b" style="padding: 20px 24px">
+            <p class="small soft">
+              {% if a_quien_avisa %}
+                El aviso le llega a
+                {% for u, por_que in a_quien_avisa %}{% if not forloop.first %} y a {% endif %}{{ u.get_full_name|default:u.get_username }}, {% if por_que == 'delegado' %}a cargo de la delegación{% else %}responsable del compromiso{% endif %},{% endfor %}
+                en su Mi panel.
+              {% else %}
+                La delegación no tiene delegado asignado y el responsable eres tú: el aviso quedará en la ficha, pero no le llegará a nadie.
+              {% endif %}
+              La fecha comprometida no cambia.
+            </p>
+            <div class="form-grid">
+              {% include "comun/_campo.html" with campo=form_aviso.motivo %}
+            </div>
+          </div>
+          <div class="card-f">
+            <div class="end"><button type="submit" class="btn btn-sm btn-secondary">Enviar aviso</button></div>
+          </div>
+        </form>
+      </section>
     {% endif %}
 
     {% if form_reasignar %}

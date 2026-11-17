@@ -108,6 +108,10 @@ urlpatterns = [
          name="compromiso_reasignar"),
     path("agenda/<int:pk>/validar/", ag.CompromisoValidar.as_view(),
          name="compromiso_validar"),
+    path("agenda/<int:pk>/avisar/", ag.CompromisoAvisar.as_view(),
+         name="compromiso_avisar"),
+    path("agenda/<int:pk>/avisos/<int:aviso>/visto/", ag.AvisoVisto.as_view(),
+         name="compromiso_aviso_visto"),
     # El paso va al final: así una ruta más específica como «reasignar» se
     # resuelve antes y no la captura este patrón.
     path("agenda/<int:pk>/<str:paso>/", ag.CompromisoTransicion.as_view(),

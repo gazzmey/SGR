@@ -214,3 +214,30 @@ class ReasignarForm(forms.Form):
                 f"Anota el motivo con algo que se entienda después. Debe tener al menos 15 caracteres (escribiste {len(texto)})."
             )
         return texto
+
+
+class AvisoForm(forms.Form):
+    """
+    El aviso de que no se llega a la fecha comprometida.
+
+    El motivo es obligatorio por la misma razón que el de una reasignación:
+    a quien le llega el aviso le sirve saber por qué y, si ya se sabe, para
+    cuándo podría quedar. «No alcanzo» no le dice nada.
+    """
+
+    motivo = forms.CharField(
+        label="Por qué no se llega a la fecha",
+        widget=forms.Textarea(attrs={
+            "class": "input", "rows": 4, "ancho": True,
+            "placeholder": "Por ejemplo: Diserco no tiene cuadrilla hasta el 28; quedaría para la primera semana de diciembre",
+        }),
+    )
+
+    def clean_motivo(self):
+        texto = (self.cleaned_data["motivo"] or "").strip()
+        if len(texto) < 15:
+            raise forms.ValidationError(
+                "Cuenta por qué no se llega y, si lo sabes, para cuándo podría "
+                f"quedar. Debe tener al menos 15 caracteres (escribiste {len(texto)})."
+            )
+        return texto

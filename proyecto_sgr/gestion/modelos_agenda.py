@@ -369,6 +369,7 @@ class CambioCompromiso(models.Model):
         ESTADO = "estado", "Cambió de estado"
         RESPONSABLE = "responsable", "Se reasignó"
         VALIDACION = "validacion", "Se validó"
+        AVISO = "aviso", "Avisó que no llega a la fecha"
 
     compromiso = models.ForeignKey(
         Compromiso, on_delete=models.PROTECT, related_name="cambios",
@@ -452,4 +453,131 @@ class CambioCompromiso(models.Model):
                 nombre(self.responsable_anterior),
                 nombre(self.responsable_nuevo),
             )
+        if self.tipo == self.Tipo.AVISO:
+            return "No se va a cumplir la fecha comprometida."
         return "Se validó el cumplimiento."
+
+
+def _nombre(usuario):
+    return usuario.get_full_name() or usuario.get_username()
+
+
+class AvisoCompromiso(models.Model):
+    """
+    El aviso de que un compromiso no se va a cumplir en la fecha.
+
+    Es el punto 4 del flujo 4.2 de la guía: «registrar observaciones de
+    avance y comunicar cambios cuando no sea posible cumplir la fecha». Quien
+    trabaja el compromiso escribe el motivo, y el aviso le llega al delegado
+    de la delegación y al responsable, en su *Mi panel*, hasta que lo marcan
+    como visto.
+
+    **El aviso no mueve la fecha.** El vencimiento sigue siendo el mismo y el
+    atraso se cuenta igual que antes. Cambiar la fecha comprometida —y decidir
+    desde cuándo cuenta el atraso cuando se cambia— queda para otra versión.
+    Por eso el aviso guarda la fecha que había al avisar y cuántos días
+    faltaban: es el dato que esa decisión va a necesitar.
+
+    Solo se agregan filas, igual que en el historial.
+    """
+
+    compromiso = models.ForeignKey(
+        Compromiso, on_delete=models.PROTECT, related_name="avisos",
+        verbose_name="compromiso",
+    )
+    motivo = models.TextField(
+        help_text="Por qué no se va a cumplir la fecha y, si se sabe, para cuándo podría quedar.",
+    )
+    autor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="avisos_enviados", verbose_name="avisó",
+    )
+    vencimiento = models.DateField(
+        "fecha comprometida al avisar",
+        help_text="Se copia al avisar: si algún día la fecha cambia, el aviso sigue diciendo cuál era.",
+    )
+    creado = models.DateTimeField("avisado el", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "aviso de incumplimiento"
+        verbose_name_plural = "avisos de incumplimiento"
+        ordering = ["-creado", "-pk"]
+
+    def __str__(self):
+        return f"{self.compromiso.codigo}: aviso de {_nombre(self.autor)}"
+
+    @property
+    def dias_de_anticipacion(self):
+        """Días entre el aviso y el vencimiento. Negativo si ya había vencido."""
+        from django.utils import timezone
+
+        dia = timezone.localtime(self.creado).date() if self.creado else date.today()
+        return (self.vencimiento - dia).days
+
+    @property
+    def cuando_texto(self):
+        """«3 días antes del vencimiento», «el día del vencimiento» o «2 días después de vencido»."""
+        dias = self.dias_de_anticipacion
+        if dias == 0:
+            return "el día del vencimiento"
+        cuantos = abs(dias)
+        palabra = "día" if cuantos == 1 else "días"
+        if dias > 0:
+            return f"{cuantos} {palabra} antes del vencimiento"
+        return f"{cuantos} {palabra} después de vencido"
+
+
+class DestinatarioAviso(models.Model):
+    """A quién le llegó un aviso y cuándo lo vio."""
+
+    class Motivo(models.TextChoices):
+        DELEGADO = "delegado", "a cargo de la delegación"
+        RESPONSABLE = "responsable", "responsable del compromiso"
+
+    aviso = models.ForeignKey(
+        AvisoCompromiso, on_delete=models.PROTECT, related_name="destinatarios",
+        verbose_name="aviso",
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="avisos_recibidos", verbose_name="destinatario",
+    )
+    por_que = models.CharField("por qué le llega", max_length=12, choices=Motivo.choices)
+    visto_el = models.DateTimeField("visto el", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "destinatario del aviso"
+        verbose_name_plural = "destinatarios de los avisos"
+        ordering = ["pk"]
+        constraints = [
+            models.UniqueConstraint(fields=["aviso", "usuario"], name="aviso_una_vez_por_persona"),
+        ]
+
+    def __str__(self):
+        return f"{self.aviso} → {_nombre(self.usuario)}"
+
+
+def destinatarios_del_aviso(compromiso, autor):
+    """
+    A quién le llega el aviso: el delegado de la delegación y el responsable.
+
+    A quien avisa no se le manda su propio aviso. Si el delegado es además el
+    responsable, le llega una sola vez. Un delegado con la cuenta inactiva no
+    cuenta: el aviso le quedaría a alguien que ya no entra.
+
+    Devuelve una lista de pares ``(usuario, motivo)``, en ese orden.
+    """
+    salida, vistos = [], {autor.pk}
+
+    delegado = compromiso.delegacion.delegado
+    if delegado is not None and delegado.pk not in vistos and delegado.is_active:
+        perfil = getattr(delegado, "perfil", None)
+        if perfil is None or perfil.activo:
+            salida.append((delegado, DestinatarioAviso.Motivo.DELEGADO))
+            vistos.add(delegado.pk)
+
+    responsable = compromiso.responsable
+    if responsable.pk not in vistos:
+        salida.append((responsable, DestinatarioAviso.Motivo.RESPONSABLE))
+
+    return salida
