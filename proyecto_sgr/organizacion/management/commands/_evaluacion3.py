@@ -554,6 +554,7 @@ def cargar(cmd):
     _catalogo_desechable(cmd)
     _registros(cmd, periodo, hitos, vecinos)
     _presencia(cmd)
+    _trimestre_anterior(cmd, periodo)
 
 
 #: Para el mapa de presencia: en qué territorio quedan las actividades de la
@@ -569,6 +570,85 @@ PRESENCIA = [
     ("hector.pizarro@ejemplo.cl", "TER-04", 0),
     ("ana.villalobos@ejemplo.cl", "TER-05", 20),
 ]
+
+
+#: El trimestre anterior, para que el mapa tenga con qué comparar. Por
+#: territorio: quién fue y cuántas veces en todo ese trimestre. Repartidas
+#: a lo largo del trimestre, a la misma altura que el actual Los Aromos
+#: tenía más presencia que hoy (bajó) y El Mirador menos (subió).
+ANTERIOR = [
+    ("TER-01", "marcela.rios@ejemplo.cl", 10),
+    ("TER-01", "jorge.salinas@ejemplo.cl", 10),
+    ("TER-02", "camila.otarola@ejemplo.cl", 16),
+    ("TER-03", "jorge.salinas@ejemplo.cl", 4),
+    ("TER-04", "hector.pizarro@ejemplo.cl", 18),
+    ("TER-05", "rodrigo.tapia@ejemplo.cl", 16),
+]
+VERIFICA = {"DEL-01": "pablo.fuentes@ejemplo.cl", "DEL-02": "ana.villalobos@ejemplo.cl"}
+
+
+def _trimestre_anterior(cmd, periodo):
+    """
+    Un trimestre cerrado justo antes del de demostración, con actividades
+    aprobadas en los territorios. Si la base ya tiene ese trimestre (una con
+    trimestres reales), no se inventa otro encima.
+    """
+    from catalogos.models import Item
+    from gestion.modelos_actividad import Actividad, Evidencia
+    from gestion.models import MetaPeriodo, Periodo
+
+    anio, numero = (periodo.anio, periodo.numero - 1) if periodo.numero > 1 else (periodo.anio - 1, 4)
+    inicio, termino = _limites(anio, numero)
+    termino = min(termino, periodo.inicio - timedelta(days=1))
+    if termino <= inicio or not _libre(Periodo, "PER-D01", anio, numero, inicio, termino):
+        return
+    coordinadora = User.objects.filter(email="valentina.cortes@ejemplo.cl").first()
+    anterior, nuevo = Periodo.objects.update_or_create(
+        codigo="PER-D01",
+        defaults={"nombre": nombre_libre(Periodo, "PER-D01", f"Trimestre {numero} de {anio} (cerrado)"),
+                  "anio": anio, "numero": numero, "inicio": inicio, "termino": termino,
+                  "estado": Periodo.Estado.CERRADO, "cerrado_el": termino + timedelta(days=1),
+                  "cerrado_por": coordinadora,
+                  "observacion": "El trimestre anterior, ya cerrado. Sirve para comparar en el mapa de presencia."},
+    )
+    cmd._informar("Trimestre", anterior, nuevo)
+
+    usuarios = {u.email: u for u in User.objects.filter(email__in=[c for _, c, _ in ANTERIOR]
+                                                         + list(VERIFICA.values()))}
+    dias = max(1, (termino - inicio).days)
+    numero_act = 0
+    for clave, correo, cuantas in ANTERIOR:
+        territorio, persona = _TERR.get(clave), usuarios.get(correo)
+        perfil = getattr(persona, "perfil", None)
+        if territorio is None or perfil is None or perfil.cargo_asignado_id is None:
+            continue
+        meta = (MetaPeriodo.objects.filter(periodo=periodo, cargo=perfil.cargo_asignado,
+                                           funcionario__isnull=True, activo=True)
+                .exclude(item__medicion=Item.Medicion.AGENDA).order_by("item__codigo").first())
+        if meta is None:
+            continue
+        for i in range(cuantas):
+            numero_act += 1
+            fecha = inicio + timedelta(days=round((i + 0.5) * dias / cuantas))
+            actividad, _ = Actividad.objects.update_or_create(
+                codigo=f"ACT-P{numero_act:03d}",
+                defaults={"funcionario": persona, "delegacion": territorio.delegacion,
+                          "periodo": anterior, "item": meta.item, "fecha": fecha, "cantidad": 1,
+                          "accion": "Recorrido de terreno por el sector",
+                          "detalle": "Recorrido del trimestre anterior. Registro de ejemplo para comparar en el mapa.",
+                          "territorio": territorio, "tipo": "terreno", "origen": "planificada",
+                          "responsable": persona, "estado": Actividad.Estado.APROBADA},
+            )
+            Evidencia.objects.update_or_create(
+                codigo=f"EVI-P{numero_act:03d}",
+                defaults={"actividad": actividad, "descripcion": "Acta del recorrido",
+                          "referencia": f"ACTA-P{numero_act:03d}/{termino:%Y}", "autor": persona,
+                          "decision": Evidencia.Decision.APROBADA,
+                          "verificador": usuarios.get(VERIFICA.get(territorio.delegacion.codigo)),
+                          "decidida": timezone.now(), "motivo": ""},
+            )
+    if numero_act:
+        cmd.stdout.write(f"  Trimestre anterior: {numero_act} actividades para comparar en el mapa.")
 
 
 def _presencia(cmd):

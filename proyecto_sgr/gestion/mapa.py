@@ -37,6 +37,7 @@ El alcance es el de siempre: las delegaciones que el perfil autoriza. Un
 import re
 import unicodedata
 from collections import Counter, defaultdict
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.core.exceptions import PermissionDenied
@@ -136,6 +137,39 @@ class Filtros:
         else:
             self.referencia = hoy
         self.hoy = hoy
+        self._comparacion()
+
+    def _comparacion(self):
+        """
+        Con qué se compara: el trimestre anterior, **a la misma altura**.
+
+        Si el trimestre elegido está en curso, comparar sus 46 días con los
+        91 del anterior completo haría que todo pareciera bajar. Se cuenta el
+        anterior solo hasta el mismo día del trimestre: el día 46 contra el
+        día 46. Con el trimestre ya cerrado, se comparan los dos completos.
+        """
+        self.anterior = self.corte = None
+        self.misma_altura = False
+        if self.periodo is None:
+            return
+        self.anterior = (Periodo.objects.filter(activo=True, termino__lt=self.periodo.inicio)
+                         .order_by("-termino").first())
+        if self.anterior is None:
+            return
+        if self.periodo.termino >= self.hoy:
+            transcurridos = max(0, (self.hoy - self.periodo.inicio).days)
+            self.corte = min(self.anterior.termino, self.anterior.inicio + timedelta(days=transcurridos))
+            self.misma_altura = True
+        else:
+            self.corte = self.anterior.termino
+
+    def comparacion_texto(self):
+        if self.anterior is None:
+            return ""
+        if self.misma_altura:
+            return "%s hasta el %s, a la misma altura del trimestre" % (
+                self.anterior.nombre, self.corte.strftime("%d-%m-%Y"))
+        return "%s completo" % self.anterior.nombre
 
     @property
     def ids(self):
@@ -271,6 +305,12 @@ def calcular(usuario, filtros, modo):
         )
     }
 
+    # El mismo conteo en el trimestre anterior, hasta la misma altura.
+    anteriores = {}
+    if filtros.anterior is not None:
+        previo = _medida(base.filter(periodo=filtros.anterior, fecha__lte=filtros.corte), filtros)
+        anteriores = dict(previo.values_list("territorio_id").annotate(n=Count("id")))
+
     por_tipo = defaultdict(list)
     etiquetas_tipo = dict(Actividad.Tipo.choices)
     for fila in (_medida(del_periodo, filtros).values("territorio_id", "tipo")
@@ -331,6 +371,9 @@ def calcular(usuario, filtros, modo):
             "registradas": registradas,
             "verificadas": verificadas,
             "medida": verificadas if filtros.presencia == "verificada" else registradas,
+            "anterior": anteriores.get(t.pk, 0) if filtros.anterior is not None else None,
+            "cambio": ((verificadas if filtros.presencia == "verificada" else registradas)
+                       - anteriores.get(t.pk, 0)) if filtros.anterior is not None else None,
             "por_tipo": por_tipo.get(t.pk, []),
             "gestiones": gestiones.get(t.pk, 0),
             "abiertos": compromisos.get("abiertos", 0),
@@ -359,8 +402,41 @@ def calcular(usuario, filtros, modo):
             "actividades": sum(f["medida"] for f in filas),
             "vencidos": sum(f["vencidos"] for f in filas),
             "abiertos": sum(f["abiertos"] for f in filas),
+            "suben": sum(1 for f in filas if f["anterior"] is not None and f["medida"] > f["anterior"]),
+            "bajan": sum(1 for f in filas if f["anterior"] is not None and f["medida"] < f["anterior"]),
         },
     }
+
+
+def compromisos_abiertos(filtros, usuario, modo, territorios):
+    """
+    Los compromisos abiertos de cada territorio, de cualquier trimestre: los
+    que conviene tener a mano en una salida a terreno. En la vista personal,
+    solo los propios.
+    """
+    consulta = (Compromiso.objects
+                .filter(delegacion_id__in={t.delegacion_id for t in territorios},
+                        estado__in=Compromiso.ABIERTOS)
+                .order_by("vencimiento", "codigo"))
+    if modo == PERSONAL:
+        consulta = consulta.filter(responsable=usuario)
+    reconoce = _reconocedor(territorios)
+    resultado = defaultdict(list)
+    for c in consulta:
+        pk = reconoce.get((c.delegacion_id, normalizar(c.territorio)))
+        if pk is not None:
+            resultado[pk].append(c)
+    return resultado
+
+
+def distancia_km(a, b):
+    """Distancia en línea recta entre dos puntos (latitud, longitud), en km."""
+    import math
+
+    la1, lo1, la2, lo2 = (math.radians(float(v)) for v in (a[0], a[1], b[0], b[1]))
+    h = (math.sin((la2 - la1) / 2) ** 2
+         + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2)
+    return 6371.0 * 2 * math.asin(math.sqrt(h))
 
 
 def _gestiones(filtros, usuario, modo, ids):

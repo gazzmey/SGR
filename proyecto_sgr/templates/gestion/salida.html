@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load sgr %}
+
+{% comment %}
+Hoja de ruta de una salida a terreno (gestion/views_mapa.py, «salida»).
+
+Se arma en el mapa de presencia eligiendo territorios; aquí se ven las
+paradas en orden con lo que conviene saber de cada una, y se imprime para
+llevarla. Quien puede crear hitos la deja además planificada: un hito por
+parada. Igual que el mapa, no hay datos de vecinos: solo el territorio, su
+agenda y sus juntas.
+{% endcomment %}
+
+{% block titulo %}Salida a terreno{% endblock %}
+{% block ruta %}
+  <a href="{% url 'gestion:mapa' %}">Mapa de presencia</a>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Salida a terreno</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="hoja-ruta">
+<div class="page-head">
+  <div>
+    <h1>Salida a terreno</h1>
+    <p>
+      {{ paradas|length }} parada{{ paradas|length|pluralize }}, en el orden en que se visitan{% if total_km %}: unos {{ total_km|floatformat:1 }} km en línea recta de la primera a la última{% endif %}.
+      {% if personal %}Los compromisos que aparecen son los tuyos.{% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-secondary" href="{% url 'gestion:mapa' %}?salida={{ ids }}">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2-6-2z"/><path d="M9 4.5v13M15 6.5v13"/></svg>Cambiar en el mapa
+    </a>
+    <button class="btn btn-secondary" type="button" onclick="window.print()">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="1.5"/><path d="M7 14h10v6.5H7z"/></svg>Imprimir hoja de ruta
+    </button>
+  </div>
+</div>
+
+{% if omitidas %}
+  <div class="notice warn" style="margin-bottom: 20px">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/></svg>
+    <div><b>{% if omitidas == 1 %}Un territorio quedó fuera{% else %}{{ omitidas }} territorios quedaron fuera{% endif %}</b>Solo entran territorios activos de tus delegaciones, hasta {{ maximo }} por salida.</div>
+  </div>
+{% endif %}
+
+<div class="grid g-side">
+  <ol class="hr-paradas">
+    {% for p in paradas %}
+      <li class="card hr-parada">
+        <div class="hr-cab">
+          <span class="hr-num" aria-hidden="true">{{ p.numero }}</span>
+          <div class="hr-tit">
+            <h2><span class="sr">Parada {{ p.numero }}: </span>{{ p.t.nombre }}</h2>
+            <span class="hr-sub">{{ p.t.delegacion.nombre }} · <span class="mono">{{ p.t.codigo }}</span>{% if p.tramo is not None %} · a {{ p.tramo|floatformat:1 }} km de la parada anterior{% elif not p.t.tiene_ubicacion %} · sin ubicar en el mapa{% endif %}</span>
+          </div>
+          {% if p.fila %}
+            <span class="chip {% if p.fila.semaforo == 'verde' %}ok{% elif p.fila.semaforo == 'ambar' %}warn{% elif p.fila.semaforo == 'rojo' %}bad{% else %}off{% endif %}">{% if p.fila.ultima %}Última vez {{ p.fila.hace|lower }}{% else %}Nunca{% endif %}</span>
+          {% endif %}
+        </div>
+
+        <div class="hr-cuerpo">
+          <section>
+            <h3>Compromisos abiertos</h3>
+            {% if p.compromisos %}
+              <ul class="hr-lista">
+                {% for x in p.compromisos %}
+                  <li>
+                    <a class="mono" href="{% url 'gestion:compromiso_detalle' x.c.pk %}">{{ x.c.codigo }}</a>
+                    <span>{{ x.c.descripcion|truncatechars:110 }}</span>
+                    <span class="hr-vence{% if x.vencido %} vencido{% endif %}">{% if x.vencido %}Venció el {% else %}Vence el {% endif %}{{ x.c.vencimiento|date:"d-m-Y" }} · lo pidió {{ x.c.solicitante }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="soft">Nada abierto en la agenda para este territorio.</p>
+            {% endif %}
+          </section>
+          {% if p.fila.juntas %}
+            <section>
+              <h3>Juntas de vecinos</h3>
+              <ul class="hr-lista">
+                {% for j in p.fila.juntas %}
+                  <li><b>{{ j.nombre }}</b><span class="hr-vence">{{ j.socios }} socio{{ j.socios|pluralize }} vigente{{ j.socios|pluralize }} · {% if j.contacto %}último contacto el {{ j.contacto }}{% else %}sin contacto registrado{% endif %}</span></li>
+                {% endfor %}
+              </ul>
+            </section>
+          {% endif %}
+          {% if p.fila %}
+            <p class="hr-resumen">En el trimestre: {{ p.fila.registradas }} actividad{{ p.fila.registradas|pluralize:"es" }} ({{ p.fila.verificadas }} verificada{{ p.fila.verificadas|pluralize }}), {{ p.fila.gestiones }} {% if p.fila.gestiones == 1 %}gestión social{% else %}gestiones sociales{% endif %} y {{ p.fila.hitos }} hito{{ p.fila.hitos|pluralize }} planificado{{ p.fila.hitos|pluralize }}.</p>
+          {% endif %}
+          <div class="hr-notas" aria-hidden="true"><span>Notas de la visita</span><i></i><i></i><i></i></div>
+        </div>
+      </li>
+    {% endfor %}
+  </ol>
+
+  <aside class="hr-lado">
+    {% if puede_guardar %}
+      <form class="card" method="post" novalidate>
+        {% csrf_token %}
+        {% for p in paradas %}<input type="hidden" name="t" value="{{ p.t.pk }}">{% endfor %}
+        <div class="card-h"><h2>Dejarla planificada</h2></div>
+        <div class="card-b">
+          <p class="small soft" style="margin-bottom: 14px">Se crea un hito por parada, con la misma fecha y las mismas personas. Así cada territorio muestra en el mapa que tiene una visita planificada.</p>
+          {% if form.non_field_errors %}
+            <div class="notice bad" style="margin-bottom: 14px"><div>{% for e in form.non_field_errors %}{{ e }} {% endfor %}</div></div>
+          {% endif %}
+          <div class="form-grid hr-form">
+            {% include "comun/_campo.html" with campo=form.fecha %}
+            {% include "comun/_campo.html" with campo=form.nombre %}
+            {% include "comun/_campo.html" with campo=form.responsables %}
+          </div>
+        </div>
+        <div class="card-f">
+          <button class="btn btn-primary" type="submit">Planificar {{ paradas|length }} hito{{ paradas|length|pluralize }}</button>
+        </div>
+      </form>
+    {% else %}
+      <div class="notice info">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+        <div><b>Para llevarla impresa</b>Dejarla planificada como hitos lo hace quien configura el período. Puedes imprimir esta hoja y llevarla.</div>
+      </div>
+    {% endif %}
+  </aside>
+</div>
+</div>
+{% endblock %}

@@ -48,6 +48,8 @@ urlpatterns = [
     path("mi-resultado/", vt.mi_resultado, name="mi_resultado"),
     path("tablero/", vt.tablero, name="tablero"),
     path("mapa/", vm.mapa, name="mapa"),
+    path("mapa/salida/", vm.salida, name="mapa_salida"),
+    path("mapa/ubicar/<int:pk>/", vm.ubicar, name="mapa_ubicar"),
 
     # --- alertas y auditoría ---
     path("alertas/", al.alertas, name="alertas"),

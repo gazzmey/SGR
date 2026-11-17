@@ -320,3 +320,148 @@ class SinDatos(Base):
         r = self._cliente("felipe.araya@ejemplo.cl").get(URL, {"periodo": pasado.pk})
         self.assertEqual(datos_del_mapa(r)["referencia"], pasado.termino.strftime("%d-%m-%Y"))
         self.assertLess(pasado.termino, self.hoy + timedelta(days=1))
+
+
+class Comparacion(Base):
+    """«Cambio vs. trimestre anterior»: el anterior, a la misma altura."""
+
+    def test_compara_con_el_anterior_a_la_misma_altura(self):
+        from gestion.models import Periodo
+
+        r = self._cliente("felipe.araya@ejemplo.cl").get(URL)
+        datos = datos_del_mapa(r)
+        self.assertIsNotNone(datos["comparacion"])
+        anterior = Periodo.objects.get(codigo="PER-D01")
+        corte = anterior.inicio + timedelta(days=(self.hoy - self.periodo.inicio).days)
+        ter2 = Territorio.objects.get(codigo="TER-02")
+        esperado = (Actividad.objects.filter(periodo=anterior, territorio=ter2, fecha__lte=corte)
+                    .exclude(estado=Actividad.Estado.ANULADA).count())
+        t = por_codigo(datos)["TER-02"]
+        self.assertEqual(t["anterior"], esperado)
+        self.assertEqual(t["cambio"], t["medida"] - esperado)
+        # En la demostración Los Aromos bajó y El Mirador subió.
+        self.assertLess(t["cambio"], 0)
+        self.assertGreater(por_codigo(datos)["TER-01"]["cambio"], 0)
+        self.assertContains(r, "Vs. anterior")
+
+    def test_sin_anterior_no_hay_comparacion(self):
+        from gestion.models import Periodo
+
+        anterior = Periodo.objects.get(codigo="PER-D01")
+        datos = datos_del_mapa(self._cliente("felipe.araya@ejemplo.cl").get(URL, {"periodo": anterior.pk}))
+        self.assertIsNone(datos["comparacion"])
+        self.assertTrue(all(t["anterior"] is None for t in datos["territorios"]))
+
+
+class UbicarConUnClic(Base):
+    def setUp(self):
+        super().setUp()
+        self.ter7 = Territorio.objects.get(codigo="TER-07")
+        self.url = reverse("gestion:mapa_ubicar", args=[self.ter7.pk])
+
+    def test_guarda_y_queda_en_la_auditoria(self):
+        from comun.models import EventoAuditoria
+
+        r = self.gestion.post(self.url, {"lat": "-29.920500", "lng": "-71.250100"})
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["ok"])
+        self.ter7.refresh_from_db()
+        self.assertEqual((self.ter7.latitud, self.ter7.longitud), (Decimal("-29.920500"), Decimal("-71.250100")))
+        self.assertTrue(EventoAuditoria.objects.filter(detalle__icontains="mapa de presencia").exists())
+
+    def test_misma_validacion_que_la_ficha(self):
+        r = self.gestion.post(self.url, {"lat": "-33.45", "lng": "-70.66"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Región de Coquimbo", r.json()["error"])
+        self.ter7.refresh_from_db()
+        self.assertIsNone(self.ter7.latitud)
+
+    def test_sin_permiso_o_sin_post(self):
+        marcela = self._cliente("marcela.rios@ejemplo.cl")
+        self.assertEqual(marcela.post(self.url, {"lat": "-29.92", "lng": "-71.25"}).status_code, 403)
+        self.assertEqual(self.gestion.get(self.url).status_code, 405)
+        otro = reverse("gestion:mapa_ubicar", args=[999999])
+        self.assertEqual(self.gestion.post(otro, {"lat": "-29.92", "lng": "-71.25"}).status_code, 404)
+
+    def test_el_mapa_ofrece_ubicar_solo_a_quien_puede(self):
+        self.assertIsNotNone(datos_del_mapa(self.gestion.get(URL))["ubicar"])
+        self.assertIsNone(datos_del_mapa(self._cliente("marcela.rios@ejemplo.cl").get(URL))["ubicar"])
+
+
+class SalidaATerreno(Base):
+    URL = reverse("gestion:mapa_salida")
+
+    def setUp(self):
+        super().setUp()
+        self.ter2 = Territorio.objects.get(codigo="TER-02")
+        self.ter3 = Territorio.objects.get(codigo="TER-03")
+        self.valentina = self._cliente("valentina.cortes@ejemplo.cl")
+        self.yo = U.objects.get(email="valentina.cortes@ejemplo.cl")
+
+    def test_hoja_de_ruta_en_el_orden_pedido(self):
+        r = self.valentina.get(self.URL, {"t": f"{self.ter3.pk},{self.ter2.pk}"})
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode()
+        self.assertLess(html.index(self.ter3.nombre), html.index(self.ter2.nombre))
+        self.assertContains(r, "Dejarla planificada")
+        self.assertContains(r, "km de la parada anterior")
+
+    def test_planifica_un_hito_por_parada(self):
+        from gestion.modelos_hitos import Hito
+
+        manana = self.hoy + timedelta(days=1)
+        antes = Hito.objects.count()
+        r = self.valentina.post(self.URL, {"t": [self.ter2.pk, self.ter3.pk], "fecha": str(manana),
+                                           "responsables": [self.yo.pk], "nombre": ""})
+        self.assertEqual(r.status_code, 302)
+        nuevos = list(Hito.objects.order_by("-pk")[:2])
+        self.assertEqual(Hito.objects.count(), antes + 2)
+        self.assertEqual({h.territorio_id for h in nuevos}, {self.ter2.pk, self.ter3.pk})
+        self.assertTrue(all(h.fecha_inicio == manana and h.fecha_termino == manana for h in nuevos))
+        self.assertTrue(all(list(h.responsables.all()) == [self.yo] for h in nuevos))
+        # El mapa ya los cuenta.
+        t = por_codigo(datos_del_mapa(self.valentina.get(URL)))["TER-02"]
+        self.assertGreaterEqual(t["hitos"], 1)
+
+    def test_no_se_planifica_en_el_pasado_ni_con_gente_de_otra_delegacion(self):
+        from gestion.modelos_hitos import Hito
+
+        antes = Hito.objects.count()
+        r = self.valentina.post(self.URL, {"t": [self.ter2.pk], "fecha": str(self.hoy - timedelta(days=1)),
+                                           "responsables": [self.yo.pk]})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "no para una fecha pasada")
+        ter4 = Territorio.objects.get(codigo="TER-04")
+        r = self.valentina.post(self.URL, {"t": [self.ter2.pk, ter4.pk], "fecha": str(self.hoy + timedelta(days=2)),
+                                           "responsables": [self.marcela.pk]})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "ni tiene alcance")
+        self.assertEqual(Hito.objects.count(), antes)
+
+    def test_quien_no_crea_hitos_solo_la_imprime(self):
+        marcela = self._cliente("marcela.rios@ejemplo.cl")
+        r = marcela.get(self.URL, {"t": self.ter2.pk})
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, 'name="responsables"')
+        self.assertContains(r, "Para llevarla impresa")
+        self.assertContains(r, "Imprimir hoja de ruta")
+        r = marcela.post(self.URL, {"t": [self.ter2.pk], "fecha": str(self.hoy + timedelta(days=1)),
+                                    "responsables": [self.marcela.pk]})
+        self.assertEqual(r.status_code, 403)
+
+    def test_fuera_del_alcance_queda_fuera(self):
+        pablo = self._cliente("pablo.fuentes@ejemplo.cl")
+        ter4 = Territorio.objects.get(codigo="TER-04")
+        r = pablo.get(self.URL, {"t": f"{self.ter2.pk},{ter4.pk}"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Un territorio quedó fuera")
+        self.assertNotContains(r, ter4.nombre)
+        r = pablo.get(self.URL, {"t": str(ter4.pk)})
+        self.assertEqual(r.status_code, 302)
+
+    def test_la_hoja_no_trae_datos_de_vecinos(self):
+        html = self.valentina.get(self.URL, {"t": f"{self.ter2.pk},{self.ter3.pk}"}).content.decode()
+        for vecino in Solicitante.objects.all():
+            for dato in (vecino.direccion, vecino.rut, vecino.telefono):
+                if dato and len(dato) > 5:
+                    self.assertNotIn(dato, html)

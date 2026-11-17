@@ -103,6 +103,7 @@ de un territorio, y todo lo que se muestra son conteos.
         <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
       </span>
     </div>
+    <input type="hidden" name="ver" id="f-ver" value="{% if request.GET.ver == 'cambio' %}cambio{% endif %}">
     <div class="mapa-filtros-botones">
       <button class="btn btn-secondary sin-js" type="submit">Aplicar</button>
       {% if filtros.activos or filtros.delegacion %}
@@ -146,6 +147,17 @@ de un territorio, y todo lo que se muestra son conteos.
   <div class="card-h">
     <h2 id="t-mapa">Territorios</h2>
     <span class="sub">{{ ubicados }} de {{ resumen.total }} ubicado{{ resumen.total|pluralize }} en el mapa</span>
+    {% if ubicados %}
+      <div class="end mapa-herramientas solo-js">
+        <div class="seg mp-capas" role="group" aria-label="Qué muestra el mapa">
+          <button type="button" data-capa="presencia" aria-pressed="true">Presencia</button>
+          <button type="button" data-capa="cambio" aria-pressed="false"{% if not comparacion %} disabled title="No hay un trimestre anterior con el que comparar"{% endif %}>Cambio vs. trimestre anterior</button>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" data-armar-salida>
+          <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8 17.5h6.5a3.5 3.5 0 0 0 0-7h-5a3.5 3.5 0 0 1 0-7H16"/></svg>Armar una salida
+        </button>
+      </div>
+    {% endif %}
   </div>
   <div class="mapa-cuerpo">
     <div class="mapa-lienzo" id="mapa-lienzo" data-ubicados="{{ ubicados }}">
@@ -194,13 +206,13 @@ de un territorio, y todo lo que se muestra son conteos.
   <section class="card" aria-labelledby="t-sin-ubicar" style="margin-top: 20px">
     <div class="card-h">
       <h2 id="t-sin-ubicar">Sin ubicar en el mapa</h2>
-      <span class="sub">{{ sin_ubicar|length }} territorio{{ sin_ubicar|length|pluralize }}. Siguen contando en la tabla.</span>
+      <span class="sub">{{ sin_ubicar|length }} territorio{{ sin_ubicar|length|pluralize }}. Siguen contando en la tabla.{% if puede_ubicar %}<span class="solo-js"> Toca «Ubicarlo» y haz clic en el mapa donde está su centro.</span>{% endif %}</span>
     </div>
     <ul class="mapa-sin-ubicar">
       {% for t in sin_ubicar %}
         <li>
           <span><b>{{ t.nombre }}</b><span class="small soft"> · {{ t.delegacion }}</span></span>
-          {% for a in t.acciones %}{% if a.texto == "Ubicarlo en el mapa" %}<a class="btn btn-secondary btn-sm" href="{{ a.url }}">Ubicarlo</a>{% endif %}{% endfor %}
+          {% if puede_ubicar %}<a class="btn btn-secondary btn-sm" href="{% url 'organizacion:territorio_editar' t.id %}" data-ubicar="{{ t.id }}">Ubicarlo</a>{% endif %}
         </li>
       {% endfor %}
     </ul>
@@ -217,7 +229,7 @@ de un territorio, y todo lo que se muestra son conteos.
 <section class="card" aria-labelledby="t-tabla" style="margin-top: 20px">
   <div class="card-h">
     <h2 id="t-tabla">Detalle por territorio</h2>
-    <span class="sub">Primero los que llevan más tiempo sin presencia.<span class="solo-js"> Toca un nombre para verlo en el mapa.</span></span>
+    <span class="sub">Primero los que llevan más tiempo sin presencia.<span class="solo-js"> Toca un nombre para verlo en el mapa.</span>{% if comparacion %} «Vs. anterior» compara con {{ comparacion }}.{% endif %}</span>
   </div>
   <div class="tabla-wrap">
     <table class="tabla mapa-tabla">
@@ -230,6 +242,7 @@ de un territorio, y todo lo que se muestra son conteos.
           <th class="r">Gestiones</th>
           {% if not personal %}<th class="r">Juntas</th>{% endif %}
           <th class="r">Hitos</th>
+          {% if comparacion %}<th class="r">Vs. anterior</th>{% endif %}
           <th class="sin-js"><span class="sr">Acciones</span></th>
         </tr>
       </thead>
@@ -260,6 +273,12 @@ de un territorio, y todo lo que se muestra son conteos.
               </td>
             {% endif %}
             <td class="r">{{ t.hitos }}</td>
+            {% if comparacion %}
+              <td class="r">
+                {% if t.cambio > 0 %}<span class="mapa-sube">+{{ t.cambio }}</span>{% elif t.cambio < 0 %}<span class="mapa-baja">−{{ t.cambio|stringformat:"d"|cut:"-" }}</span>{% else %}<span class="soft">Igual</span>{% endif %}
+                <span class="t2">{{ t.anterior }} antes</span>
+              </td>
+            {% endif %}
             <td class="r sin-js">
               {% for a in t.acciones %}{% if a.principal %}<a class="btn btn-secondary btn-sm" href="{{ a.url }}" aria-label="{{ a.texto }}: {{ t.nombre }}">{{ a.corto|default:a.texto }}</a>{% endif %}{% endfor %}
             </td>

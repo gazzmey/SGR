@@ -1172,3 +1172,23 @@ compromiso con el territorio ya puesto.
   en una tabla escrita por el servidor, que funciona sin JavaScript.
 - **Mis actividades** ahora tiene el campo opcional «Territorio», que es lo
   que pone la actividad en el mapa.
+- **Cambio vs. trimestre anterior.** Un botón cambia lo que pinta el mapa:
+  cada territorio en verde si tuvo más actividades que el trimestre pasado y
+  en rojo si tuvo menos. Se compara **a la misma altura**: con el trimestre
+  en curso en el día 46, el anterior se cuenta hasta su día 46. La tabla
+  agrega la columna «Vs. anterior».
+- **Armar una salida a terreno.** Se tocan en el mapa los territorios a
+  visitar; el orden se arma solo (parte por el que lleva más tiempo sin
+  presencia, sigue por el más cercano y deshace los cruces) y se puede
+  cambiar. La hoja de ruta (`/periodo/mapa/salida/`) muestra cada parada con
+  sus compromisos abiertos y sus juntas, y se imprime con espacio para
+  notas. Quien puede crear hitos la deja planificada: un hito por parada,
+  con la misma fecha y responsables, y queda en la auditoría.
+- **Ubicar con un clic.** Quien puede editar territorios toca «Ubicarlo» en
+  la lista de los sin ubicar (o «Corregir la ubicación» en el panel), hace
+  clic en el mapa y arrastra el punto para afinar. Se guarda con la misma
+  validación que el campo de la ficha y queda en la auditoría.
+- **Datos de prueba.** `cargar_datos_demo` crea el trimestre anterior,
+  cerrado (`PER-D01`), con actividades en los territorios, para que la
+  comparación tenga con qué comparar. Si la base ya tiene ese trimestre, no
+  inventa otro.
