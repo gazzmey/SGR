@@ -17,6 +17,10 @@ muestra y lo borra. Así:
 - sobrevive al redirect, que es lo que hace que recargar no repita el POST;
 - se muestra una sola vez, porque se consume al leerlo.
 
+Si SweetAlert2 no llega (se descarga de cdn.jsdelivr.net), ``sgr-app.js``
+muestra el mismo aviso en un diálogo propio con igual aspecto, o, en un
+navegador sin ``<dialog>``, escrito en la página.
+
 Sin JavaScript el aviso igual se ve: la plantilla lo dibuja dentro de un
 ``<noscript>`` con el mismo texto.
 """

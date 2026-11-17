@@ -144,6 +144,9 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "es-cl"
+# Los mensajes de validación de Django, con el tuteo del resto del sistema.
+# Ver locale/es/LC_MESSAGES/django.po.
+LOCALE_PATHS = [BASE_DIR / "locale"]
 TIME_ZONE = "America/Santiago"
 USE_I18N = True
 USE_TZ = True

@@ -1,7 +1,8 @@
 {% comment %}
   El resultado de la última operación.
 
-  Se publica como JSON para que sgr-app.js lo muestre con SweetAlert2, y se
+  Se publica como JSON para que sgr-app.js lo muestre con SweetAlert2 (o con
+  su diálogo propio, si SweetAlert2 no cargó), y se
   repite dentro de <noscript> para que sin JavaScript el resultado igual se
   lea. El dato lo deja la vista en la sesión después de guardar, así que este
   bloque solo aparece cuando la operación ya terminó.

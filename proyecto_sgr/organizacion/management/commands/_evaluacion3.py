@@ -250,7 +250,7 @@ def _hitos(cmd, periodo):
          ["marcela.rios@ejemplo.cl"], False),
         ("HIT-04", "Hito de prueba (desechable)",
          "Registro para probar editar y desactivar. No tiene actividades.",
-         "unica", hoy + timedelta(days=30), hoy + timedelta(days=31), "DEL-02", "TER-07",
+         "unica", hoy + timedelta(days=30), hoy + timedelta(days=31), "DEL-02", None,
          ["rodrigo.tapia@ejemplo.cl"], True),
     ]
     hitos = {}

@@ -801,6 +801,73 @@
 .sgr-swal .lista li + li { margin-top: 4px }
 
 /* ============================================================
+   8b. El diálogo propio, cuando SweetAlert2 no carga
+   ----------------------------------------------------------------
+   Si SweetAlert2 no llega del servidor externo, sgr-app.js abre este
+   diálogo, con el mismo aspecto: caja blanca de bordes redondeados, ícono
+   en un círculo de color, título, texto y botones centrados. Usa <dialog>,
+   así que el foco queda dentro y Escape cierra.
+   ============================================================ */
+
+.sgr-dialogo {
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  padding: 0;
+  width: min(420px, calc(100vw - 32px));
+  background: var(--sup);
+  color: var(--tinta);
+  box-shadow: 0 18px 48px rgba(30, 23, 21, .3);
+}
+.sgr-dialogo::backdrop { background: rgba(30, 23, 21, .42) }
+.sgr-dialogo[open] { animation: sgr-dialogo-entra .18s var(--ease) }
+@keyframes sgr-dialogo-entra {
+  from { opacity: 0; transform: translateY(6px) scale(.98) }
+  to { opacity: 1; transform: none }
+}
+@media (prefers-reduced-motion: reduce) { .sgr-dialogo[open] { animation: none } }
+
+.sgr-dialogo .dlg-caja { padding: 26px 24px 20px; text-align: center }
+.sgr-dialogo .dlg-ic {
+  width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; border: 2px solid;
+}
+.sgr-dialogo .dlg-ic.warning { border-color: #EBD09D; color: var(--ambar); background: var(--ambar-bg) }
+.sgr-dialogo .dlg-ic.error { border-color: #F0C0BA; color: var(--rojo); background: var(--rojo-bg) }
+.sgr-dialogo .dlg-ic.success { border-color: #BCDDC9; color: var(--verde); background: var(--verde-bg) }
+.sgr-dialogo .dlg-ic.info,
+.sgr-dialogo .dlg-ic.question { border-color: #C5D8EA; color: var(--info); background: var(--info-bg) }
+.sgr-dialogo h2 { font-size: 18px; font-weight: 600; line-height: 1.3; color: var(--tinta) }
+.sgr-dialogo .dlg-tx { font-size: 13.5px; color: var(--tinta2); line-height: 1.55; margin-top: 10px }
+.sgr-dialogo .dlg-tx b { color: var(--tinta); font-weight: 600 }
+.sgr-dialogo .dlg-tx .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13px }
+.sgr-dialogo .dlg-acc { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 20px }
+.sgr-dialogo .dlg-acc .btn { min-width: 110px }
+.btn-peligro { background: var(--rojo); border-color: var(--rojo); color: #fff }
+.btn-peligro:hover { background: #8F1C13; border-color: #8F1C13 }
+@media (max-width: 420px) {
+  .sgr-dialogo .dlg-acc { flex-direction: column-reverse }
+  .sgr-dialogo .dlg-acc .btn { width: 100% }
+}
+
+.sgr-dialogo .aviso {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  text-align: left;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  border: 1px solid #F0C0BA;
+  background: var(--rojo-bg);
+  color: #86180F;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sgr-dialogo .aviso.neu { border-color: var(--linea); background: var(--sup2); color: var(--tinta2) }
+.sgr-dialogo .lista { text-align: left; margin: 12px 0 0; padding-left: 20px }
+.sgr-dialogo .lista li + li { margin-top: 4px }
+
+/* ============================================================
    9. Añadidos de la versión Django
    ----------------------------------------------------------------
    Lo que cambia respecto de la maqueta estática: la delegación activa
@@ -1355,4 +1422,15 @@ main.content > noscript > .notice { margin-bottom: 20px }
 .desde-tx span { font-size: 12.5px; color: var(--tinta3) }
 .desde-fl { flex: none; color: var(--tinta3) }
 .desde-fila:hover .desde-fl { color: var(--g700) }
+
+/* =====================================================================
+   Campos de 16 px en pantallas chicas
+   ---------------------------------------------------------------------
+   Safari del iPhone acerca la página cada vez que se toca un campo con
+   letra menor a 16 px, y no la vuelve a alejar sola. En pantallas chicas
+   los campos suben a 16 px; en escritorio quedan como estaban.
+   ===================================================================== */
+@media (max-width: 760px) {
+  .input, .input-sm, .deleg-select, .pager-bar .por .input { font-size: 16px }
+}
 

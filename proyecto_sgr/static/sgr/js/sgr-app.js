@@ -19,7 +19,122 @@
 (function () {
   'use strict';
 
-  var hayAlerta = function () { return typeof window.Swal !== 'undefined'; };
+  /* ---------------------------------------------------------------------
+     0. Confirmaciones y resultados: SweetAlert2, con respaldo propio
+
+     Las confirmaciones y los resultados se muestran con SweetAlert2, como
+     pide la entrega. SweetAlert2 llega desde un servidor externo
+     (cdn.jsdelivr.net), y si esa descarga falla —una red que la bloquea,
+     una conexión lenta— antes el resultado de guardar simplemente no se
+     veía. Ahora, sin SweetAlert2, se abre un diálogo propio con el mismo
+     aspecto, hecho con el elemento <dialog> del navegador (foco atrapado,
+     Escape para cerrar, fondo que bloquea la página).
+
+     dialogo({...}) devuelve una promesa con {confirmado, negado}, o null si
+     no hay ni SweetAlert2 ni <dialog>: quien llama usa entonces su respaldo
+     (el confirm() del navegador o el aviso escrito en la página).
+     --------------------------------------------------------------------- */
+
+  function conSweetAlert(op) {
+    var opciones = {
+      icon: op.icono || 'info',
+      title: op.titulo || '',
+      confirmButtonText: op.aceptar || 'Entendido',
+      buttonsStyling: false,
+      customClass: { popup: 'sgr-swal' + (op.peligro ? ' peligro' : ''), container: 'sgr-fondo' }
+    };
+    if (op.html) opciones.html = op.html; else opciones.text = op.texto || '';
+    if (op.cancelar) {
+      opciones.showCancelButton = true;
+      opciones.cancelButtonText = op.cancelar;
+      opciones.reverseButtons = true;
+      opciones.focusCancel = !!op.enfocarCancelar;
+    }
+    if (op.negar) {
+      opciones.showDenyButton = true;
+      opciones.denyButtonText = op.negar;
+      opciones.reverseButtons = true;
+    }
+    return window.Swal.fire(opciones).then(function (r) {
+      return { confirmado: !!r.isConfirmed, negado: !!r.isDenied };
+    });
+  }
+
+  var TRAZO = 'width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+              'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  var ICONOS = {
+    warning: '<svg ' + TRAZO + '><path d="M12 6.5v7M12 17.5h.01"/></svg>',
+    error: '<svg ' + TRAZO + '><path d="M7.5 7.5l9 9M16.5 7.5l-9 9"/></svg>',
+    success: '<svg ' + TRAZO + '><path d="m5.5 12.5 4.2 4.2L18.5 8"/></svg>',
+    info: '<svg ' + TRAZO + '><path d="M12 11v6M12 7h.01"/></svg>',
+    question: '<svg ' + TRAZO + '><path d="M9.2 9.2a2.9 2.9 0 1 1 3.9 2.7c-.7.3-1.1.9-1.1 1.6v.5M12 17.5h.01"/></svg>'
+  };
+  var contadorDialogos = 0;
+
+  function dialogo(op) {
+    if (typeof window.Swal !== 'undefined') return conSweetAlert(op);
+    if (typeof window.HTMLDialogElement !== 'function') return null;
+    return new Promise(function (resolver) {
+      var id = 'sgr-dialogo-' + (++contadorDialogos);
+      var d = document.createElement('dialog');
+      d.className = 'sgr-dialogo' + (op.peligro ? ' peligro' : '');
+      d.setAttribute('aria-labelledby', id + '-t');
+      var caja = document.createElement('div');
+      caja.className = 'dlg-caja';
+      if (ICONOS[op.icono]) {
+        var icono = document.createElement('div');
+        icono.className = 'dlg-ic ' + op.icono;
+        icono.innerHTML = ICONOS[op.icono];
+        caja.appendChild(icono);
+      }
+      var titulo = document.createElement('h2');
+      titulo.id = id + '-t';
+      titulo.textContent = op.titulo || '';
+      caja.appendChild(titulo);
+      if (op.html || op.texto) {
+        var texto = document.createElement('div');
+        texto.className = 'dlg-tx';
+        /* html solo llega desde las plantillas (data-confirmar-texto); lo
+           que viene de lo que escribe la gente va siempre como texto. */
+        if (op.html) texto.innerHTML = op.html; else texto.textContent = op.texto;
+        caja.appendChild(texto);
+      }
+      var acciones = document.createElement('div');
+      acciones.className = 'dlg-acc';
+      caja.appendChild(acciones);
+      d.appendChild(caja);
+
+      var resuelto = false;
+      function cerrar(valor) {
+        if (resuelto) return;
+        resuelto = true;
+        d.close();
+        d.remove();
+        resolver({ confirmado: valor === 'aceptar', negado: valor === 'negar' });
+      }
+      function boton(rotulo, clase, valor) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn ' + clase;
+        b.textContent = rotulo;
+        b.addEventListener('click', function () { cerrar(valor); });
+        acciones.appendChild(b);
+        return b;
+      }
+      var cancelar = op.cancelar ? boton(op.cancelar, 'btn-secondary', 'cancelar') : null;
+      if (op.negar) boton(op.negar, 'btn-secondary', 'negar');
+      var aceptar = boton(op.aceptar || 'Entendido', op.peligro ? 'btn-peligro' : 'btn-primary', 'aceptar');
+
+      /* Escape y un clic fuera de la caja cierran como «cancelar». */
+      d.addEventListener('cancel', function (e) { e.preventDefault(); cerrar('cancelar'); });
+      d.addEventListener('click', function (e) { if (e.target === d) cerrar('cancelar'); });
+
+      document.body.appendChild(d);
+      d.showModal();
+      (op.enfocarCancelar && cancelar ? cancelar : aceptar).focus();
+    });
+  }
+  window.sgrDialogo = dialogo;
 
   /* ---------------------------------------------------------------------
      1. Desplegables que envían su formulario
@@ -35,8 +150,9 @@
   /* ---------------------------------------------------------------------
      2. Confirmar antes de cambiar datos
 
-     El botón lleva data-confirmar con el título. Si SweetAlert2 no cargó,
-     se usa el diálogo del navegador: la acción nunca queda sin confirmar.
+     El botón lleva data-confirmar con el título. Se pregunta con SweetAlert2
+     o, si no cargó, con el diálogo propio; en último caso, con el confirm()
+     del navegador: la acción nunca queda sin confirmar.
      --------------------------------------------------------------------- */
 
   document.addEventListener('click', function (e) {
@@ -54,27 +170,24 @@
       else boton.click();
     }
 
-    if (!hayAlerta()) {
+    var respuesta = dialogo({
+      icono: 'warning',
+      titulo: titulo,
+      html: texto,
+      cancelar: 'Cancelar',
+      aceptar: 'Sí, continuar',
+      peligro: true,
+      enfocarCancelar: true
+    });
+    if (!respuesta) {
       if (window.confirm(titulo + '\n\n' + texto.replace(/<[^>]+>/g, ''))) seguir();
       return;
     }
-
-    window.Swal.fire({
-      icon: 'warning',
-      title: titulo,
-      html: texto,
-      showCancelButton: true,
-      confirmButtonText: 'Sí, continuar',
-      cancelButtonText: 'Cancelar',
-      reverseButtons: true,
-      focusCancel: true,
-      buttonsStyling: false,
-      customClass: { popup: 'sgr-swal peligro', container: 'sgr-fondo' }
-    }).then(function (r) { if (r.isConfirmed) seguir(); });
+    respuesta.then(function (r) { if (r.confirmado) seguir(); });
   });
 
   /* ---------------------------------------------------------------------
-     3a. El resultado de la operación, con SweetAlert2
+     3a. El resultado de la operación, con SweetAlert2 (o su respaldo)
 
      Lo deja la vista en la sesión DESPUÉS de guardar, así que si este
      diálogo aparece es porque la operación terminó. Nunca se dispara desde
@@ -94,30 +207,30 @@
 
     var acciones = dato.acciones || [];
 
-    if (!hayAlerta()) {
-      /* Sin SweetAlert2 el aviso ya está en la página, dentro del
-         <noscript>. No se usa alert(): sería peor que el texto. */
+    var respuesta = dialogo({
+      icono: dato.icono || 'success',
+      titulo: dato.titulo,
+      texto: dato.texto || '',
+      aceptar: acciones[0] ? acciones[0].texto : 'Entendido',
+      negar: acciones[1] ? acciones[1].texto : ''
+    });
+
+    if (!respuesta) {
+      /* Sin ningún diálogo, el aviso se escribe en la página: es el mismo
+         que trae el <noscript> para quien navega sin JavaScript. */
+      var respaldo = bloque.nextElementSibling;
+      if (respaldo && respaldo.tagName === 'NOSCRIPT') {
+        var aviso = document.createElement('div');
+        aviso.innerHTML = respaldo.textContent;
+        respaldo.insertAdjacentElement('afterend', aviso);
+      }
       return;
     }
 
-    var opciones = {
-      icon: dato.icono || 'success',
-      title: dato.titulo,
-      text: dato.texto || '',
-      buttonsStyling: false,
-      customClass: { popup: 'sgr-swal', container: 'sgr-fondo' },
-      confirmButtonText: acciones[0] ? acciones[0].texto : 'Entendido'
-    };
-    if (acciones[1]) {
-      opciones.showDenyButton = true;
-      opciones.denyButtonText = acciones[1].texto;
-      opciones.reverseButtons = true;
-    }
-
-    window.Swal.fire(opciones).then(function (r) {
-      if (r.isConfirmed && acciones[0] && acciones[0].url) {
+    respuesta.then(function (r) {
+      if (r.confirmado && acciones[0] && acciones[0].url) {
         window.location.href = acciones[0].url;
-      } else if (r.isDenied && acciones[1] && acciones[1].url) {
+      } else if (r.negado && acciones[1] && acciones[1].url) {
         window.location.href = acciones[1].url;
       }
     });

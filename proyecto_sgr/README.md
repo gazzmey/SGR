@@ -1096,6 +1096,22 @@ queda en JavaScript solo mejora el uso. Todo funciona sin él: los formularios
 tienen su botón de enviar, los selectores su opción de cambiar, y la validación
 que manda es la del servidor.
 
+**Confirmaciones y resultados.** Se muestran con SweetAlert2, que llega
+desde cdn.jsdelivr.net. Si esa descarga falla (una red que la bloquea, una
+conexión lenta), `sgr-app.js` abre un diálogo propio con el mismo aspecto,
+hecho con el elemento `<dialog>` del navegador; y si tampoco hay `<dialog>`,
+pregunta con `confirm()` y escribe el resultado en la página. Antes, sin
+SweetAlert2, el aviso de «guardado» no se veía.
+
+**Mensajes con tuteo.** Django trae sus mensajes de validación en «usted»
+(«Introduzca una dirección…»). `locale/es/LC_MESSAGES/django.po` los
+reemplaza por la versión con tuteo del resto del sistema («Escribe un correo
+válido…»); `LOCALE_PATHS` en `config/settings.py` lo carga. El `.mo`
+compilado va en el repositorio, así que el servidor no necesita gettext.
+
+**En celular.** Los campos suben a 16 px en pantallas de hasta 760 px: con
+menos, Safari del iPhone acerca la página cada vez que se toca uno.
+
 **Relleno inteligente (`sgr-relleno.js` y `comun/relleno.py`).** Los
 formularios que se relacionan con registros ya creados se completan solos
 mientras se llenan, para no tener que buscar en listas largas:
