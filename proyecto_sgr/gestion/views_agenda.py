@@ -278,6 +278,16 @@ def compromiso_nuevo(request):
     periodo = periodo_abierto()
     delegacion = delegacion_activa(request) or getattr(perfil, "delegacion", None)
 
+    # Desde el mapa de presencia llegan el territorio y su delegación. La
+    # delegación se acepta solo si está entre las que el perfil autoriza:
+    # si no, se queda la activa, igual que siempre.
+    pedida = (request.GET.get("delegacion") or "").strip()
+    if perfil is not None and pedida.isdigit():
+        delegacion = perfil.delegaciones_visibles().filter(pk=pedida).first() or delegacion
+    inicial = {}
+    if request.GET.get("territorio"):
+        inicial["territorio"] = request.GET["territorio"].strip()[:120]
+
     if perfil is None or periodo is None or delegacion is None:
         return render(request, "gestion/compromiso_imposible.html", {
             "menu": "agenda",
@@ -288,7 +298,7 @@ def compromiso_nuevo(request):
 
     formulario = CompromisoForm(
         request.POST or None, perfil=perfil, periodo=periodo,
-        delegacion=delegacion,
+        delegacion=delegacion, initial=inicial,
     )
 
     if request.method == "POST" and formulario.is_valid():

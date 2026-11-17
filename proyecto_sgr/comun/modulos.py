@@ -61,6 +61,7 @@ ICONOS = {
     "resultado": '<path d="M4 19.5h16"/><path d="M7 19.5v-6M12 19.5V7M17 19.5v-9"/>',
     "actividades": '<path d="M8 5.5h11M8 12h11M8 18.5h11"/><path d="M4 5.5h.01M4 12h.01M4 18.5h.01"/>',
     "agenda": '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3.5v3M16 3.5v3M3.5 10h17"/><path d="m9 14.5 1.8 1.8L15 12.5"/>',
+    "mapa": '<path d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2-6-2z"/><path d="M9 4.5v13M15 6.5v13"/>',
     "observaciones": '<path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4 19.5l1.4-4.4A7.5 7.5 0 1 1 20 11.5z"/>',
     "cartas": '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/>',
     "atencion": '<path d="M8 10.5h8M8 14h5"/><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V18H4.5A1.5 1.5 0 0 1 3 16.5V7a1.5 1.5 0 0 1 1.5-1.5z"/>',
@@ -109,6 +110,13 @@ def _ver(clave):
         entidad.permiso("view"))
 
 
+def _mapa(t):
+    """La misma regla de gestion.mapa.modo_de, escrita con ``tiene``."""
+    return (t(P.VER_TABLERO) or t(P.VALIDAR_EVIDENCIA) or t(P.CONFIGURAR_PERIODO)
+            or t(P.GESTIONAR_USUARIO) or (_ver("territorio")(t) and _ver("actividad")(t))
+            or t(P.REGISTRAR_ACTIVIDAD))
+
+
 #: (clave, área, título, qué hace, url, permiso, nuevo). ``permiso`` recibe
 #: la función ``tiene`` y repite la condición del menú en base.html.
 MODULOS = (
@@ -122,6 +130,9 @@ MODULOS = (
     ("agenda", "comunidad", "Agenda de compromisos",
      "Lo comprometido con la comunidad, con plazo.",
      "gestion:agenda", _todos, False),
+    ("mapa", "comunidad", "Mapa de presencia",
+     "Dónde se ha estado y dónde hace tiempo que no.",
+     "gestion:mapa", _mapa, False),
     ("observaciones", "comunidad", "Observaciones",
      "Consultas en compromisos, casos y cartas.",
      "comun:observaciones", _todos, False),

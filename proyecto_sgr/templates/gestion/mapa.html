@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% load static sgr %}
+
+{% comment %}
+Mapa de presencia territorial (gestion/mapa.py).
+
+La página tiene dos partes con los mismos datos: el mapa, que dibuja
+sgr-mapa.js en el navegador, y la tabla de abajo, que se escribe aquí en el
+servidor. Si el JavaScript no carga, la tabla y la lista de «dónde hace más
+tiempo que no hay nadie» siguen funcionando: los enlaces llevan a la fila.
+
+En el mapa no hay casas ni direcciones: cada punto es el centro aproximado
+de un territorio, y todo lo que se muestra son conteos.
+{% endcomment %}
+
+{% block titulo %}Mapa de presencia{% endblock %}
+{% block ruta %}
+  <span>Comunidad</span>
+  <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+  <span aria-current="page">Mapa de presencia</span>
+{% endblock %}
+
+{% block contenido %}
+<div class="mapa-hoja" id="mapa-hoja">
+<div class="page-head">
+  <div>
+    <h1>Mapa de presencia</h1>
+    <p>
+      Dónde {% if personal %}has estado{% else %}ha estado la delegación{% endif %} y dónde hace tiempo que no.
+      La última presencia se cuenta al {{ filtros.referencia|date:"d-m-Y" }}{% if periodo %}; las cifras son de {{ periodo.nombre }}{% endif %}.
+    </p>
+  </div>
+</div>
+
+{% if personal %}
+  <div class="notice info" style="margin-bottom: 20px">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.3"/><path d="M3 20c.6-3.6 3-5.5 6-5.5s5.4 1.9 6 5.5"/></svg>
+    <div><b>Estás viendo solo lo tuyo</b>Los números son tus actividades, tus compromisos y tus casos. La presencia del resto de la delegación la ve quien supervisa.</div>
+  </div>
+{% endif %}
+
+<section class="card" aria-label="Filtros del mapa" style="margin-bottom: 20px">
+  <form method="get" class="filters mapa-filtros" data-autoenvio>
+    {% if periodos %}
+      <div class="field">
+        <label for="f-periodo">Trimestre</label>
+        <span class="selw">
+          <select class="input" id="f-periodo" name="periodo">
+            {% for p in periodos %}
+              <option value="{{ p.pk }}"{% if periodo and p.pk == periodo.pk %} selected{% endif %}>{{ p.nombre }}{% if p.estado == 'abierto' %} (abierto){% endif %}</option>
+            {% endfor %}
+          </select>
+          <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+        </span>
+      </div>
+    {% endif %}
+    {% if delegaciones|length > 1 %}
+      <div class="field">
+        <label for="f-delegacion">Delegación</label>
+        <span class="selw">
+          <select class="input" id="f-delegacion" name="delegacion">
+            <option value="">Todas las que puedes ver</option>
+            {% for d in delegaciones %}
+              <option value="{{ d.pk }}"{% if filtros.delegacion and d.pk == filtros.delegacion.pk %} selected{% endif %}>{{ d.nombre }}</option>
+            {% endfor %}
+          </select>
+          <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+        </span>
+      </div>
+    {% endif %}
+    <div class="field">
+      <label for="f-presencia">Presencia</label>
+      <span class="selw">
+        <select class="input" id="f-presencia" name="presencia">
+          {% for clave, texto in presencias %}
+            <option value="{{ clave }}"{% if filtros.presencia == clave %} selected{% endif %}>{{ texto }}</option>
+          {% endfor %}
+        </select>
+        <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+      </span>
+    </div>
+    <div class="field">
+      <label for="f-origen">Origen</label>
+      <span class="selw">
+        <select class="input" id="f-origen" name="origen">
+          <option value="">Cualquier origen</option>
+          {% for clave, texto in origenes %}
+            <option value="{{ clave }}"{% if filtros.origen == clave %} selected{% endif %}>{{ texto }}</option>
+          {% endfor %}
+        </select>
+        <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+      </span>
+    </div>
+    <div class="field">
+      <label for="f-tipo">Tipo de actividad</label>
+      <span class="selw">
+        <select class="input" id="f-tipo" name="tipo">
+          <option value="">Cualquier tipo</option>
+          {% for clave, texto in tipos %}
+            <option value="{{ clave }}"{% if filtros.tipo == clave %} selected{% endif %}>{{ texto }}</option>
+          {% endfor %}
+        </select>
+        <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+      </span>
+    </div>
+    <div class="mapa-filtros-botones">
+      <button class="btn btn-secondary sin-js" type="submit">Aplicar</button>
+      {% if filtros.activos or filtros.delegacion %}
+        <a class="btn btn-ghost" href="{% url 'gestion:mapa' %}{% if periodo %}?periodo={{ periodo.pk }}{% endif %}">Quitar filtros</a>
+      {% endif %}
+    </div>
+  </form>
+</section>
+
+{% if not filas %}
+  <div class="notice info">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+    <div><b>No hay territorios que mostrar</b>Las delegaciones que puedes ver todavía no tienen territorios registrados.{% if sgr_ver.territorio %} Se crean en <a class="link" href="{% url 'organizacion:territorios' %}">Territorios</a>.{% endif %}</div>
+  </div>
+{% else %}
+
+<div class="kpis" style="margin-bottom: 20px">
+  <div class="card kpi">
+    <span class="lbl"><i class="mapa-pto verde" aria-hidden="true"></i>Con presencia reciente</span>
+    <div class="val">{{ resumen.verde }} <small>de {{ resumen.total }}</small></div>
+    <div class="meta">La última actividad fue hace {{ verde_hasta }} días o menos</div>
+  </div>
+  <div class="card kpi">
+    <span class="lbl"><i class="mapa-pto ambar" aria-hidden="true"></i>Hace tiempo</span>
+    <div class="val">{{ resumen.ambar }}</div>
+    <div class="meta">Entre {{ verde_hasta|add:1 }} y {{ ambar_hasta }} días sin actividad</div>
+  </div>
+  <div class="card kpi">
+    <span class="lbl"><i class="mapa-pto rojo" aria-hidden="true"></i>Sin presencia</span>
+    <div class="val">{{ resumen.rojo }}</div>
+    <div class="meta">Más de {{ ambar_hasta }} días, o ninguna actividad registrada</div>
+  </div>
+  <div class="card kpi">
+    <span class="lbl">Compromisos vencidos</span>
+    <div class="val">{{ resumen.vencidos }}</div>
+    <div class="meta">{% if resumen.abiertos %}De {{ resumen.abiertos }} abierto{{ resumen.abiertos|pluralize }} en {% if personal %}tu agenda{% else %}la agenda{% endif %}{% else %}Nada abierto en la agenda del trimestre{% endif %}</div>
+  </div>
+</div>
+
+<section class="card mapa-card" aria-labelledby="t-mapa">
+  <div class="card-h">
+    <h2 id="t-mapa">Territorios</h2>
+    <span class="sub">{{ ubicados }} de {{ resumen.total }} ubicado{{ resumen.total|pluralize }} en el mapa</span>
+    <div class="end legend">
+      <span><i class="mapa-pto verde"></i>Hasta {{ verde_hasta }} días</span>
+      <span><i class="mapa-pto ambar"></i>{{ verde_hasta|add:1 }} a {{ ambar_hasta }} días</span>
+      <span><i class="mapa-pto rojo"></i>Más de {{ ambar_hasta }} o nunca</span>
+      {% if resumen.gris %}<span><i class="mapa-pto gris"></i>Desactivado</span>{% endif %}
+    </div>
+  </div>
+  <div class="mapa-cuerpo">
+    <div class="mapa-lienzo" id="mapa-lienzo" data-ubicados="{{ ubicados }}">
+      {% if not ubicados %}
+        <div class="empty mapa-vacio">
+          <b>Todavía no hay territorios ubicados</b>
+          <p>Cada territorio aparece aquí cuando su ficha tiene la ubicación de su centro. Mientras tanto, la tabla de abajo tiene toda la información.</p>
+        </div>
+      {% else %}
+        <noscript>
+          <div class="empty mapa-vacio">
+            <b>El mapa necesita JavaScript</b>
+            <p>La tabla de abajo tiene exactamente la misma información, territorio por territorio.</p>
+          </div>
+        </noscript>
+      {% endif %}
+    </div>
+
+    <aside class="mapa-panel" id="mapa-panel" aria-live="polite" aria-label="Detalle del territorio">
+      <div class="mapa-panel-inicio" id="mapa-panel-inicio">
+        <h3>Dónde hace más tiempo que no hay nadie</h3>
+        {% if olvidados %}
+          <ol class="mapa-olvidados">
+            {% for t in olvidados %}
+              <li>
+                <a href="#t-{{ t.id }}" data-territorio="{{ t.id }}">
+                  <span class="nom">{{ t.nombre }}</span>
+                  <span class="cuando">{% if t.ultima %}Última vez el {{ t.ultima }}, {{ t.hace|lower }}{% else %}Sin actividades registradas{% endif %}</span>
+                </a>
+              </li>
+            {% endfor %}
+          </ol>
+        {% else %}
+          <p class="soft">Ningún territorio lleva más de {{ ambar_hasta }} días sin presencia. Elige uno en el mapa para ver su detalle.</p>
+        {% endif %}
+        <p class="small soft mapa-ayuda solo-js">Toca un círculo para ver qué pasa en ese territorio y registrar desde ahí.</p>
+      </div>
+    </aside>
+  </div>
+  <div class="card-f mapa-pie">
+    <span>El tamaño del círculo es la cantidad de actividades del trimestre ({{ filtros.como_texto }}).</span>
+    <span>La costa y el río son una referencia aproximada. Cada punto es el centro del territorio, nunca la casa de un vecino.</span>
+  </div>
+</section>
+
+{% if sin_ubicar %}
+  <section class="card" aria-labelledby="t-sin-ubicar" style="margin-top: 20px">
+    <div class="card-h">
+      <h2 id="t-sin-ubicar">Sin ubicar en el mapa</h2>
+      <span class="sub">{{ sin_ubicar|length }} territorio{{ sin_ubicar|length|pluralize }}. Siguen contando en la tabla.</span>
+    </div>
+    <ul class="mapa-sin-ubicar">
+      {% for t in sin_ubicar %}
+        <li>
+          <span><b>{{ t.nombre }}</b><span class="small soft"> · {{ t.delegacion }}</span></span>
+          {% for a in t.acciones %}{% if a.texto == "Ubicarlo en el mapa" %}<a class="btn btn-secondary btn-sm" href="{{ a.url }}">Ubicarlo</a>{% endif %}{% endfor %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
+{% if sin_reconocer %}
+  <div class="notice warn" style="margin-top: 20px">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/></svg>
+    <div><b>{{ sin_reconocer }} compromiso{{ sin_reconocer|pluralize }} sin territorio reconocido</b>Su territorio está escrito de una forma que no coincide con ninguno registrado, así que no se cuenta{{ sin_reconocer|pluralize:"n" }} en el mapa. Para que aparezca{{ sin_reconocer|pluralize:"n" }}, edita el compromiso y elige el territorio de la lista de sugerencias.</div>
+  </div>
+{% endif %}
+
+<section class="card" aria-labelledby="t-tabla" style="margin-top: 20px">
+  <div class="card-h">
+    <h2 id="t-tabla">Detalle por territorio</h2>
+    <span class="sub">Primero los que llevan más tiempo sin presencia.<span class="solo-js"> Toca un nombre para verlo en el mapa.</span></span>
+  </div>
+  <div class="tabla-wrap">
+    <table class="tabla mapa-tabla">
+      <thead>
+        <tr>
+          <th>Territorio</th>
+          <th>Última presencia</th>
+          <th class="r">Actividades</th>
+          <th class="r">Compromisos</th>
+          <th class="r">Gestiones</th>
+          {% if not personal %}<th class="r">Juntas</th>{% endif %}
+          <th class="r">Hitos</th>
+          <th class="sin-js"><span class="sr">Acciones</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in filas %}
+          <tr id="t-{{ t.id }}" data-territorio-fila="{{ t.id }}"{% if not t.activo %} class="off"{% endif %}>
+            <td>
+              {% if t.lat is not None %}<a class="mapa-nombre" href="#t-{{ t.id }}" data-territorio="{{ t.id }}" title="Ver en el mapa"><b>{{ t.nombre }}</b></a>{% else %}<b>{{ t.nombre }}</b>{% endif %}
+              <span class="t2">{{ t.delegacion }} · <span class="mono">{{ t.codigo }}</span>{% if t.lat is None %} · sin ubicar{% endif %}</span>
+            </td>
+            <td>
+              <span class="chip {% if t.semaforo == 'verde' %}ok{% elif t.semaforo == 'ambar' %}warn{% elif t.semaforo == 'rojo' %}bad{% else %}off{% endif %}">{{ t.hace }}</span>
+              <span class="t2">{% if t.ultima %}{{ t.ultima }}{% else %}Sin registro{% endif %}</span>
+            </td>
+            <td class="r">
+              {{ t.registradas }}
+              <span class="t2">{{ t.verificadas }} verificada{{ t.verificadas|pluralize }}</span>
+            </td>
+            <td class="r">
+              {{ t.abiertos }} abierto{{ t.abiertos|pluralize }}
+              <span class="t2{% if t.vencidos %} mapa-vencido{% endif %}">{{ t.vencidos }} vencido{{ t.vencidos|pluralize }}</span>
+            </td>
+            <td class="r">{{ t.gestiones }}</td>
+            {% if not personal %}
+              <td class="r">
+                {{ t.juntas|length }}
+                {% if t.juntas %}<span class="t2">{{ t.socios }} socio{{ t.socios|pluralize }}</span>{% endif %}
+              </td>
+            {% endif %}
+            <td class="r">{{ t.hitos }}</td>
+            <td class="r sin-js">
+              {% for a in t.acciones %}{% if a.principal %}<a class="btn btn-secondary btn-sm" href="{{ a.url }}" aria-label="{{ a.texto }}: {{ t.nombre }}">{{ a.corto|default:a.texto }}</a>{% endif %}{% endfor %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{{ para_el_mapa|json_script:"datos-mapa" }}
+<script src="{% static 'sgr/js/sgr-mapa.js' %}" defer></script>
+{% endif %}
+</div>
+{% endblock %}

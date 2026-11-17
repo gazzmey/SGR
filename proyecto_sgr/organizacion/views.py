@@ -281,6 +281,8 @@ class TerritorioNuevo(_Territorio, CrearMantenedor):
         ("Identificación", "El código se asigna solo. El nombre no se repite dentro de la delegación.",
          ["codigo", "nombre", "delegacion"]),
         ("Qué comprende", "Para reconocerlo sin abrir un mapa.", ["descripcion"]),
+        ("Dónde queda", "Un punto aproximado para el mapa de presencia. Puede quedar en blanco.",
+         ["ubicacion"]),
     ]
 
 
@@ -304,6 +306,7 @@ class TerritorioDetalle(_Territorio, DetalleMantenedor):
         ("Nombre", "nombre"),
         ("Delegación", lambda o: o.delegacion.nombre),
         ("Qué comprende", "descripcion", {"ancho": True}),
+        ("Ubicación en el mapa", lambda o: o.ubicacion_texto or "Sin ubicar", {"mono": True}),
         ("Juntas de vecinos",
          lambda o: ", ".join(j.nombre for j in o.juntas.all()) or "Ninguna", {"ancho": True}),
         ("Creado el", lambda o: o.creada.strftime("%d-%m-%Y") if o.creada else ""),

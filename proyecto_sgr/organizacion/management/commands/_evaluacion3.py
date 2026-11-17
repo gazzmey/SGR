@@ -24,6 +24,7 @@ RUT antes de crearse.
 """
 
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -90,6 +91,19 @@ TERRITORIOS = [
      "Registro para probar editar y desactivar. No tiene nada asociado.", True),
 ]
 
+#: Centro aproximado de cada territorio de prueba, para el mapa de presencia.
+#: Son puntos de barrio, no de casas, y quedan en Las Compañías (norte del
+#: río Elqui) y en el sector sur de La Serena. El territorio desechable
+#: queda sin ubicar a propósito: así se ve la lista «Sin ubicar».
+UBICACIONES = {
+    "TER-01": ("-29.870500", "-71.236500"),
+    "TER-02": ("-29.875200", "-71.246200"),
+    "TER-03": ("-29.880000", "-71.228000"),
+    "TER-04": ("-29.924000", "-71.233500"),
+    "TER-05": ("-29.931000", "-71.242500"),
+    "TER-06": ("-29.866800", "-71.244500"),
+}
+
 #: Clave de la tabla de arriba → territorio en la base. En una base que ya
 #: migró, los sectores de texto libre se convirtieron en territorios con
 #: otros códigos: aquí se buscan por delegación y nombre, nunca se pisan.
@@ -124,6 +138,10 @@ def territorios(cmd):
         registro.descripcion = descripcion
         registro.activo = activo
         registro.desactivada = None if activo else date(2026, 6, 30)
+        # La ubicación se pone solo si no tiene: si alguien ya la corrigió
+        # en la ficha, la suya manda.
+        if registro.latitud is None and clave in UBICACIONES:
+            registro.latitud, registro.longitud = (Decimal(v) for v in UBICACIONES[clave])
         registro.save()
         _TERR[clave] = registro
         cmd._informar("Territorio", registro, nuevo)
@@ -405,7 +423,7 @@ def _registros(cmd, periodo, hitos, vecinos):
             )
 
     # Dos actividades sin evidencia (para adjuntarles una) y una anulada.
-    def registrar(codigo, persona, fecha, accion, estado, motivo=""):
+    def registrar(codigo, persona, fecha, accion, estado, motivo="", contacto=""):
         perfil = getattr(persona, "perfil", None)
         meta = (MetaPeriodo.objects.filter(periodo=periodo, cargo=perfil.cargo_asignado,
                                            funcionario__isnull=True, activo=True)
@@ -419,6 +437,7 @@ def _registros(cmd, periodo, hitos, vecinos):
                       "accion": accion, "detalle": accion + ". Registro de ejemplo de la Evaluación 3.",
                       "estado": estado, "motivo_anulacion": motivo, "territorio": ter1,
                       "tipo": "terreno", "origen": "planificada", "responsable": persona,
+                      "contacto": contacto,
                       "avance": 100 if estado != "borrador" else 60},
         )
         cmd._informar("Actividad", act, nuevo)
@@ -426,7 +445,8 @@ def _registros(cmd, periodo, hitos, vecinos):
 
     if marcela is not None:
         registrar("ACT-E001", marcela, hoy - timedelta(days=2),
-                  "Reunión con la directiva de la junta El Mirador", "borrador")
+                  "Reunión con la directiva de la junta El Mirador", "borrador",
+                  contacto="Directiva de la Junta de Vecinos El Mirador")
     if jorge is not None:
         registrar("ACT-E002", jorge, hoy - timedelta(days=3),
                   "Inspección de la vereda levantada de calle El Mirador", "borrador")
@@ -533,3 +553,39 @@ def cargar(cmd):
     _cargos_y_asignaciones(cmd, periodo)
     _catalogo_desechable(cmd)
     _registros(cmd, periodo, hitos, vecinos)
+    _presencia(cmd)
+
+
+#: Para el mapa de presencia: en qué territorio quedan las actividades de la
+#: demostración que no tienen uno, por funcionario. «Desde» es cuántos días
+#: atrás como mínimo: así, al cargar, Los Aromos lleva más de 30 días sin
+#: nadie (rojo), San Juan y El Milagro Alto entre 16 y 30 (ámbar) y El
+#: Mirador y Villa Esperanza tienen presencia reciente (verde). Las que no
+#: calzan quedan sin territorio, como una atención en la oficina.
+PRESENCIA = [
+    ("jorge.salinas@ejemplo.cl", "TER-01", 0),
+    ("camila.otarola@ejemplo.cl", "TER-03", 17),
+    ("pablo.fuentes@ejemplo.cl", "TER-02", 32),
+    ("hector.pizarro@ejemplo.cl", "TER-04", 0),
+    ("ana.villalobos@ejemplo.cl", "TER-05", 20),
+]
+
+
+def _presencia(cmd):
+    from gestion.modelos_actividad import Actividad
+
+    hoy = timezone.localdate()
+    total = 0
+    for correo, clave, desde in PRESENCIA:
+        territorio = _TERR.get(clave)
+        if territorio is None:
+            continue
+        # Solo las que no tienen territorio y son de la misma delegación: si
+        # alguien ya eligió uno durante la revisión, el suyo manda.
+        total += (Actividad.objects
+                  .filter(funcionario__email=correo, territorio__isnull=True,
+                          delegacion=territorio.delegacion, codigo__startswith="ACT-D",
+                          fecha__lte=hoy - timedelta(days=desde))
+                  .update(territorio=territorio))
+    if total:
+        cmd.stdout.write(f"  Mapa de presencia: {total} actividades de la demostración ubicadas en su territorio.")

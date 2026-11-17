@@ -139,6 +139,10 @@ class Territorio(models.Model):
     activo = models.BooleanField(default=True)
     creada = models.DateField("creado el", auto_now_add=True)
     desactivada = models.DateField("desactivado el", null=True, blank=True)
+    # Un punto de referencia del territorio para el mapa de presencia. No es
+    # la dirección de nadie: es el centro aproximado de la unidad vecinal.
+    latitud = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitud = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
     class Meta:
         verbose_name = "territorio"
@@ -154,8 +158,20 @@ class Territorio(models.Model):
     def __str__(self):
         return f"{self.codigo} — {self.nombre}"
 
+    @property
+    def tiene_ubicacion(self):
+        return self.latitud is not None and self.longitud is not None
+
+    @property
+    def ubicacion_texto(self):
+        if not self.tiene_ubicacion:
+            return ""
+        return f"{self.latitud:.5f}, {self.longitud:.5f}"
+
     def clean(self):
         super().clean()
+        if (self.latitud is None) != (self.longitud is None):
+            raise ValidationError("La ubicación necesita latitud y longitud, o ninguna de las dos.")
         # Un territorio nuevo, o uno que se cambia de delegación, no puede
         # quedar en una delegación inactiva. Uno que ya estaba en ella se
         # puede seguir editando.

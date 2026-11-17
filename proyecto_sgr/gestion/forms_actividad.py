@@ -28,7 +28,7 @@ class ActividadForm(forms.ModelForm):
 
     class Meta:
         model = Actividad
-        fields = ["item", "fecha", "cantidad", "accion", "detalle", "contacto"]
+        fields = ["item", "fecha", "cantidad", "accion", "detalle", "contacto", "territorio"]
         widgets = {
             "fecha": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "cantidad": forms.NumberInput(attrs={"min": 1, "step": 1}),
@@ -89,6 +89,19 @@ class ActividadForm(forms.ModelForm):
         R.elige_si_unica(self.fields["item"])
         R.sugerencias(self.fields["contacto"],
                       R.sugerencias_comunidad(getattr(perfil, "delegacion", None)))
+
+        # Dónde fue. Es opcional, pero es lo que pone la actividad en el mapa
+        # de presencia: sin territorio, la actividad suma igual a la meta
+        # pero el mapa no la ve. Solo se ofrecen los de su delegación.
+        from organizacion.models import Territorio
+
+        territorio = self.fields["territorio"]
+        territorio.queryset = (
+            Territorio.objects.filter(delegacion=perfil.delegacion, activo=True).order_by("nombre")
+            if perfil is not None else Territorio.objects.none())
+        territorio.required = False
+        territorio.empty_label = "No fue en un territorio en particular"
+        territorio.help_text = "Dónde ocurrió. Es lo que la ubica en el mapa de presencia."
 
     def _items_con_meta(self):
         """Los ítems con meta para el cargo de esta persona en este período."""

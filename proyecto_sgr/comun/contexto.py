@@ -63,9 +63,18 @@ def sesion_sgr(request):
         # Qué entidades de la Evaluación 3 puede consultar: por la acción
         # de negocio o por el permiso de Django de su grupo.
         "sgr_ver": _entidades_de(request.user),
+        # El mapa de presencia: completo para quien supervisa, personal para
+        # quien registra. Las reglas están en gestion/mapa.py.
+        "sgr_mapa": _modo_mapa(request.user),
         # El resultado de la última operación, que se consume al mostrarlo.
         "sgr_resultado": tomar_resultado(request),
     }
+
+
+def _modo_mapa(usuario):
+    from gestion.mapa import modo_de
+
+    return modo_de(usuario)
 
 
 def _entidades_de(usuario):

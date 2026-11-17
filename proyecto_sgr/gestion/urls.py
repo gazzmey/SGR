@@ -11,6 +11,7 @@ from gestion import (
     views_versiones as vv,
     views_alertas as al,
     views_informes as inf,
+    views_mapa as vm,
     views_tablero as vt,
     views_registros as rg,
 )
@@ -46,6 +47,7 @@ urlpatterns = [
     # --- resultado y tablero ---
     path("mi-resultado/", vt.mi_resultado, name="mi_resultado"),
     path("tablero/", vt.tablero, name="tablero"),
+    path("mapa/", vm.mapa, name="mapa"),
 
     # --- alertas y auditoría ---
     path("alertas/", al.alertas, name="alertas"),

@@ -1179,27 +1179,29 @@ COMPROMISOS_DEMO = [
                     "delegación y se derivó a la unidad competente."},
 
     # --- DEL-02 ------------------------------------------------------------
+    # Villa Esperanza es un territorio de La Antena: el mapa de presencia
+    # reconoce el territorio escrito dentro de la delegación del compromiso.
     {"delegacion": "DEL-02", "responsable": "hector.pizarro@ejemplo.cl",
      "solicitante": "Junta de vecinos Villa El Sauce", "item": "ITM-01",
-     "territorio": "Unidad vecinal 3 · San Juan", "vence_en": -16,
+     "territorio": "Unidad vecinal 4 · Villa Esperanza", "vence_en": -16,
      "descripcion": "Gestionar la reparación del cierre perimetral de la "
                     "sede vecinal y verificar su ejecución.",
      "estado": Compromiso.Estado.REALIZADO},
     {"delegacion": "DEL-02", "responsable": "rodrigo.tapia@ejemplo.cl",
      "solicitante": "Comité de seguridad Los Aromos", "item": "ITM-02",
-     "territorio": "Unidad vecinal 3 · San Juan", "vence_en": -12,
+     "territorio": "Unidad vecinal 4 · Villa Esperanza", "vence_en": -12,
      "descripcion": "Levantar el catastro de luminarias en mal estado del "
                     "sector y remitirlo a la unidad correspondiente.",
      "estado": Compromiso.Estado.REALIZADO, "cerro_tarde": 2},
     {"delegacion": "DEL-02", "responsable": "rodrigo.tapia@ejemplo.cl",
      "solicitante": "Junta de vecinos Villa El Sauce", "item": "ITM-01",
-     "territorio": "Unidad vecinal 3 · San Juan", "vence_en": -2,
+     "territorio": "Unidad vecinal 4 · Villa Esperanza", "vence_en": -2,
      "descripcion": "Coordinar la visita de la unidad de tránsito para "
                     "evaluar la demarcación del cruce escolar.",
      "estado": Compromiso.Estado.EN_PROCESO},
     {"delegacion": "DEL-02", "responsable": "hector.pizarro@ejemplo.cl",
      "solicitante": "Club de huasos El Peumo",
-     "territorio": "Unidad vecinal 3 · San Juan", "vence_en": 9,
+     "territorio": "Unidad vecinal 4 · Villa Esperanza", "vence_en": 9,
      "descripcion": "Entregar la orientación sobre el permiso municipal "
                     "para la actividad programada por la organización.",
      "estado": Compromiso.Estado.INGRESADO},

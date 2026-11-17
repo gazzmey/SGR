@@ -162,7 +162,13 @@ def actividad_nueva(request):
             "periodo": periodo,
         })
 
-    formulario = ActividadForm(request.POST or None, perfil=perfil, periodo=periodo)
+    # Desde el mapa de presencia llega ?territorio=: queda propuesto. El
+    # selector solo ofrece los de su delegación, así que uno ajeno no entra.
+    inicial = {}
+    if request.method == "GET" and (request.GET.get("territorio") or "").isdigit():
+        inicial["territorio"] = int(request.GET["territorio"])
+    formulario = ActividadForm(request.POST or None, perfil=perfil, periodo=periodo,
+                               initial=inicial)
 
     if request.method == "POST" and formulario.is_valid():
         actividad = formulario.save()

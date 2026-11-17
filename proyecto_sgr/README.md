@@ -340,6 +340,7 @@ recorrido cortado a la mitad.
 | Agenda de compromisos | `/periodo/agenda/` | La agenda colectiva, con plazos, estados, reasignación e historial. |
 | Mi resultado | `/periodo/mi-resultado/` | Cumplimiento por ítem, aporte ponderado, avance esperado y semáforo. |
 | Tablero de delegación | `/periodo/tablero/` | El resultado de cada persona de la delegación y el indicador de la agenda. |
+| Mapa de presencia | `/periodo/mapa/` | Dónde ha estado la delegación y dónde hace tiempo que no, territorio por territorio. |
 | Alertas | `/periodo/alertas/` | Las siete condiciones que requieren atención, con sus umbrales a la vista. |
 | Felicitaciones y reclamos | `/periodo/reconocimientos/` | Lo que la comunidad escribió sobre cada funcionario; suma o resta al resultado (hoja RECLAMOS de la matriz). |
 | Ausencias | `/periodo/ausencias/` | Licencias, vacaciones, emergencias y compensatorios, que bajan el avance esperado (hoja SEMAFORO). |
@@ -1007,6 +1008,11 @@ Después de la Evaluación 3 se agregó el **relleno inteligente** de los
 formularios: `comun/relleno.py`, `static/sgr/js/sgr-relleno.js` y
 `pruebas/test_relleno.py`. Ver «Relleno inteligente» más abajo.
 
+El **mapa de presencia** está en `gestion/mapa.py`, `gestion/views_mapa.py`,
+`templates/gestion/mapa.html`, `static/sgr/js/sgr-mapa.js` y
+`pruebas/test_mapa.py`; la ubicación de cada territorio, en la migración
+`organizacion/0006_territorio_ubicacion`. Ver «Mapa de presencia» más abajo.
+
 ```
 proyecto_sgr/
   manage.py
@@ -1138,3 +1144,31 @@ Lo completado lleva la nota «Completado según…», se puede cambiar, y lo que
 la persona eligió a mano nunca se pisa. El servidor arma los datos de cada
 opción dentro del alcance de quien edita y valida igual que siempre: sin
 JavaScript el formulario funciona como antes.
+
+**Mapa de presencia (`/periodo/mapa/`).** Responde «¿dónde hemos estado y
+dónde no?». Cada territorio aparece en el centro aproximado que se escribe
+en su ficha («Ubicación en el mapa», validada dentro de la Región de
+Coquimbo), con un color según su última actividad —verde hasta 15 días,
+ámbar de 16 a 30, rojo más de 30 o nunca, gris si está desactivado— y un
+tamaño según las actividades del trimestre. Al elegir uno se ven sus
+actividades registradas y verificadas, los compromisos abiertos y vencidos
+de la agenda, las gestiones sociales, sus juntas con el último contacto, los
+hitos y quiénes fueron, con botones para registrar una actividad o crear un
+compromiso con el territorio ya puesto.
+
+- **Quién lo ve.** Completo, quien supervisa (tablero, validación,
+  configuración o usuarios) o tiene el permiso de Django de ver territorios
+  y actividades. Personal, quien solo registra: ve sus propios números y
+  ningún nombre ajeno. El resto recibe 403. Las delegaciones son las que
+  autoriza el perfil; pedir otra por la dirección también da 403.
+- **Filtros.** Trimestre, delegación, qué cuenta como presencia (todo lo
+  registrado o solo lo verificado), origen y tipo de actividad. Las anuladas
+  nunca cuentan.
+- **Sin casas.** El mapa no recibe ningún dato de vecinos: solo conteos por
+  territorio. Cada punto es el centro del sector.
+- **Sin servicios externos.** El mapa se dibuja con SVG propio, con la costa
+  y el río Elqui como referencia aproximada. No descarga teselas ni usa
+  claves, así que funciona en cualquier red. Debajo va la misma información
+  en una tabla escrita por el servidor, que funciona sin JavaScript.
+- **Mis actividades** ahora tiene el campo opcional «Territorio», que es lo
+  que pone la actividad en el mapa.

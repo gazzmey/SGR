@@ -6,6 +6,9 @@ mismo criterio escrito donde corresponde: el navegador avisa antes de
 enviar, pero quien decide si algo se guarda es el servidor.
 """
 
+import re
+from decimal import Decimal, InvalidOperation
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -107,8 +110,58 @@ class DelegacionForm(_Base):
 # =========================================================================
 
 
+# Lo que el mapa acepta como ubicación: la Región de Coquimbo con holgura.
+# Sirve para atajar el error más común, que es pegar las coordenadas al
+# revés (longitud primero) o con el signo cambiado.
+REGION_LATITUD = (-32.5, -28.0)
+REGION_LONGITUD = (-72.0, -69.5)
+
+
+def leer_ubicacion(texto):
+    """
+    «-29.8705, -71.2365» → (Decimal latitud, Decimal longitud), o None si
+    viene vacío. Acepta coma o punto y coma entre los dos números, y la coma
+    decimal si los números van separados por punto y coma o espacio.
+    """
+    texto = (texto or "").strip()
+    if not texto:
+        return None
+    partes = [p for p in re.split(r"\s*[;,]\s*|\s+", texto) if p]
+    if len(partes) == 4:          # «-29,8705; -71,2365» partido en las comas
+        partes = [partes[0] + "." + partes[1], partes[2] + "." + partes[3]]
+    if len(partes) != 2:
+        raise forms.ValidationError(
+            "Escribe la latitud y la longitud separadas por una coma, "
+            "por ejemplo: -29.8705, -71.2365.")
+    try:
+        latitud, longitud = (Decimal(p.replace(",", ".")) for p in partes)
+    except InvalidOperation:
+        raise forms.ValidationError("Las coordenadas deben ser números, por ejemplo: -29.8705, -71.2365.")
+    if REGION_LONGITUD[0] <= latitud <= REGION_LONGITUD[1] and \
+            REGION_LATITUD[0] <= longitud <= REGION_LATITUD[1]:
+        raise forms.ValidationError(
+            "Parece que están al revés: va primero la latitud (cerca de -29.9) "
+            "y después la longitud (cerca de -71.2).")
+    if not (REGION_LATITUD[0] <= latitud <= REGION_LATITUD[1]
+            and REGION_LONGITUD[0] <= longitud <= REGION_LONGITUD[1]):
+        raise forms.ValidationError(
+            "Esa ubicación queda fuera de la Región de Coquimbo. Revisa el signo: "
+            "en La Serena las dos coordenadas son negativas.")
+    return latitud.quantize(Decimal("0.000001")), longitud.quantize(Decimal("0.000001"))
+
+
 class TerritorioForm(ConAlcance, _Base):
     prefijo = "TER"
+
+    ubicacion = forms.CharField(
+        label="Ubicación en el mapa", required=False, max_length=60,
+        widget=forms.TextInput(attrs={"placeholder": "Por ejemplo: -29.8705, -71.2365",
+                                      "inputmode": "decimal", "autocomplete": "off"}),
+        help_text=(
+            "Un punto aproximado al centro del territorio, para el mapa de presencia. "
+            "En Google Maps, mantén presionado el lugar y copia los números que aparecen. "
+            "No pongas la casa de un vecino: basta el centro del sector."),
+    )
 
     class Meta:
         model = Territorio
@@ -126,12 +179,22 @@ class TerritorioForm(ConAlcance, _Base):
         self.fields["delegacion"].queryset = self.delegaciones(
             getattr(self.instance, "delegacion_id", None))
         self.fields["delegacion"].empty_label = "Elige la delegación"
+        if self.instance.pk and not self.is_bound:
+            self.initial["ubicacion"] = self.instance.ubicacion_texto
 
     def clean_nombre(self):
         nombre = (self.cleaned_data["nombre"] or "").strip()
         if len(nombre) < 3:
             raise forms.ValidationError("El nombre debe tener al menos 3 caracteres.")
         return nombre
+
+    def clean_ubicacion(self):
+        return leer_ubicacion(self.cleaned_data.get("ubicacion"))
+
+    def save(self, commit=True):
+        punto = self.cleaned_data.get("ubicacion")
+        self.instance.latitud, self.instance.longitud = punto if punto else (None, None)
+        return super().save(commit=commit)
 
     def clean(self):
         datos = super().clean()

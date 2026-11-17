@@ -1434,3 +1434,128 @@ main.content > noscript > .notice { margin-bottom: 20px }
   .input, .input-sm, .deleg-select, .pager-bar .por .input { font-size: 16px }
 }
 
+
+/* =====================================================================
+   Mapa de presencia territorial (gestion/mapa.html, sgr-mapa.js)
+   ---------------------------------------------------------------------
+   Un croquis, no un mapa de calles: papel con una trama de puntos, el mar
+   y el río como referencia, y un círculo por territorio con el color del
+   semáforo. Hueco quiere decir «nadie fue en el trimestre».
+   ===================================================================== */
+.mapa-hoja .solo-js { display: none }
+.mapa-hoja.con-js .solo-js { display: inline-flex }
+.mapa-hoja.con-js p.solo-js { display: block }
+.mapa-hoja.con-js .sin-js { display: none }
+
+.mapa-filtros { border-bottom: 0 }
+.mapa-filtros .field { min-width: 140px; flex-basis: 140px }
+.mapa-filtros-botones { display: flex; gap: 8px; align-items: flex-end }
+
+.mapa-pto { width: 11px; height: 11px; border-radius: 50%; display: inline-block; flex: none }
+.mapa-pto.verde { background: var(--verde-bar) }
+.mapa-pto.ambar { background: var(--ambar-bar) }
+.mapa-pto.rojo { background: var(--rojo-bar) }
+.mapa-pto.gris { background: #A89E99 }
+
+.mapa-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 420px }
+.mapa-lienzo {
+  position: relative; min-width: 0; display: flex; align-items: flex-start; justify-content: center;
+  background-color: #F8F5F1;
+  background-image: radial-gradient(rgba(111, 100, 96, .16) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+.mapa-svg { display: block; width: 100%; height: auto }
+.mapa-vacio { max-width: 420px }
+.mapa-vacio b { font-size: 15px }
+
+.mp-tierra { fill: transparent }
+.mp-mar { fill: #DCE6E9 }
+.mp-costa { fill: none; stroke: #A8BFC7; stroke-width: 1.5; stroke-linejoin: round }
+.mp-rio { fill: none; stroke: #86ABBC; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round }
+.mp-lugar { fill: var(--tinta3) }
+.mp-rot { font-family: inherit; font-size: 12px; fill: var(--tinta3); paint-order: stroke; stroke: rgba(248, 245, 241, .92); stroke-width: 4px; stroke-linejoin: round }
+.mp-rot-mar { font-style: italic; font-size: 13px; fill: #5F808C; stroke: none; letter-spacing: .02em }
+.mp-rot-rio { font-style: italic; fill: #4F7A8D }
+.mp-rot-lugar { font-size: 11.5px }
+.mp-escala path { fill: none; stroke: var(--tinta2); stroke-width: 1.5 }
+.mp-escala text { font-size: 11px; fill: var(--tinta2) }
+
+.mp-t { cursor: pointer; outline: none }
+.mp-punto { stroke: #fff; stroke-width: 2.5 }
+.mp-verde .mp-punto { fill: var(--verde-bar) }
+.mp-ambar .mp-punto { fill: var(--ambar-bar) }
+.mp-rojo .mp-punto { fill: var(--rojo-bar) }
+.mp-gris .mp-punto { fill: #A89E99 }
+.mp-cero .mp-punto { fill: #fff; stroke-width: 2.5; stroke-dasharray: 3.5 2.5 }
+.mp-cero.mp-verde .mp-punto { stroke: var(--verde-bar) }
+.mp-cero.mp-ambar .mp-punto { stroke: var(--ambar-bar) }
+.mp-cero.mp-rojo .mp-punto { stroke: var(--rojo-bar) }
+.mp-cero.mp-gris .mp-punto { stroke: #A89E99 }
+.mp-num { font-size: 12.5px; font-weight: 600; fill: #fff; pointer-events: none }
+.mp-rot-t { font-size: 12.5px; font-weight: 500; fill: var(--tinta) }
+.mp-anillo { fill: none; stroke: var(--tinta3); stroke-width: 2; opacity: 0; transition: opacity var(--tf) ease }
+.mp-t:hover .mp-anillo { opacity: .35 }
+.mp-t:focus-visible .mp-anillo { opacity: 1; stroke: var(--g700); stroke-dasharray: 4 3 }
+.mp-t.sel .mp-anillo { opacity: 1; stroke: var(--g700); stroke-width: 3; stroke-dasharray: none }
+.mp-t.sel .mp-rot-t { font-weight: 600; fill: var(--g800) }
+
+.mapa-panel { border-left: 1px solid var(--linea); padding: 20px 22px; min-width: 0; max-height: 600px; overflow: auto }
+.mapa-panel h3 { font-size: 15px; font-weight: 600; line-height: 1.35 }
+.mapa-panel h4 { font-size: 13px; font-weight: 600; color: var(--tinta2); margin: 18px 0 8px }
+.mapa-olvidados { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.mapa-olvidados a {
+  display: flex; flex-direction: column; gap: 1px; padding: 9px 12px; border-radius: var(--rs);
+  border: 1px solid var(--linea); border-left: 3px solid var(--rojo-bar); color: var(--tinta);
+  text-decoration: none; background: #fff;
+}
+.mapa-olvidados a:hover { border-color: var(--linea2); border-left-color: var(--rojo); background: var(--sup2) }
+.mapa-olvidados .nom { font-weight: 600; font-size: 13.5px }
+.mapa-olvidados .cuando { font-size: 12.5px; color: var(--tinta3) }
+.mapa-ayuda { margin-top: 14px }
+
+.mapa-detalle .mp-volver { margin: -6px 0 10px -10px }
+.mapa-detalle .mp-titulo { font-size: 18px; margin-top: 8px; outline: none }
+.mapa-detalle .mp-sub { font-size: 12.5px; color: var(--tinta3); margin-top: 2px }
+.mp-datos { margin: 14px 0 0; display: flex; flex-direction: column; gap: 4px }
+.mp-par { display: flex; justify-content: space-between; gap: 12px; font-size: 13px }
+.mp-par dt { color: var(--tinta2) }
+.mp-par dd { margin: 0; font-weight: 500; text-align: right }
+.mp-cifras { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px }
+.mp-cifra { border: 1px solid var(--linea); border-radius: var(--rs); padding: 10px; display: flex; flex-direction: column; background: var(--sup2) }
+.mp-cifra .n { font-size: 22px; font-weight: 600; line-height: 1.1 }
+.mp-cifra .r { font-size: 12px; color: var(--tinta2); line-height: 1.3; margin-top: 2px }
+.mp-cifra .nota { font-size: 11.5px; color: var(--tinta3); margin-top: 4px }
+.mp-cifra.mp-alerta { border-color: #EBBDB7; background: var(--rojo-bg) }
+.mp-cifra.mp-alerta .nota { color: var(--rojo); font-weight: 600 }
+.mp-tipos, .mp-juntas, .mp-quienes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.mp-tipos li { display: grid; grid-template-columns: 96px minmax(0, 1fr) 28px; align-items: center; gap: 8px; font-size: 13px }
+.mp-tipos .bar { height: 8px; border-radius: 4px; background: var(--hueso); overflow: hidden }
+.mp-tipos .bar i { display: block; height: 100%; background: var(--tinta2); border-radius: 4px }
+.mp-tipos .n, .mp-quienes .n { text-align: right; color: var(--tinta2) }
+.mp-juntas li { display: flex; flex-direction: column; font-size: 13px; line-height: 1.4 }
+.mp-juntas li span { color: var(--tinta3); font-size: 12.5px }
+.mp-quienes li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px }
+.mp-nota { margin-top: 16px; font-size: 13px; color: var(--tinta2) }
+.mp-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-bottom: 4px }
+
+.mapa-pie { flex-direction: column; align-items: flex-start; gap: 2px; font-size: 12.5px; color: var(--tinta3) }
+.mapa-sin-ubicar { list-style: none; margin: 0; padding: 6px 20px 12px }
+.mapa-sin-ubicar li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linea) }
+.mapa-sin-ubicar li:last-child { border-bottom: 0 }
+.mapa-tabla .mapa-vencido { color: var(--rojo); font-weight: 600 }
+.mapa-tabla td .btn + .btn { margin-left: 6px }
+
+@media (max-width: 1180px) {
+  .mapa-cuerpo { grid-template-columns: minmax(0, 1fr) }
+  .mapa-panel { border-left: 0; border-top: 1px solid var(--linea); max-height: none }
+}
+@media (max-width: 560px) {
+  .mapa-hoja .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px }
+  .mapa-hoja .kpi .val { font-size: 24px }
+  .mapa-panel { padding: 16px }
+  .mp-cifras { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) }
+}
+.mapa-tabla .mapa-nombre { color: var(--tinta); text-decoration: none }
+.mapa-hoja.con-js .mapa-tabla .mapa-nombre { border-bottom: 1px dashed var(--linea2) }
+.mapa-hoja.con-js .mapa-tabla .mapa-nombre:hover { color: var(--g700); border-bottom-color: var(--g700) }
+.mapa-hoja.con-js span.solo-js { display: inline }
