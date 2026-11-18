@@ -9,23 +9,29 @@
 {% block titulo %}Atenciones registradas{% endblock %}
 
 {% block ruta %}
-  <a href="{% url 'atencion:ingreso' %}">Atención ciudadana</a>
+  {% if puede_registrar %}
+    <a href="{% url 'atencion:ingreso' %}">Atención ciudadana</a>
+  {% else %}
+    <span>Comunidad</span>
+  {% endif %}
   <svg class="i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
-  <span aria-current="page">Registradas</span>
+  <span aria-current="page">Atenciones registradas</span>
 {% endblock %}
 
 {% block contenido %}
 <div class="page-head">
   <div>
     <h1>Atenciones registradas</h1>
-    <p>Lo atendido en {% if activa %}<b>{{ activa.nombre }}</b>{% else %}la delegación{% endif %}. Se muestran las 100 más recientes.</p>
+    <p>Lo atendido en {% if activa %}<b>{{ activa.nombre }}</b>{% else %}la delegación{% endif %}. Se muestran las 100 más recientes.{% if not puede_registrar %} Es una pantalla de consulta: las atenciones las registra quien atiende.{% endif %}{% if sgr_puede_cambiar_delegacion %} Para ver otra delegación, cámbiala arriba.{% endif %}</p>
   </div>
-  <div class="actions">
-    <a class="btn btn-primary" href="{% url 'atencion:ingreso' %}">
-      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-      Registrar atención
-    </a>
-  </div>
+  {% if puede_registrar %}
+    <div class="actions">
+      <a class="btn btn-primary" href="{% url 'atencion:ingreso' %}">
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Registrar atención
+      </a>
+    </div>
+  {% endif %}
 </div>
 
 <section class="card">
@@ -71,8 +77,15 @@
               <td>{{ atencion.funcionario.get_full_name|default:atencion.funcionario.get_username }}</td>
               <td>
                 {% if atencion.caso %}
-                  <a class="link" href="{% url 'atencion:caso' atencion.caso.pk %}">{{ atencion.caso.codigo }}</a><span class="t2">{{ atencion.caso.siguiente_paso }}</span>
-                {% elif atencion.subatencion.tipo_atencion.area == 'Social' %}
+                  {% if puede_ver_caso %}
+                    <a class="link" href="{% url 'atencion:caso' atencion.caso.pk %}">{{ atencion.caso.codigo }}</a>
+                  {% elif puede_ver_gestion %}
+                    <a class="link" href="{% url 'atencion:gestion_detalle' atencion.caso.pk %}">{{ atencion.caso.codigo }}</a>
+                  {% else %}
+                    <span class="mono">{{ atencion.caso.codigo }}</span>
+                  {% endif %}
+                  <span class="t2">{{ atencion.caso.siguiente_paso }}</span>
+                {% elif atencion.subatencion.tipo_atencion.area == 'Social' and puede_registrar %}
                   <form method="post" action="{% url 'atencion:caso_abrir' atencion.pk %}">{% csrf_token %}
                     <button class="btn btn-secondary" type="submit" style="min-height: 32px; padding: 0 10px; font-size: 13px">Abrir caso</button>
                   </form>
@@ -94,8 +107,12 @@
         <div class="row mt8"><a class="btn btn-secondary" href="{% url 'atencion:registradas' %}">Quitar el filtro</a></div>
       {% else %}
         <h3>Todavía no hay atenciones</h3>
-        <p>Cuando registres la primera, aparecerá aquí con su fecha, el solicitante y quién la atendió.</p>
-        <div class="row mt8"><a class="btn btn-primary" href="{% url 'atencion:ingreso' %}">Registrar la primera</a></div>
+        {% if puede_registrar %}
+          <p>Cuando registres la primera, aparecerá aquí con su fecha, el solicitante y quién la atendió.</p>
+          <div class="row mt8"><a class="btn btn-primary" href="{% url 'atencion:ingreso' %}">Registrar la primera</a></div>
+        {% else %}
+          <p>Cuando alguien de {% if activa %}{{ activa.nombre }}{% else %}la delegación{% endif %} registre una, aparecerá aquí con su fecha, el solicitante y quién la atendió.</p>
+        {% endif %}
       {% endif %}
     </div>
   {% endif %}

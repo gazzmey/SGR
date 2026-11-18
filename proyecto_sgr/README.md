@@ -315,7 +315,7 @@ explicar una operación CRUD, una validación y una restricción de acceso.
 | 10 | Tipos de atención | `/catalogo/tipos-atencion/` | Mantenedor completo. |
 | 11 | Subtipos de atención | `/catalogo/subatenciones/` | Mantenedor completo, dependiente del tipo. |
 | 12 | Ingreso de atención | `/atencion/ingreso/` | Registro de atención ciudadana. |
-| 13 | Atenciones registradas | `/atencion/registradas/` | Consulta de lo registrado en la delegación. |
+| 13 | Atenciones registradas | `/atencion/registradas/` | Consulta de lo registrado en la delegación activa. Está en el menú para quien registra, supervisa (`ver_tablero`) o ve las gestiones sociales (Administrador, Consulta, Gestión); solo quien registra ve los botones para registrar y abrir un caso. |
 
 Las once que exige la entrega son las primeras once; las dos últimas
 completan el módulo de atención ciudadana. Las pantallas de la Evaluación 3
@@ -849,7 +849,9 @@ es el que puede explicarle a la persona por qué se rechazó su archivo.
 - **El Administrador no registra atenciones.** Según la tabla de permisos
   aprobada, `registrar_atencion` es del rol Funcionario. No es un error: si se
   quisiera que el Administrador también pudiera, se marca la casilla en el
-  mantenedor de Roles, sin tocar código.
+  mantenedor de Roles, sin tocar código. Sí las consulta: *Comunidad →
+  Atenciones registradas* es de lectura para él y para quien supervisa (la
+  regla está en `atencion/acceso.py`).
 - **Los archivos de las evidencias no entran en el respaldo del despliegue.**
   `desplegar.sh` respalda el código y la base, pero no `media/`: el despliegue
   no toca esos archivos y el sistema nunca los modifica ni los borra. Para

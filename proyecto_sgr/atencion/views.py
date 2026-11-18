@@ -120,8 +120,17 @@ def _subatenciones_por_tipo():
 
 @login_required
 def registradas(request):
-    """Lo registrado en la delegación activa. Pantalla de consulta."""
-    if not P.tiene_permiso(request.user, P.REGISTRAR_ATENCION):
+    """
+    Lo registrado en la delegación activa. Pantalla de consulta.
+
+    La ve quien registra atenciones y también quien supervisa o administra
+    (``atencion/acceso.py``). Solo quien registra ve los botones para
+    registrar y para abrir un caso; los demás la usan para mirar.
+    """
+    from atencion.acceso import puede_consultar_atenciones
+    from comun.entidades import puede
+
+    if not puede_consultar_atenciones(request.user):
         raise PermissionDenied("No tienes permiso para ver las atenciones.")
 
     activa = delegacion_activa(request)
@@ -145,12 +154,18 @@ def registradas(request):
             | Q(detalle__icontains=termino)
         )
 
+    puede_registrar = P.tiene_permiso(request.user, P.REGISTRAR_ATENCION)
     return render(request, "atencion/registradas.html", {
-        "menu": "atencion",
+        "menu": "atenciones",
         "activa": activa,
         "atenciones": atenciones[:100],
         "total": atenciones.count(),
         "termino": termino,
+        "puede_registrar": puede_registrar,
+        # El caso se abre en su ficha si se puede; si no, en la de la
+        # gestión social, que es el mismo registro visto desde Registros.
+        "puede_ver_caso": puede_registrar or P.tiene_permiso(request.user, P.VER_TABLERO),
+        "puede_ver_gestion": puede(request.user, "gestion_social", "view"),
     })
 
 

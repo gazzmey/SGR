@@ -77,6 +77,11 @@
         <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10.5h8M8 14h5"/><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V18H4.5A1.5 1.5 0 0 1 3 16.5V7a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Atención ciudadana</span>
       </a>
     {% endif %}
+    {% if sgr_atenciones %}
+      <a href="{% url 'atencion:registradas' %}"{% if menu == 'atenciones' %} aria-current="page"{% endif %}>
+        <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/></svg><span>Atenciones registradas</span>
+      </a>
+    {% endif %}
     {% if sgr_permisos.registrar_atencion or sgr_permisos.ver_tablero %}
       <a href="{% url 'atencion:casos' %}"{% if menu == 'casos' %} aria-current="page"{% endif %}>
         <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>Casos sociales</span>

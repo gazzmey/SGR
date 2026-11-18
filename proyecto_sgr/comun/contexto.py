@@ -66,9 +66,18 @@ def sesion_sgr(request):
         # El mapa de presencia: completo para quien supervisa, personal para
         # quien registra. Las reglas están en gestion/mapa.py.
         "sgr_mapa": _modo_mapa(request.user),
+        # Las atenciones registradas: las consulta quien atiende, supervisa
+        # o administra. La regla está en atencion/acceso.py.
+        "sgr_atenciones": _atenciones(request.user),
         # El resultado de la última operación, que se consume al mostrarlo.
         "sgr_resultado": tomar_resultado(request),
     }
+
+
+def _atenciones(usuario):
+    from atencion.acceso import puede_consultar_atenciones
+
+    return puede_consultar_atenciones(usuario)
 
 
 def _modo_mapa(usuario):

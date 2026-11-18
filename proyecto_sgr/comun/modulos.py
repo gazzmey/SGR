@@ -65,6 +65,7 @@ ICONOS = {
     "observaciones": '<path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4 19.5l1.4-4.4A7.5 7.5 0 1 1 20 11.5z"/>',
     "cartas": '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/>',
     "atencion": '<path d="M8 10.5h8M8 14h5"/><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V18H4.5A1.5 1.5 0 0 1 3 16.5V7a1.5 1.5 0 0 1 1.5-1.5z"/>',
+    "atenciones": '<rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>',
     "casos": '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
     "regalos": '<rect x="3.5" y="9" width="17" height="11.5" rx="1.5"/><path d="M3.5 13h17M12 9v11.5"/><path d="M12 9c-1.5-3.5-5.5-4-5.5-1.5S10 9 12 9zM12 9c1.5-3.5 5.5-4 5.5-1.5S14 9 12 9z"/>',
     "validar": '<path d="m5 12.5 4.5 4.5L19 7.5"/><path d="M3 19.5h18"/>',
@@ -110,6 +111,11 @@ def _ver(clave):
         entidad.permiso("view"))
 
 
+def _atenciones(t):
+    """La misma regla de atencion.acceso.puede_consultar_atenciones, escrita con ``tiene``."""
+    return t(P.REGISTRAR_ATENCION) or t(P.VER_TABLERO) or _ver("gestion_social")(t)
+
+
 def _mapa(t):
     """La misma regla de gestion.mapa.modo_de, escrita con ``tiene``."""
     return (t(P.VER_TABLERO) or t(P.VALIDAR_EVIDENCIA) or t(P.CONFIGURAR_PERIODO)
@@ -142,6 +148,9 @@ MODULOS = (
     ("atencion", "comunidad", "Atención ciudadana",
      "Quién vino y qué se le entregó.",
      "atencion:ingreso", lambda t: t(P.REGISTRAR_ATENCION), False),
+    ("atenciones", "comunidad", "Atenciones registradas",
+     "Lo atendido en la delegación, para consultar.",
+     "atencion:registradas", _atenciones, True),
     ("casos", "comunidad", "Casos sociales",
      "Visita, informe y beneficio, con plazos.",
      "atencion:casos", lambda t: t(P.REGISTRAR_ATENCION) or t(P.VER_TABLERO), False),
