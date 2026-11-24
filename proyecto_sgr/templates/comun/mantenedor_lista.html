@@ -25,7 +25,7 @@
     <p>{{ bajada }}</p>
   </div>
   <div class="actions">
-    <a class="btn btn-secondary" href="?{{ cola_exportar }}">
+    <a class="btn btn-secondary" href="?{{ cola_exportar }}" data-vivo="exportar">
       <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 19.5h15"/></svg>
       Exportar a Excel
     </a>
@@ -52,16 +52,27 @@
 <section class="card">
   <div class="card-h">
     <h2>Listado de {{ plural }}</h2>
-    <span class="sub">{{ page_obj.paginator.count }} {% if page_obj.paginator.count == 1 %}{{ singular }}{% else %}{{ plural }}{% endif %}</span>
+    <span class="sub" data-vivo="total">{{ page_obj.paginator.count }} {% if page_obj.paginator.count == 1 %}{{ singular }}{% else %}{{ plural }}{% endif %}</span>
   </div>
 
-  <form class="filters" method="get" data-filtros>
+  <form class="filters" method="get" data-filtros data-buscar-vivo>
     <div class="field grow">
       <label for="f-q">Buscar</label>
       <input class="input" id="f-q" type="search" name="q" value="{{ termino }}"
-             placeholder="{{ placeholder }}" autocomplete="off">
-      <span class="help">Búsqueda parcial: la colación de la base ignora mayúsculas y tildes.</span>
+             placeholder="{{ placeholder }}" autocomplete="off" aria-controls="sgr-resultados">
+      <span class="help">Los resultados cambian mientras escribes. Búsqueda parcial: ignora mayúsculas y tildes.</span>
     </div>
+
+    {% if rango_fechas %}
+      <div class="field">
+        <label for="f-desde">{{ rango_fechas.rotulo }} desde</label>
+        <input class="input" id="f-desde" type="date" name="desde" value="{{ rango_fechas.desde }}">
+      </div>
+      <div class="field">
+        <label for="f-hasta">{{ rango_fechas.rotulo }} hasta</label>
+        <input class="input" id="f-hasta" type="date" name="hasta" value="{{ rango_fechas.hasta }}">
+      </div>
+    {% endif %}
 
     {% for filtro in filtros %}
       <div class="field">
@@ -84,6 +95,7 @@
     <a class="btn btn-ghost" href="{% url url_lista %}">Limpiar</a>
   </form>
 
+  <div id="sgr-resultados" data-vivo="resultados" aria-live="polite">
   {% if descripcion_filtros %}
     <div class="filtro-activo">
       <svg class="i" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
@@ -213,6 +225,7 @@
       {% endif %}
     </div>
   {% endif %}
+  </div>
 </section>
 
 {% if nota %}

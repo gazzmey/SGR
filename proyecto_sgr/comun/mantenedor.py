@@ -304,6 +304,9 @@ class ListaMantenedor(RequierePermiso, AlcanceDelegacion, ListView):
     url_estado = ""
     rotulo_nuevo = "Nuevo"
     menu = ""               # qué entrada del menú lateral se marca
+    #: Filtro por rango de fechas: (campo, rótulo). Agrega «desde» y «hasta»
+    #: a la barra de filtros; vacío, el listado no lo ofrece.
+    rango_fechas = None
 
     # --- consulta --------------------------------------------------------
 
@@ -335,7 +338,27 @@ class ListaMantenedor(RequierePermiso, AlcanceDelegacion, ListView):
             valor = (self.request.GET.get(filtro.clave) or "").strip()
             if valor:
                 consulta = consulta.filter(filtro.q(valor))
+        if self.rango_fechas:
+            campo = self.rango_fechas[0]
+            desde, hasta = self._rango()
+            if desde:
+                consulta = consulta.filter(**{f"{campo}__gte": desde})
+            if hasta:
+                consulta = consulta.filter(**{f"{campo}__lte": hasta})
         return consulta
+
+    def _rango(self):
+        """Las fechas «desde» y «hasta» de la dirección; una inválida se ignora."""
+        from datetime import date
+
+        fechas = []
+        for clave in ("desde", "hasta"):
+            texto = (self.request.GET.get(clave) or "").strip()
+            try:
+                fechas.append(date.fromisoformat(texto) if texto else None)
+            except ValueError:
+                fechas.append(None)
+        return fechas
 
     def _ordenar(self, consulta):
         campo = self.request.GET.get("orden") or self.orden_inicial
@@ -388,6 +411,15 @@ class ListaMantenedor(RequierePermiso, AlcanceDelegacion, ListView):
             valor = (self.request.GET.get(filtro.clave) or "").strip()
             if valor:
                 partes.append(f"{filtro.titulo.lower()}: {filtro.rotulo(valor)}")
+        if self.rango_fechas:
+            desde, hasta = self._rango()
+            rotulo = self.rango_fechas[1].lower()
+            if desde and hasta:
+                partes.append(f"{rotulo} entre el {desde:%d-%m-%Y} y el {hasta:%d-%m-%Y}")
+            elif desde:
+                partes.append(f"{rotulo} desde el {desde:%d-%m-%Y}")
+            elif hasta:
+                partes.append(f"{rotulo} hasta el {hasta:%d-%m-%Y}")
         return " · ".join(partes)
 
     def _cola(self, **cambios):
@@ -465,6 +497,11 @@ class ListaMantenedor(RequierePermiso, AlcanceDelegacion, ListView):
             "cuerpo": filas,
             "filtros": filtros,
             "termino": self.request.GET.get("q", ""),
+            "rango_fechas": ({
+                "rotulo": self.rango_fechas[1],
+                "desde": self.request.GET.get("desde", ""),
+                "hasta": self.request.GET.get("hasta", ""),
+            } if self.rango_fechas else None),
             "descripcion_filtros": self.describir_filtros(),
             "tamanos": TAMANOS,
             "tam": self.get_paginate_by(None),
@@ -570,6 +607,22 @@ class _FormMantenedor(RequierePermiso, AlcanceDelegacion):
         return reverse(self.url_lista)
 
 
+def motivo_no_editable(obj, usuario=None):
+    """
+    Por qué ese registro ya no se puede editar, o "" si se puede.
+
+    Lo responde el propio modelo con ``motivo_no_editable(usuario)``; los
+    modelos que no lo definen se pueden editar siempre (con permiso).
+    """
+    metodo = getattr(obj, "motivo_no_editable", None)
+    if not callable(metodo):
+        return ""
+    try:
+        return metodo(usuario) or ""
+    except TypeError:
+        return metodo() or ""
+
+
 class CrearMantenedor(_FormMantenedor, CreateView):
     accion_django = "add"
     #: Campos que se pueden dejar elegidos desde la dirección, por ejemplo
@@ -638,13 +691,35 @@ class EditarMantenedor(_FormMantenedor, UpdateView):
                        or concurrencia.huella(self.object))
         return ctx
 
+    def _rechazo_por_estado(self, request):
+        """
+        Un registro que su propio estado deja cerrado no se edita.
+
+        Lo decide el modelo con ``motivo_no_editable()`` —por ejemplo, una
+        actividad aprobada—, y se comprueba aquí, en el servidor, para que
+        escribir la dirección de edición a mano tampoco sirva.
+        """
+        motivo = motivo_no_editable(self.object, request.user)
+        if not motivo:
+            return None
+        anunciar(request, "No se puede editar", motivo, icono="error")
+        destino = (reverse(self.url_detalle, args=[self.object.pk])
+                   if self.url_detalle else reverse(self.url_lista))
+        return redirect(destino)
+
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
+        rechazo = self._rechazo_por_estado(request)
+        if rechazo:
+            return rechazo
         self._huella = concurrencia.huella(self.object)
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
+        rechazo = self._rechazo_por_estado(request)
+        if rechazo:
+            return rechazo
         self._huella = concurrencia.huella(self.object)
         self._antes = (self.object.datos_version()
                        if hasattr(self.object, "datos_version") else None)
@@ -769,7 +844,9 @@ class DetalleMantenedor(RequierePermiso, AlcanceDelegacion, DetailView):
             "plural": self.plural,
             "genero": self.genero,
             "url_lista": self.url_lista,
-            "url_editar": self.url_editar if self.autoriza("change") else "",
+            "url_editar": (self.url_editar if self.autoriza("change")
+                           and not motivo_no_editable(obj, self.request.user) else ""),
+            "motivo_no_editable": motivo_no_editable(obj, self.request.user),
             "url_estado": self.url_estado if self.autoriza("delete") else "",
             "url_anular": self.url_anular if self.autoriza("delete") else "",
             "menu": self.menu,

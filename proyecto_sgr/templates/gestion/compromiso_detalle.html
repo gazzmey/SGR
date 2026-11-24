@@ -55,7 +55,7 @@
     <dl class="datos">
       <div class="par"><dt>Código</dt><dd class="mono">{{ obj.codigo }}</dd></div>
       <div class="par"><dt>Vencimiento</dt><dd>{{ obj.vencimiento|date:"d-m-Y" }}</dd></div>
-      <div class="par"><dt>Solicitante</dt><dd>{{ obj.solicitante }}<span class="t2">{% if obj.origen == 'interno' %}Interno · lo pidió el municipio{% elif obj.origen == 'externo' %}Externo · lo pidió la comunidad{% else %}Origen sin indicar{% endif %}</span></dd></div>
+      <div class="par"><dt>Solicitante</dt><dd>{{ obj.solicitante }}{% if obj.vecino_id %}<span class="t2">Vecino registrado · RUT {{ obj.vecino.rut }}</span>{% endif %}<span class="t2">{% if obj.origen == 'interno' %}Interno · lo pidió el municipio{% elif obj.origen == 'externo' %}Externo · lo pidió la comunidad{% else %}Origen sin indicar{% endif %}</span></dd></div>
       <div class="par"><dt>Territorio</dt><dd>{{ obj.territorio }}</dd></div>
       <div class="par"><dt>Responsable</dt><dd>{{ obj.responsable.get_full_name|default:obj.responsable.get_username }}
         {% if obj.responsable_original and obj.responsable_original_id != obj.responsable_id %}
@@ -173,7 +173,7 @@
     {% else %}
       <div class="notice">
         <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
-        <div><b>Sin cambios posibles</b>{% if obj.cerrado %}El compromiso está cerrado y no se reabre. Si hace falta hacer algo más, ingresa uno nuevo que lo cite.{% else %}No tienes permiso para moverlo de estado.{% endif %}</div>
+        <div><b>Sin cambios posibles</b>{% if obj.cerrado %}El compromiso está cerrado y no se reabre. Si hace falta hacer algo más, ingresa uno nuevo que lo cite.{% else %}{% if solo_consulta %}Solo {{ obj.responsable.get_full_name|default:obj.responsable.username }}, responsable del compromiso, lo mueve de estado. Tú puedes consultarlo y dejar una observación.{% else %}No tienes permiso para moverlo de estado.{% endif %}{% endif %}</div>
       </div>
     {% endif %}
 

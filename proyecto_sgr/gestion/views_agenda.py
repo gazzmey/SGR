@@ -137,6 +137,21 @@ def _visibles_para(usuario):
 # =========================================================================
 
 
+def _gente_para_filtro():
+    """
+    Las personas que tienen compromisos, para el filtro por funcionario.
+
+    Las opciones se arman sin la persona que mira; el listado igual se
+    limita después a las delegaciones que cada uno puede ver.
+    """
+    from django.contrib.auth import get_user_model
+
+    gente = (get_user_model().objects
+             .filter(compromisos__isnull=False)
+             .distinct().order_by("first_name", "last_name"))
+    return [(str(u.pk), u.get_full_name() or u.get_username()) for u in gente]
+
+
 class Agenda(ListaMantenedor):
     """
     Los compromisos de la delegación, con su plazo y su estado.
@@ -156,9 +171,11 @@ class Agenda(ListaMantenedor):
     singular = "compromiso"
     plural = "compromisos"
     genero = "el"
-    placeholder = "Código, solicitante, territorio o descripción"
+    placeholder = "Código, RUT o nombre del solicitante, territorio o descripción"
     rotulo_nuevo = "Ingresar compromiso"
-    busca = ["codigo", "solicitante", "territorio", "descripcion", "apoyo"]
+    busca = ["codigo", "solicitante", "territorio", "descripcion", "apoyo",
+             "vecino__rut", "vecino__nombres", "vecino__apellidos"]
+    rango_fechas = ("creado__date", "Ingresado")
     orden_inicial = "vencimiento"
 
     url_lista = "gestion:agenda"
@@ -175,8 +192,8 @@ class Agenda(ListaMantenedor):
                ),
                vacio="Solo abiertos"),
         Filtro("quien", "Responsable",
-               [("mios", "Los míos")],
-               consulta=lambda v: Q(),      # se resuelve en base_queryset
+               lambda: [("mios", "Los míos")] + _gente_para_filtro(),
+               consulta=lambda v: Q(responsable_id=v) if v.isdigit() else Q(),
                vacio="De toda la delegación"),
         Filtro("plazo", "Plazo",
                [("vencidos", "Vencidos"), ("semana", "Vencen en 7 días")],
@@ -191,9 +208,11 @@ class Agenda(ListaMantenedor):
         Columna("codigo", "Código", clase="mono"),
         Columna("solicitante", "Compromiso", orden="solicitante", clase="w",
                 celda=lambda o: format_html(
-                    '<a class="link" href="{}">{}</a><span class="t2">{}{}</span>',
+                    '<a class="link" href="{}">{}</a><span class="t2">{}{}{}</span>',
                     reverse("gestion:compromiso_detalle", args=[o.pk]),
-                    o.solicitante, o.territorio,
+                    o.solicitante,
+                    f"RUT {o.vecino.rut} · " if o.vecino_id else "",
+                    o.territorio,
                     {"interno": " · interno", "externo": " · externo"}.get(o.origen, ""),
                 ),
                 valor=lambda o: o.solicitante),
@@ -212,11 +231,25 @@ class Agenda(ListaMantenedor):
         "ítem hasta que alguien distinto lo valida."
     )
 
+    def _buscar(self, consulta):
+        """
+        La búsqueda de siempre, más el RUT escrito con puntos: «12.345.678-5»
+        encuentra al vecino guardado como 12345678-5.
+        """
+        import re
+
+        resultado = super()._buscar(consulta)
+        termino = (self.request.GET.get("q") or "").strip()
+        sin_puntos = termino.replace(".", "").replace(" ", "").upper()
+        if termino and sin_puntos != termino.upper() and re.fullmatch(r"\d{1,8}-?[\dK]?", sin_puntos):
+            resultado = resultado | consulta.filter(vecino__rut__icontains=sin_puntos)
+        return resultado
+
     def base_queryset(self):
         consulta = (
             Compromiso.objects
             .select_related("responsable", "item", "delegacion", "periodo",
-                            "responsable_original")
+                            "responsable_original", "vecino")
         )
 
         visibles = _visibles_para(self.request.user)
@@ -251,6 +284,19 @@ class Agenda(ListaMantenedor):
         from gestion import reglas as R
 
         contexto = super().get_context_data(**kwargs)
+        # El filtro por funcionario ofrece solo a la gente que esta persona
+        # puede ver: las de sus delegaciones.
+        from django.contrib.auth import get_user_model
+
+        visibles = _visibles_para(self.request.user)
+        gente = get_user_model().objects.filter(is_active=True, perfil__activo=True)
+        if visibles is not None:
+            gente = gente.filter(perfil__delegacion_id__in=visibles)
+        for filtro in contexto.get("filtros", []):
+            if filtro["clave"] == "quien":
+                filtro["opciones"] = [("mios", "Los míos")] + [
+                    (str(u.pk), u.get_full_name() or u.get_username())
+                    for u in gente.order_by("first_name", "last_name").distinct()]
         contexto["puede_ingresar"] = tiene_permiso(
             self.request.user, P.REGISTRAR_ACTIVIDAD)
         if not contexto["puede_ingresar"]:
@@ -356,7 +402,8 @@ def compromiso_detalle(request, pk):
             "Ese compromiso es de una delegación que no tienes autorizada."
         )
 
-    puede_avanzar = tiene_permiso(request.user, P.REGISTRAR_ACTIVIDAD)
+    puede_avanzar = (tiene_permiso(request.user, P.REGISTRAR_ACTIVIDAD)
+                     and compromiso.puede_modificar(request.user))
     pasos = []
     if puede_avanzar:
         for clave, estado in PASOS.items():
@@ -392,6 +439,8 @@ def compromiso_detalle(request, pk):
         "cambios": compromiso.cambios.select_related(
             "quien", "responsable_anterior", "responsable_nuevo"),
         "pasos": pasos,
+        "solo_consulta": (tiene_permiso(request.user, P.REGISTRAR_ACTIVIDAD)
+                          and compromiso.abierto and not puede_avanzar),
         "form_paso": TransicionForm(),
         "form_reasignar": (
             ReasignarForm(compromiso=compromiso)
@@ -440,6 +489,10 @@ class CompromisoTransicion(View):
         visibles = _visibles_para(request.user)
         if visibles is not None and compromiso.delegacion_id not in visibles:
             raise PermissionDenied("Ese compromiso no es de tu delegación.")
+        if compromiso.abierto and not compromiso.puede_modificar(request.user):
+            raise PermissionDenied(
+                "Solo el responsable mueve este compromiso. Si no puede "
+                "seguir, la delegada lo reasigna.")
 
         if paso not in PASOS:
             raise PermissionDenied("Ese paso no existe.")
@@ -593,6 +646,9 @@ class CompromisoAvisar(View):
         visibles = _visibles_para(request.user)
         if visibles is not None and compromiso.delegacion_id not in visibles:
             raise PermissionDenied("Ese compromiso no es de tu delegación.")
+        if compromiso.abierto and compromiso.responsable_id != request.user.pk:
+            raise PermissionDenied(
+                "Solo el responsable avisa que su compromiso no llega a la fecha.")
 
         if not compromiso.abierto:
             anunciar(request, "Ya está cerrado",

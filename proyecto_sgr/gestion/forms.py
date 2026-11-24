@@ -294,6 +294,7 @@ class ReglaCalculoForm(forms.ModelForm):
             "umbral_ambar", "convencion_dias",
             "dias_aviso_vencimiento", "dias_sin_registrar",
             "dias_evidencia_espera",
+            "dias_gracia_semana", "limite_diario_actividades",
             "valor_felicitacion", "max_felicitaciones", "valor_reclamo",
             "periodos_reclamo_rrhh",
             "plazo_programar_visita", "tolerancia_visita", "plazo_informe",

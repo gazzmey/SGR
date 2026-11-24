@@ -115,6 +115,40 @@ class CompromisoForm(forms.ModelForm):
             .distinct()
         )
 
+    def clean(self):
+        """
+        Si quien lo pidió es un vecino registrado, el compromiso queda
+        enlazado a su ficha: así se encuentra en el Tubo por su RUT.
+
+        Se reconoce por el RUT escrito (con o sin puntos) o por el nombre
+        completo exacto de un vecino de la delegación. Con el RUT, el texto
+        pasa a ser su nombre. Si no se reconoce, queda solo el texto.
+        """
+        datos = super().clean()
+        texto = (datos.get("solicitante") or "").strip()
+        vecino = self._vecino_de(texto)
+        self.instance.vecino = vecino
+        if vecino is not None and any(ch.isdigit() for ch in texto):
+            datos["solicitante"] = vecino.nombre
+        return datos
+
+    def _vecino_de(self, texto):
+        import re
+
+        from atencion.models import Solicitante
+        from comun.rut import limpiar_rut
+
+        if not texto:
+            return None
+        rut = re.search(r"\b(\d{1,2}\.?\d{3}\.?\d{3}-[\dkK])\b", texto)
+        if rut:
+            return Solicitante.objects.filter(rut=limpiar_rut(rut.group(1)), activo=True).first()
+        if self.delegacion is None:
+            return None
+        iguales = [v for v in Solicitante.objects.filter(activo=True, territorio__delegacion=self.delegacion)
+                   if v.nombre.casefold() == texto.casefold()]
+        return iguales[0] if len(iguales) == 1 else None
+
     def clean_descripcion(self):
         texto = (self.cleaned_data["descripcion"] or "").strip()
         if len(texto) < 20:

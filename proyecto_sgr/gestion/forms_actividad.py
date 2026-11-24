@@ -74,10 +74,15 @@ class ActividadForm(forms.ModelForm):
         )
 
         if periodo is not None:
+            from gestion.reglas import vigente
+            from gestion.semanas import texto_plazo
+
             self.fields["fecha"].help_text = (
-                "Tiene que caer entre el %s y el %s, que es lo que dura «%s»."
+                "Tiene que caer entre el %s y el %s, que es lo que dura «%s». "
+                "Lo de cada semana se ingresa hasta %s."
                 % (periodo.inicio.strftime("%d-%m-%Y"),
-                   periodo.termino.strftime("%d-%m-%Y"), periodo.nombre)
+                   periodo.termino.strftime("%d-%m-%Y"), periodo.nombre,
+                   texto_plazo(vigente(periodo).dias_gracia_semana))
             )
 
         # Relleno inteligente: la fecha es hoy (dentro del trimestre), si

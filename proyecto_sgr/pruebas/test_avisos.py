@@ -61,24 +61,23 @@ class QuienAvisa(Base):
         destinatarios = list(aviso.destinatarios.values_list("usuario__email", "por_que"))
         self.assertEqual(destinatarios, [("soledad.guerrero@ejemplo.cl", "delegado")])
 
-    def test_si_avisa_un_colega_tambien_le_llega_al_responsable(self):
-        self.avisar("marcela.rios@ejemplo.cl", self.de_camila)
-        aviso = AvisoCompromiso.objects.filter(autor=self.marcela).latest("pk")
-        self.assertEqual(
-            list(aviso.destinatarios.values_list("usuario__email", "por_que")),
-            [("soledad.guerrero@ejemplo.cl", "delegado"),
-             ("camila.otarola@ejemplo.cl", "responsable")])
+    def test_un_colega_no_avisa_por_el_responsable(self):
+        # Guía de la evaluación 3: en el Tubo cada funcionario modifica solo
+        # sus propios registros. El aviso lo da quien responde por el
+        # compromiso.
+        antes = AvisoCompromiso.objects.count()
+        self.assertEqual(self.avisar("marcela.rios@ejemplo.cl", self.de_camila).status_code, 403)
+        self.assertEqual(AvisoCompromiso.objects.count(), antes)
 
-    def test_si_el_delegado_es_el_responsable_le_llega_una_vez(self):
+    def test_si_el_delegado_es_el_responsable_no_se_avisa_a_si_mismo(self):
         del2 = Delegacion.objects.get(codigo="DEL-02")
         rodrigo = U.objects.get(email="rodrigo.tapia@ejemplo.cl")
         self.assertEqual(del2.delegado, rodrigo)
         suyo = abierto("DEL-02", "rodrigo.tapia@ejemplo.cl")
         self.assertIsNotNone(suyo)
-        self.avisar("hector.pizarro@ejemplo.cl", suyo)
+        self.avisar("rodrigo.tapia@ejemplo.cl", suyo)
         aviso = AvisoCompromiso.objects.filter(compromiso=suyo).latest("pk")
-        self.assertEqual(list(aviso.destinatarios.values_list("usuario__email", "por_que")),
-                         [("rodrigo.tapia@ejemplo.cl", "delegado")])
+        self.assertEqual(aviso.destinatarios.count(), 0)
 
     def test_queda_en_el_historial_en_la_observacion_y_en_la_auditoria(self):
         self.avisar("marcela.rios@ejemplo.cl", self.suyo)
@@ -182,11 +181,13 @@ class EnMiPanel(Base):
         self.assertFalse(DestinatarioAviso.objects.filter(aviso=self.aviso, visto_el__isnull=False).exists())
 
     def test_la_ficha_dice_a_quien_le_llegara_antes_de_avisar(self):
-        r = self._cliente("marcela.rios@ejemplo.cl").get(
-            reverse("gestion:compromiso_detalle", args=[self.compromiso.pk]))
+        ficha = reverse("gestion:compromiso_detalle", args=[self.compromiso.pk])
+        r = self._cliente("camila.otarola@ejemplo.cl").get(ficha)
         self.assertContains(r, "Enviar aviso")
         self.assertContains(r, "La fecha comprometida no cambia")
         self.assertContains(r, "Soledad")
+        # Una colega lo consulta, pero no avisa por la responsable.
+        self.assertNotContains(self._cliente("marcela.rios@ejemplo.cl").get(ficha), "Enviar aviso")
 
     def test_quien_no_avanza_no_ve_el_formulario(self):
         r = self._cliente("soledad.guerrero@ejemplo.cl").get(

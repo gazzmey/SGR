@@ -613,4 +613,64 @@
       });
     });
   });
+
+  /* ---------------------------------------------------------------------
+     10. Búsqueda mientras se escribe
+
+     En los listados, el resultado cambia a medida que se escribe en
+     «Buscar» o se eligen fechas, sin tocar el botón. Se pide al servidor la
+     misma página que daría el botón —con la misma búsqueda, los mismos
+     filtros y el mismo alcance— y se reemplazan solo las partes marcadas
+     con data-vivo: la tabla con su paginador, el total y el enlace de
+     exportación, para que el Excel siga trayendo exactamente lo filtrado.
+     El campo no se toca, así que el cursor queda donde estaba. Sin
+     JavaScript, el botón «Buscar» sigue funcionando igual.
+     --------------------------------------------------------------------- */
+
+  document.querySelectorAll('form[data-buscar-vivo]').forEach(function (form) {
+    var espera = null, ultima = '', peticion = 0;
+
+    function direccion() {
+      var datos = new URLSearchParams(new FormData(form));
+      datos.delete('p');
+      Array.from(datos.keys()).forEach(function (k) { if (!datos.get(k)) datos.delete(k); });
+      var cola = datos.toString();
+      return window.location.pathname + (cola ? '?' + cola : '');
+    }
+
+    function refrescar() {
+      var url = direccion();
+      if (url === ultima) return;
+      ultima = url;
+      var numero = ++peticion;
+      form.setAttribute('aria-busy', 'true');
+      fetch(url, { headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+        .then(function (html) {
+          if (numero !== peticion) return;     // llegó tarde: ya hay otra
+          var nuevo = new DOMParser().parseFromString(html, 'text/html');
+          document.querySelectorAll('[data-vivo]').forEach(function (viejo) {
+            var reemplazo = nuevo.querySelector('[data-vivo="' + viejo.dataset.vivo + '"]');
+            if (!reemplazo) return;
+            if (viejo.tagName === 'A') viejo.setAttribute('href', reemplazo.getAttribute('href'));
+            else viejo.innerHTML = reemplazo.innerHTML;
+          });
+          window.history.replaceState(null, '', url);
+        })
+        .catch(function () { form.submit(); })   // si algo falla, la búsqueda de siempre
+        .then(function () { form.removeAttribute('aria-busy'); });
+    }
+
+    var q = form.querySelector('input[name="q"]');
+    if (q) {
+      q.addEventListener('input', function () {
+        clearTimeout(espera);
+        espera = setTimeout(refrescar, 300);
+      });
+    }
+    form.querySelectorAll('input[type="date"]').forEach(function (f) {
+      f.addEventListener('change', refrescar);
+    });
+    ultima = direccion();
+  });
 })();

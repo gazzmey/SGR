@@ -119,6 +119,28 @@ class ReglaCalculo(models.Model):
         ),
     )
 
+    # --- registro de gestiones (reglas del cliente, guía de la evaluación 3)
+    # La semana de trabajo va de lunes a domingo. Lo de una semana se ingresa
+    # hasta unos días después del domingo; pasado ese plazo la semana queda
+    # cerrada y no admite registros nuevos. Y nadie registra más de cierto
+    # número de actividades en un mismo día.
+
+    dias_gracia_semana = models.PositiveSmallIntegerField(
+        "días para ingresar una semana", default=1,
+        help_text=(
+            "Cuántos días después del domingo se pueden seguir ingresando las "
+            "gestiones de esa semana. Con 1, la semana se cierra al terminar "
+            "el lunes siguiente."
+        ),
+    )
+    limite_diario_actividades = models.PositiveSmallIntegerField(
+        "actividades por día", default=7,
+        help_text=(
+            "Cuántas actividades puede registrar una persona con la misma "
+            "fecha. La matriz fija 7."
+        ),
+    )
+
     # --- felicitaciones y reclamos (hoja RECLAMOS de la matriz) -----------
     # Se suman o restan al cumplimiento ponderado de la persona, después de
     # los ítems. Están aquí y no fijos porque la matriz misma no es pareja:
@@ -262,6 +284,15 @@ class ReglaCalculo(models.Model):
                     "Es un porcentaje: tiene que estar entre 1 y 100."
                 )
 
+        if self.dias_gracia_semana is not None and self.dias_gracia_semana > 30:
+            errores["dias_gracia_semana"] = (
+                "Más de 30 días deja de ser un cierre semanal. Usa entre 0 y 30."
+            )
+        if self.limite_diario_actividades is not None and self.limite_diario_actividades < 1:
+            errores["limite_diario_actividades"] = (
+                "Con 0 nadie podría registrar nada. El mínimo es 1."
+            )
+
         if self.valor_felicitacion is not None and self.valor_felicitacion > 50:
             errores["valor_felicitacion"] = (
                 "Más de 50 puntos por felicitación pesaría más que la mitad de "
@@ -314,6 +345,8 @@ class ReglaCalculo(models.Model):
             "Aviso de vencimiento": f"{self.dias_aviso_vencimiento} días",
             "Días sin registrar": f"{self.dias_sin_registrar} días",
             "Espera de evidencia": f"{self.dias_evidencia_espera} días",
+            "Cierre de la semana": f"{self.dias_gracia_semana} día(s) después del domingo",
+            "Actividades por día": f"hasta {self.limite_diario_actividades}",
             "Felicitación": f"+{self.valor_felicitacion} (hasta {self.max_felicitaciones})",
             "Reclamo": f"−{self.valor_reclamo}",
             "Reclamos antes de RRHH": f"{self.periodos_reclamo_rrhh} períodos",
@@ -411,6 +444,8 @@ PROPUESTA_DEL_PLAN = {
     "dias_aviso_vencimiento": 7,
     "dias_sin_registrar": 10,
     "dias_evidencia_espera": 5,
+    "dias_gracia_semana": 1,
+    "limite_diario_actividades": 7,
     "valor_felicitacion": 10,
     "max_felicitaciones": 3,
     "valor_reclamo": 20,
