@@ -230,16 +230,38 @@ Las demás pruebas de `pruebas/` cubren las reglas de la guía de la evaluación
 en el código tiene una prueba que falla con el código anterior y pasa con la
 corrección (`test_recuperacion.py`, `test_catalogos_nombres.py`,
 `test_metas_y_apertura.py`, `test_evidencia_funcionario.py`,
-`test_compromiso_desde_actividad.py`). DEF-08 es de presentación y se revisa en
-pantalla; DEF-11 es del script de despliegue. En total, 186 pruebas, todas
-correctas.
+`test_compromiso_desde_actividad.py`, `test_envio_actividad.py`). DEF-08 es de
+presentación y se revisa en pantalla; DEF-11 es del script de despliegue y
+DEF-13 (MariaDB escuchando en todas las interfaces) de la configuración del
+servidor. `test_retencion.py` prueba el comando de retención de datos (SEG-06).
+En total, 196 pruebas, todas correctas.
+
+### Retención de datos personales
+
+`python manage.py aplicar_retencion` anonimiza a los vecinos sin movimiento
+(registro, atención, actividad en que fueron el usuario atendido o inscripción
+de regalos) dentro del plazo de conservación, salvo los que integran una junta
+o tienen un caso social en curso. El registro no se borra: sus atenciones y
+actividades siguen contando en los informes de su época, pero ya no dicen de
+quién eran. También se quita el RUT de los niños que inscribió y las copias de
+sus datos en la auditoría.
+
+Por omisión solo informa cuántos vecinos cumplen el plazo, sin mostrar datos
+personales; con `--aplicar` los anonimiza. El plazo es de 60 meses, una
+propuesta del equipo que debe aprobar el municipio, y se cambia con `--meses`
+o con `SGR_RETENCION_MESES` en el `.env` (mínimo 12). Las evidencias no se
+tocan: respaldan puntajes de trimestres cerrados y su conservación se define
+aparte. El texto libre de una atención o una observación puede nombrar a un
+vecino y no se revisa.
 
 ### Prueba de carga
 
 `herramientas/carga_sgr.py` reproduce el protocolo de carga y estrés del plan
 (mezcla de consultas, fichas, registros y validaciones, por escalones de
 usuarios virtuales) y entrega percentiles, errores y una conciliación de los
-registros. Usa solo la biblioteca estándar de Python y lee la contraseña de
+registros. Un registro que responde error se reenvía una vez con la misma
+ficha de envío, como haría una persona (DEF-10); `--sin-reintento` lo evita.
+Usa solo la biblioteca estándar de Python y lee la contraseña de
 una variable de entorno. Contra el servidor de producción conviene usar
 `--solo-lectura`, que no escribe en la base:
 

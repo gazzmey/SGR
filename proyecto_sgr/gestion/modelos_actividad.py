@@ -167,6 +167,16 @@ class Actividad(models.Model):
     )
     registrada = models.DateTimeField("registrada el", auto_now_add=True)
     actualizada = models.DateTimeField("actualizada el", auto_now=True)
+    #: Ficha de envío del formulario que la creó (DEF-10). Si la respuesta de
+    #: un registro se pierde —la red se corta, el servidor está sobrecargado—
+    #: y la persona vuelve a enviar el mismo formulario, la ficha ya está en
+    #: la base y no se crea una segunda actividad. Va guardada con el registro
+    #: y no en la sesión: en el caso que encontró el protocolo, lo que falló
+    #: después de guardar fue justamente la escritura de la sesión.
+    envio = models.CharField(
+        "ficha de envío", max_length=40, null=True, blank=True, unique=True,
+        editable=False,
+    )
 
     class Meta:
         verbose_name = "actividad"

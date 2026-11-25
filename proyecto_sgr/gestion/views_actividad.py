@@ -7,7 +7,10 @@ permiso y su propio efecto sobre el estado de la actividad, y el estado es
 lo único que decide si la actividad puntúa.
 """
 
+import secrets
+
 from django.core.exceptions import PermissionDenied
+from django.db import IntegrityError
 from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -169,8 +172,32 @@ def actividad_nueva(request):
     formulario = ActividadForm(request.POST or None, perfil=perfil, periodo=periodo,
                                initial=inicial)
 
+    # DEF-10: el formulario lleva una ficha de envío que queda guardada con la
+    # actividad. Un reenvío con la misma ficha no crea otra: lleva a la que ya
+    # se guardó. Sin ficha (un formulario abierto antes de esta versión) el
+    # registro sigue funcionando como antes.
+    ficha = (request.POST.get("envio") or "").strip()[:40] if request.method == "POST" else ""
+    if ficha:
+        previa = _registrada_con(ficha, request.user)
+        if previa is not None:
+            return _ya_registrada(request, previa)
+
     if request.method == "POST" and formulario.is_valid():
-        actividad = formulario.save()
+        if ficha:
+            formulario.instance.envio = ficha
+        try:
+            actividad = formulario.save()
+        except IntegrityError:
+            if not ficha:
+                raise
+            # Dos envíos del mismo formulario llegaron a la vez: el otro ganó.
+            previa = _registrada_con(ficha, request.user)
+            if previa is not None:
+                return _ya_registrada(request, previa)
+            # La ficha es de otra persona (un formulario copiado): no se le
+            # muestra nada ajeno; se registra como un envío sin ficha.
+            formulario.instance.envio = None
+            actividad = formulario.save()
         aviso = actividad.motivo_no_puntua
         anunciar(
             request,
@@ -192,7 +219,25 @@ def actividad_nueva(request):
         "form": formulario,
         "periodo": periodo,
         "perfil": perfil,
+        "ficha_envio": secrets.token_urlsafe(18),
     })
+
+
+def _registrada_con(ficha, usuario):
+    """La actividad que ya se guardó con esa ficha de envío, si es de esta persona."""
+    return Actividad.objects.filter(envio=ficha, funcionario=usuario).first()
+
+
+def _ya_registrada(request, actividad):
+    anunciar(
+        request,
+        "Esa actividad ya estaba registrada",
+        "El formulario llegó dos veces. No se creó otra actividad: la primera "
+        "quedó guardada con el código %s." % actividad.codigo,
+        icono="info",
+        acciones=[("Ver mis actividades", reverse("gestion:actividades"))],
+    )
+    return redirect("gestion:actividad_detalle", pk=actividad.pk)
 
 
 def actividad_detalle(request, pk):

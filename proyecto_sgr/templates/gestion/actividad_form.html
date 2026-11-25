@@ -20,6 +20,8 @@
 
 <form class="grid g-side" method="post" novalidate>
   {% csrf_token %}
+  {# Ficha de un solo uso: un reenvío del mismo formulario no duplica la actividad (DEF-10). #}
+  <input type="hidden" name="envio" value="{{ ficha_envio }}">
   <section class="card" style="align-self: start">
     {% if form.errors %}
       <div class="notice bad" role="alert" style="margin: 20px 24px 0">
