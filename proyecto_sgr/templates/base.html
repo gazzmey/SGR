@@ -24,7 +24,7 @@
 <script src="{% static 'sgr/js/sgr-app.js' %}" defer></script>
 <script src="{% static 'sgr/js/sgr-relleno.js' %}" defer></script>
 </head>
-<body class="web">
+<body class="web"{% if user.is_authenticated %} data-sesion{% endif %}>
 <div class="app">
 
 <aside class="side">

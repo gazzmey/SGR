@@ -94,6 +94,9 @@ MIDDLEWARE = [
     # Quien entra con una contraseña temporal no pasa de «Crea tu
     # contraseña» hasta cambiarla (guía de la evaluación 3).
     "comun.middleware.CambioDeClaveObligatorio",
+    # Lo que se ve con una sesión iniciada no queda guardado en el navegador:
+    # tras cerrar sesión, «Atrás» no vuelve a mostrar datos (DEF-15).
+    "comun.middleware.SinCopiaEnElNavegador",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

@@ -13,6 +13,7 @@ administrador de Django.
 
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils.cache import add_never_cache_headers
 
 
 class CambioDeClaveObligatorio:
@@ -28,3 +29,31 @@ class CambioDeClaveObligatorio:
                 if not (request.path in libres or request.path.startswith("/static/")):
                     return redirect("cuenta:cambiar_clave")
         return self.get_response(request)
+
+
+class SinCopiaEnElNavegador:
+    """
+    Las pantallas de una sesión no quedan guardadas en el navegador (DEF-15).
+
+    El protocolo de pruebas en AWS (AWS-02) encontró que, después de cerrar
+    sesión, el botón «Atrás» volvía a mostrar el panel con sus datos: el
+    navegador lo sacaba de su memoria sin preguntarle al servidor. El
+    servidor ya había cerrado la sesión —cualquier acción llevaba al
+    ingreso—, pero en un computador compartido la persona siguiente podía
+    leer lo que había en pantalla.
+
+    Toda respuesta a una sesión iniciada sale con ``Cache-Control: no-store``,
+    salvo las que ya traen su propia regla (la descarga de una evidencia).
+    Los archivos estáticos no pasan por aquí: los sirve WhiteNoise antes.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        usuario = getattr(request, "user", None)
+        con_sesion = bool(usuario is not None and usuario.is_authenticated)
+        respuesta = self.get_response(request)
+        if con_sesion and not respuesta.has_header("Cache-Control"):
+            add_never_cache_headers(respuesta)
+        return respuesta
