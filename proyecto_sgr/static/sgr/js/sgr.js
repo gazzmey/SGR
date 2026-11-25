@@ -20,7 +20,13 @@
     document.body.classList.add('is-leaving');
     setTimeout(function () { location.href = href; }, 170);
   });
-  window.addEventListener('pageshow', function () { document.body.classList.remove('is-leaving'); });
+  window.addEventListener('pageshow', function (e) {
+    document.body.classList.remove('is-leaving');
+    /* DEF-15: una pantalla de la sesión que el navegador restaura de su memoria
+       (botón Atrás) se vuelve a pedir al servidor. Si la sesión ya se cerró, el
+       servidor lleva al ingreso en vez de dejar los datos a la vista. */
+    if (e.persisted && document.body.hasAttribute('data-sesion')) { location.reload(); }
+  });
 
   /* ---------- avisos tipo toast ---------- */
   var stack;

@@ -232,9 +232,12 @@ corrección (`test_recuperacion.py`, `test_catalogos_nombres.py`,
 `test_metas_y_apertura.py`, `test_evidencia_funcionario.py`,
 `test_compromiso_desde_actividad.py`, `test_envio_actividad.py`). DEF-08 es de
 presentación y se revisa en pantalla; DEF-11 es del script de despliegue y
-DEF-13 (MariaDB escuchando en todas las interfaces) de la configuración del
-servidor. `test_retencion.py` prueba el comando de retención de datos (SEG-06).
-En total, 196 pruebas, todas correctas.
+DEF-13 (MariaDB escuchando en todas las interfaces) y DEF-14 (SSH abierto a
+todo internet) de la configuración del servidor. DEF-15 (tras cerrar sesión,
+«Atrás» mostraba la pantalla guardada en el navegador) se prueba en
+`test_sin_cache.py`: toda pantalla con sesión sale con `Cache-Control:
+no-store` (`comun/middleware.py`). `test_retencion.py` prueba el comando de
+retención de datos (SEG-06). En total, 201 pruebas, todas correctas.
 
 ### Retención de datos personales
 
