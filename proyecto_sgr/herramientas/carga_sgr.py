@@ -14,7 +14,9 @@ La validación la hacen los usuarios virtuales con cuenta de verificador (uno
 de cada diez); el resto reparte su tiempo entre las otras tres en la misma
 proporción. Cada registro lleva un texto único, así que al terminar se puede
 conciliar contra la base: cuántos se pidieron, cuántos respondieron bien y
-cuántos quedaron guardados.
+cuántos quedaron guardados. Un registro que responde error se reenvía una
+vez con la misma ficha de envío, como haría una persona; la ficha impide que
+ese reenvío lo duplique (DEF-10). Con --sin-reintento no se reenvía.
 
 Ejemplo (QA local):
     SGR_CARGA_CLAVE=... python3 carga_sgr.py --base http://127.0.0.1:8771 \\
@@ -91,6 +93,7 @@ class Prueba:
         self.clave = os.environ[args.clave_env]
         self.muestras = []
         self.registros_pedidos = []
+        self.reintentos = 0
         self.cerrojo = threading.Lock()
         self.corrida = time.strftime("%H%M%S")
 
@@ -137,12 +140,25 @@ class Prueba:
                 estado, html, ms = s.pedir(random.choice(["/periodo/mi-resultado/", "/"]))
                 self.anotar(etapa, op, estado, ms, estado == 200)
             elif op == "registro" and item:
+                # Como una persona: abre el formulario (que trae su ficha de
+                # envío) y lo guarda. Si la respuesta es un error, vuelve a
+                # enviar el MISMO formulario una vez; con la ficha, ese
+                # reenvío no puede duplicar la actividad (DEF-10).
                 texto = f"Carga {self.corrida} {etapa} VU{n} #{k}"
-                estado, html, ms = s.pedir("/periodo/actividades/nueva/", {
-                    "item": item, "fecha": time.strftime("%Y-%m-%d"), "cantidad": "1", "tipo": "terreno", "origen": "planificada",
-                    "accion": texto, "detalle": "Registro de la prueba de carga con datos ficticios."})
-                ok = estado == 302
-                self.anotar(etapa, op, estado, ms, ok)
+                _, html, _ = s.pedir("/periodo/actividades/nueva/")
+                m = re.search(r'name="envio" value="([^"]*)"', html)
+                datos = {"item": item, "fecha": time.strftime("%Y-%m-%d"), "cantidad": "1", "tipo": "terreno",
+                         "origen": "planificada", "accion": texto,
+                         "detalle": "Registro de la prueba de carga con datos ficticios.",
+                         "envio": m.group(1) if m else ""}
+                estado, html, ms = s.pedir("/periodo/actividades/nueva/", datos)
+                self.anotar(etapa, op, estado, ms, estado == 302)
+                if estado != 302 and not self.a.sin_reintento:
+                    time.sleep(random.uniform(0.5, 1.5))
+                    estado, html, ms = s.pedir("/periodo/actividades/nueva/", datos)
+                    self.anotar(etapa, "registro_reintento", estado, ms, estado == 302)
+                    with self.cerrojo:
+                        self.reintentos += 1
                 with self.cerrojo:
                     self.registros_pedidos.append((texto, estado))
             elif op == "validacion":
@@ -200,6 +216,8 @@ def main():
     ap.add_argument("--clave-env", default="SGR_CARGA_CLAVE")
     ap.add_argument("--cuentas", default="", help="correos separados por coma; reemplaza a --funcionario")
     ap.add_argument("--solo-lectura", action="store_true", help="sin registros ni validaciones: no escribe en la base")
+    ap.add_argument("--sin-reintento", action="store_true",
+                    help="no reenviar un registro que respondió error (comportamiento anterior a DEF-10)")
     ap.add_argument("--salida", default="resultados_carga")
     a = ap.parse_args()
     os.makedirs(a.salida, exist_ok=True)
@@ -216,6 +234,7 @@ def main():
         json.dump({"base": a.base, "etapas": a.etapas, "corrida": prueba.corrida, "resumen": res,
                    "registros_pedidos": len(prueba.registros_pedidos),
                    "registros_ok": sum(1 for _, e in prueba.registros_pedidos if e == 302),
+                   "reintentos": prueba.reintentos,
                    "textos_registro": [t for t, e in prueba.registros_pedidos if e == 302]}, f, ensure_ascii=False, indent=1)
     for r in res:
         if r["operacion"] == "TODAS":
