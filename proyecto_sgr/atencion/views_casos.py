@@ -23,7 +23,7 @@ from comun import concurrencia, observaciones, permisos as P
 from comun.mantenedor import Columna, Filtro, ListaMantenedor, auditar
 from comun.permisos import redirect_al_login, tiene_permiso
 from comun.resultado import anunciar
-from comun.utilidades import proximo_codigo
+from comun.utilidades import guardar_con_codigo, proximo_codigo
 from gestion import reglas as R
 
 
@@ -226,13 +226,13 @@ def caso_abrir(request, atencion_pk):
     if not responsable.is_active or perfil is None or perfil.delegacion_id != atencion.delegacion_id:
         responsable = request.user
 
-    caso = CasoSocial.objects.create(
+    caso = guardar_con_codigo(CasoSocial(
         atencion=atencion,
         codigo=proximo_codigo(CasoSocial, "CSO", ancho=3),
         responsable=responsable,
         ingreso=timezone.localtime(atencion.registrada).date(),
         fecha_atencion=timezone.localtime(atencion.registrada).date(),
-    )
+    ), "CSO", ancho=3)
     auditar(request, "crear", caso, entidad="Caso social",
             despues=f"atención Nº {atencion.pk}")
     anunciar(request, "Caso abierto",

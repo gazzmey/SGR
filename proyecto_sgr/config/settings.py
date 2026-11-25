@@ -91,6 +91,9 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # Quien entra con una contraseña temporal no pasa de «Crea tu
+    # contraseña» hasta cambiarla (guía de la evaluación 3).
+    "comun.middleware.CambioDeClaveObligatorio",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

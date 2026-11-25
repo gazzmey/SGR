@@ -490,6 +490,11 @@ def _aprobadas_por_item(periodo, funcionario=None, delegacion=None, al_dia=None)
         consulta = consulta.filter(delegacion=delegacion)
     if al_dia is not None:
         consulta = consulta.filter(fecha__lte=al_dia)
+    # Reglas del cliente: coordinaciones preparatorias, actividades para el
+    # delegado y las pedidas por la comunidad sin nombre y teléfono del
+    # usuario se aprueban, pero no suman. Se excluyen por pk para no depender
+    # de cómo trata el motor los nulos dentro de un NOT.
+    consulta = consulta.exclude(pk__in=Actividad.objects.filter(Actividad.no_puntuan()).values("pk"))
 
     filas = consulta.values("item_id").annotate(acredita=Sum("cantidad"))
     return {fila["item_id"]: (fila["acredita"] or 0) for fila in filas}
@@ -520,6 +525,7 @@ def _compromisos_que_aportan(periodo, funcionario, al_dia=None):
         .exclude(actividad__estado=Actividad.Estado.APROBADA,
                  actividad__item_id=F("item_id"))
     )
+    consulta = Compromiso.que_cuentan(consulta)
     if al_dia is not None:
         consulta = consulta.filter(Q(cerrado_el__isnull=True) | Q(cerrado_el__lte=al_dia))
     filas = consulta.values("item_id").annotate(cuantos=Count("pk"))
@@ -536,7 +542,8 @@ def compromisos_de(periodo, funcionario):
     """
     from gestion.modelos_agenda import Compromiso
 
-    consulta = Compromiso.objects.filter(periodo=periodo, responsable=funcionario)
+    consulta = Compromiso.que_cuentan(
+        Compromiso.objects.filter(periodo=periodo, responsable=funcionario))
     realizados = consulta.filter(estado=Compromiso.Estado.REALIZADO).count()
     abiertos = consulta.filter(estado__in=Compromiso.ABIERTOS).count()
     return realizados, realizados + abiertos
@@ -599,7 +606,7 @@ def resumen_por_responsable(periodo, delegaciones=None):
     from gestion.modelos_agenda import Compromiso
     from organizacion.models import Delegacion
 
-    consulta = Compromiso.objects.filter(periodo=periodo)
+    consulta = Compromiso.que_cuentan(Compromiso.objects.filter(periodo=periodo))
     if delegaciones is not None:
         consulta = consulta.filter(delegacion_id__in=delegaciones)
     filas = (
@@ -669,7 +676,9 @@ def reconocimientos_de(perfil, periodo):
     consulta = Reconocimiento.objects.filter(
         periodo=periodo, funcionario_id=perfil.usuario_id, activo=True,
     )
-    felicitaciones = consulta.filter(tipo=Reconocimiento.Tipo.FELICITACION).count()
+    # Una felicitación cuenta solo con el respaldo formal del delegado.
+    felicitaciones = consulta.filter(tipo=Reconocimiento.Tipo.FELICITACION,
+                                     respaldada_por__isnull=False).count()
     reclamos = consulta.filter(tipo=Reconocimiento.Tipo.RECLAMO).count()
     return felicitaciones, reclamos
 
@@ -997,7 +1006,7 @@ def logro_agenda(periodo, delegacion=None, regla=None, al_dia=None):
     regla = regla or R.vigente(periodo)
     hoy = al_dia or date.today()
 
-    consulta = Compromiso.objects.filter(periodo=periodo)
+    consulta = Compromiso.que_cuentan(Compromiso.objects.filter(periodo=periodo))
     if delegacion is not None:
         consulta = consulta.filter(delegacion=delegacion)
 

@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 
 from catalogos.models import Item
 from comun import relleno as R
-from comun.utilidades import proximo_codigo
+from comun.utilidades import guardar_con_codigo, proximo_codigo
 from gestion.modelos_agenda import Compromiso
 
 
@@ -165,6 +165,8 @@ class CompromisoForm(forms.ModelForm):
             # Se escribe una sola vez y no vuelve a cambiar: después de una
             # reasignación es lo único que dice de quién venía (AGE-06).
             compromiso.responsable_original = compromiso.responsable
+            if commit:
+                return guardar_con_codigo(compromiso, "CMP", ancho=4)
         if commit:
             compromiso.save()
         return compromiso

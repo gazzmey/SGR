@@ -12,10 +12,11 @@ exige ningún total.
 from django import forms
 
 from catalogos.models import Item, SubAtencion, TipoAtencion
+from comun.nombres import NombreSinRepetir
 from comun.utilidades import proximo_codigo
 
 
-class _Base(forms.ModelForm):
+class _Base(NombreSinRepetir, forms.ModelForm):
     """Lo común: el código se asigna solo y no se escribe a mano."""
 
     prefijo = ""
@@ -40,6 +41,27 @@ class _Base(forms.ModelForm):
             objeto.save()
             self.save_m2m()
         return objeto
+
+
+def _fijar_nombre_si_hay_atenciones(form, cuantas, que):
+    """
+    DEF-02: el nombre de un tipo o subtipo con atenciones registradas ya no
+    se cambia. Las atenciones guardan el vínculo, no una copia del nombre;
+    si el nombre cambiara, las anteriores se leerían con un nombre que no
+    existía cuando se registraron. La descripción sí se puede corregir.
+
+    El campo queda deshabilitado: el navegador no lo envía y, si alguien lo
+    envía igual, Django usa el valor guardado.
+    """
+    if not cuantas:
+        return
+    campo = form.fields["nombre"]
+    campo.disabled = True
+    campo.help_text = (
+        f"Ya {'hay 1 atención registrada' if cuantas == 1 else f'hay {cuantas} atenciones registradas'} "
+        f"con {que}: el nombre no se cambia para no alterar cómo se leen. Puedes corregir la "
+        "descripción; si cambió el sentido, crea uno nuevo y desactiva este cuando cierre el período."
+    )
 
 
 # =========================================================================
@@ -120,6 +142,12 @@ class TipoAtencionForm(_Base):
         campo.error_messages["required"] = (
             "La descripción es obligatoria y debe tener al menos 20 caracteres."
         )
+        if self.instance.pk:
+            from atencion.models import Atencion
+
+            _fijar_nombre_si_hay_atenciones(
+                self, Atencion.objects.filter(subatencion__tipo_atencion=self.instance).count(),
+                "este tipo")
 
     def clean_descripcion(self):
         texto = (self.cleaned_data.get("descripcion") or "").strip()
@@ -169,6 +197,8 @@ class SubAtencionForm(_Base):
         campo.required = True
         campo.help_text = "Mínimo 20 caracteres: qué incluye, qué requisitos tiene y cómo se resuelve."
         campo.error_messages["required"] = "La descripción es obligatoria y debe tener al menos 20 caracteres."
+        if self.instance.pk:
+            _fijar_nombre_si_hay_atenciones(self, self.instance.atenciones.count(), "este subtipo")
 
     def clean_descripcion(self):
         texto = (self.cleaned_data.get("descripcion") or "").strip()

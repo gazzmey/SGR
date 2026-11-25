@@ -39,13 +39,16 @@ class Actividad(models.Model):
         PENDIENTE = "pendiente", "Pendiente de validación"
         APROBADA = "aprobada", "Aprobada"
         RECHAZADA = "rechazada", "Rechazada"
+        # El verificador no la rechaza: pide que se complete. Vuelve al
+        # funcionario como una rechazada, pero no cuenta como rechazo.
+        ANTECEDENTES = "antecedentes", "Faltan antecedentes"
         ANULADA = "anulada", "Anulada"
 
     class Tipo(models.TextChoices):
         TERRENO = "terreno", "Terreno"
         OFICINA = "oficina", "Oficina"
         REUNION = "reunion", "Reunión"
-        COORDINACION = "coordinacion", "Coordinación"
+        COORDINACION = "coordinacion", "Coordinación preparatoria (no pondera)"
         OTRA = "otra", "Otra"
 
     class Origen(models.TextChoices):
@@ -53,6 +56,9 @@ class Actividad(models.Model):
         COMUNIDAD = "comunidad", "Solicitud de la comunidad"
         MUNICIPIO = "municipio", "Encargo del municipio"
         DERIVACION = "derivacion", "Derivación de otra unidad"
+
+    #: Estados en que la actividad espera una evidencia (nueva o corregida).
+    #: Se define después de la clase; ver ESPERAN_EVIDENCIA más abajo.
 
     #: Los campos que deciden cuánto suma. Con la actividad aprobada ya no se
     #: cambian: cambiarlos alteraría un puntaje que otra persona validó.
@@ -154,7 +160,7 @@ class Actividad(models.Model):
         blank=True, help_text="Qué se logró. Opcional.",
     )
     estado = models.CharField(
-        max_length=10, choices=Estado.choices, default=Estado.BORRADOR,
+        max_length=14, choices=Estado.choices, default=Estado.BORRADOR,
     )
     motivo_anulacion = models.TextField(
         "motivo de la anulación", blank=True,
@@ -285,6 +291,22 @@ class Actividad(models.Model):
                 "actividades nuevas." % self.periodo.nombre
             )
 
+        # Límite diario: nadie registra más de cierto número de actividades
+        # con la misma fecha (la matriz fija 7). Se cuenta al registrar y al
+        # mover la fecha; las anuladas no cuentan.
+        if self._fecha_nueva() and self.funcionario_id:
+            from gestion.reglas import vigente
+
+            limite = vigente(self.periodo).limite_diario_actividades
+            mismas = (type(self).objects
+                      .filter(funcionario_id=self.funcionario_id, fecha=self.fecha)
+                      .exclude(estado=self.Estado.ANULADA).exclude(pk=self.pk).count())
+            if mismas >= limite:
+                raise ValidationError({"fecha": (
+                    "Ya hay %d actividades de esta persona con fecha %s, que es el "
+                    "máximo por día. Si alguna está mal, anúlala antes de "
+                    "registrar otra." % (mismas, self.fecha.strftime("%d-%m-%Y")))})
+
         # Cierre semanal: lo de una semana se ingresa hasta poco después del
         # domingo. Vale al registrar y al mover la fecha de una existente;
         # completar otros datos de una actividad ya registrada sigue
@@ -310,10 +332,47 @@ class Actividad(models.Model):
         """
         ¿Esta actividad suma a la meta?
 
-        Solo si está aprobada. Es la regla que sostiene el cálculo: lo
+        Solo si está aprobada y ninguna regla del cliente la deja fuera. Lo
         registrado no vale hasta que alguien lo valida.
         """
-        return self.estado == self.Estado.APROBADA
+        return self.estado == self.Estado.APROBADA and not self.motivo_no_puntua
+
+    # --- reglas del cliente (guía de la evaluación 3) ----------------------
+    # Tres clases de actividad se registran, se validan y se ven, pero no
+    # ponderan. El motor de cálculo las deja fuera con ``no_puntuan()`` y la
+    # ficha explica por qué con ``motivo_no_puntua``: las dos tienen que
+    # decir lo mismo.
+
+    @classmethod
+    def no_puntuan(cls):
+        """Las actividades que, aunque se aprueben, no suman a la meta."""
+        from django.db.models import F, Q
+
+        sin_usuario = Q(origen=cls.Origen.COMUNIDAD) & (
+            Q(solicitante__isnull=True) | Q(solicitante__nombres="")
+            | Q(solicitante__telefono=""))
+        del_delegado = Q(solicitante__isnull=False,
+                         solicitante__rut=F("delegacion__delegado__perfil__rut"))
+        return Q(tipo=cls.Tipo.COORDINACION) | sin_usuario | del_delegado
+
+    @property
+    def motivo_no_puntua(self):
+        if self.tipo == self.Tipo.COORDINACION:
+            return ("Es una coordinación preparatoria: queda registrada, pero no "
+                    "pondera como acción cumplida.")
+        usuario = self.solicitante if self.solicitante_id else None
+        if self.origen == self.Origen.COMUNIDAD and (
+                usuario is None or not usuario.nombres.strip() or not usuario.telefono.strip()):
+            return ("La pidió la comunidad, pero no tiene el nombre y el teléfono "
+                    "del usuario: sin ellos no obtiene puntuación.")
+        if usuario is not None and self.delegacion_id and self.delegacion.delegado_id:
+            from comun.rut import limpiar_rut
+
+            perfil = getattr(self.delegacion.delegado, "perfil", None)
+            if perfil is not None and limpiar_rut(perfil.rut) == limpiar_rut(usuario.rut):
+                return ("El usuario atendido es el delegado de la delegación: las "
+                        "actividades para el delegado no contabilizan.")
+        return ""
 
     @property
     def evidencia_vigente(self):
@@ -348,6 +407,12 @@ class Actividad(models.Model):
         return ""
 
 
+#: Los estados en que una actividad espera que su autor adjunte evidencia.
+Actividad.ESPERAN_EVIDENCIA = (
+    Actividad.Estado.BORRADOR, Actividad.Estado.RECHAZADA, Actividad.Estado.ANTECEDENTES,
+)
+
+
 class Evidencia(models.Model):
     """
     El respaldo de una actividad, y la decisión del verificador sobre él.
@@ -363,6 +428,7 @@ class Evidencia(models.Model):
         PENDIENTE = "pendiente", "Pendiente"
         APROBADA = "aprobada", "Aprobada"
         RECHAZADA = "rechazada", "Rechazada"
+        ANTECEDENTES = "antecedentes", "Pidió más antecedentes"
 
     class Tipo(models.TextChoices):
         ACTA = "acta", "Acta"
@@ -412,7 +478,7 @@ class Evidencia(models.Model):
     creada = models.DateTimeField("cargada el", auto_now_add=True)
 
     decision = models.CharField(
-        "decisión", max_length=10,
+        "decisión", max_length=14,
         choices=Decision.choices, default=Decision.PENDIENTE,
     )
     verificador = models.ForeignKey(
@@ -490,7 +556,8 @@ class Evidencia(models.Model):
                 "La evidencia respalda una actividad o una gestión social: "
                 "elige exactamente una de las dos."
             )
-        if self.decision == self.Decision.RECHAZADA and not self.motivo.strip():
+        if (self.decision in (self.Decision.RECHAZADA, self.Decision.ANTECEDENTES)
+                and not self.motivo.strip()):
             raise ValidationError({
                 "motivo": (
                     "Rechazar sin motivo deja a la persona sin saber qué "
@@ -560,5 +627,10 @@ class Evidencia(models.Model):
             return (
                 "Está rechazada y su decisión queda registrada. La corrección "
                 "se hace adjuntando una evidencia nueva a la actividad."
+            )
+        if self.decision == self.Decision.ANTECEDENTES:
+            return (
+                "El verificador pidió más antecedentes y su pedido queda "
+                "registrado. Se responden adjuntando una evidencia nueva."
             )
         return ""

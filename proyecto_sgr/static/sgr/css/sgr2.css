@@ -1795,3 +1795,45 @@ main.content > noscript > .notice { margin-bottom: 20px }
 .list .tx b.aviso-sin-ver { display: inline; color: var(--ambar); font-weight: 600 }
 /* Al llegar desde Mi panel con #avisos, la tarjeta no queda bajo la barra fija. */
 #avisos { scroll-margin-top: 84px }
+
+/* --- Gráficos del tablero (guía de la evaluación 3) ----------------------
+   Clases con prefijo gr- para no chocar con .pista (barras de avance) ni con
+   .sw (interruptores), que ya existen en sgr.css. */
+.graficos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:20px;align-items:start}
+.gr-col{display:grid;gap:20px;min-width:0}
+.graficos .card{padding-bottom:18px;min-width:0}
+.graficos .card>.card-h+*{margin-top:14px}
+.graficos .card>.gr-leyenda,.graficos .card>ul,.graficos .card>.gr-pista,.graficos .card>p,.graficos .card>.gr-tend-wrap{margin-left:20px;margin-right:20px}
+.gr-leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--tinta2);margin-bottom:12px}
+.gr-leyenda span,.gr-cifras li{display:inline-flex;align-items:center;gap:6px}
+.gr-sw{display:inline-block;width:10px;height:10px;border-radius:3px;background:#B9ADA6;flex:none}
+.gr-ok{background:var(--verde-bar)} .gr-info{background:#3C78B0} .gr-warn{background:var(--ambar-bar)}
+.gr-neu{background:#B9ADA6} .gr-off{background:#DCD3CD}
+.gr-carga{list-style:none;padding:0;margin-top:0;display:grid;gap:10px}
+.gr-carga li{display:grid;grid-template-columns:minmax(120px,38%) 1fr;gap:12px;align-items:center;font-size:13.5px}
+.gr-carga .quien{display:flex;justify-content:space-between;gap:8px;min-width:0}
+.gr-carga .quien b{font-variant-numeric:tabular-nums}
+.gr-pista{display:block;height:22px;background:var(--sup2);border:1px solid var(--linea);border-radius:6px;overflow:hidden}
+.gr-pista.grande{height:30px}
+.gr-apilada{display:flex;height:100%}
+.gr-tramo{display:flex;align-items:center;justify-content:center;min-width:18px;color:#fff;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.gr-tramo.gr-neu,.gr-tramo.gr-off{color:var(--tinta)}
+.gr-cifras{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:13px;color:var(--tinta2)}
+.gr-cifras b{color:var(--tinta);font-variant-numeric:tabular-nums}
+.gr-vencidos{color:var(--rojo);font-weight:600}
+.gr-tend-wrap{overflow-x:auto}
+.gr-tend{display:block;width:100%;height:auto;max-height:230px}
+.gr-tend .eje{stroke:var(--linea2);stroke-width:1}
+.gr-tend .reg{fill:#E4DBD5} .gr-tend .apr{fill:var(--verde-bar)}
+.gr-tend .num{font-size:10.5px;font-weight:700;fill:var(--tinta2);text-anchor:middle}
+.gr-tend .sem{font-size:10px;fill:var(--tinta3);text-anchor:middle}
+@media (max-width:560px){.gr-carga li{grid-template-columns:1fr;gap:4px}}
+
+/* DEF-08: «Cómo se calcula» en Mi resultado desbordaba 16 px en un celular
+   de 390 px: las celdas de la tabla no se partían en dos líneas y el nombre
+   del ítem pedía 240 px como mínimo. En esta tabla el texto se parte y solo
+   la cifra queda en una línea. */
+.tabla.calculo{width:100%}
+.tabla.calculo td{white-space:normal}
+.tabla.calculo td.w{min-width:0}
+.tabla.calculo td.r{white-space:nowrap;padding-left:12px}

@@ -161,6 +161,7 @@ def chip_actividad(actividad):
         Actividad.Estado.PENDIENTE: ("warn", "Por validar"),
         Actividad.Estado.APROBADA: ("ok", "Aprobada"),
         Actividad.Estado.RECHAZADA: ("bad", "Rechazada"),
+        Actividad.Estado.ANTECEDENTES: ("warn", "Faltan antecedentes"),
     }
     if actividad.estado == Actividad.Estado.ANULADA:
         return format_html('<span class="chip off"><span class="t">Anulada</span></span>')
@@ -344,6 +345,7 @@ def chip_evidencia(evidencia):
         Evidencia.Decision.PENDIENTE: ("warn", "Pendiente"),
         Evidencia.Decision.APROBADA: ("ok", "Aprobada"),
         Evidencia.Decision.RECHAZADA: ("bad", "Rechazada"),
+        Evidencia.Decision.ANTECEDENTES: ("warn", "Más antecedentes"),
     }
     clase, texto = mapa[evidencia.decision]
     return format_html('<span class="chip {}">{}</span>', clase, texto)

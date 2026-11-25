@@ -216,6 +216,43 @@ class Periodo(models.Model):
             consulta = consulta.filter(cargo=cargo)
         return consulta.aggregate(total=models.Sum("ponderador"))["total"] or 0
 
+    @classmethod
+    def en_curso(cls, consulta=None, al_dia=None):
+        """
+        El período abierto que corresponde a hoy (DEF-12).
+
+        Puede haber más de un período abierto: el del trimestre en curso y uno
+        siguiente que ya se abrió para cargar metas. Antes se tomaba el de
+        inicio más reciente, que era el futuro, y el registro de actividades
+        rechazaba la fecha de hoy. Ahora se elige, en orden: el abierto que
+        contiene la fecha; si ninguno la contiene, el último que ya empezó; si
+        todos son futuros, el más próximo.
+        """
+        from django.utils import timezone
+
+        hoy = al_dia or timezone.localdate()
+        abiertos = (consulta if consulta is not None else cls.objects.filter(activo=True)).filter(
+            estado=cls.Estado.ABIERTO)
+        return (abiertos.filter(inicio__lte=hoy, termino__gte=hoy).order_by("-inicio").first()
+                or abiertos.filter(inicio__lte=hoy).order_by("-inicio").first()
+                or abiertos.order_by("inicio").first())
+
+    def cargos_sin_100(self):
+        """
+        Los cargos con metas en el período cuyas ponderaciones no suman 100 %.
+
+        Mientras se configura, la suma pasa por valores intermedios y se
+        permite; para **abrir** el período tiene que estar completa (DEF-04).
+        Devuelve una lista de (cargo, suma).
+        """
+        sumas = (self.metas.filter(activo=True, funcionario__isnull=True)
+                 .values("cargo").annotate(total=models.Sum("ponderador")))
+        incompletos = [(fila["cargo"], fila["total"] or 0) for fila in sumas if (fila["total"] or 0) != 100]
+        if not incompletos:
+            return []
+        cargos = Cargo.objects.in_bulk([pk for pk, _ in incompletos])
+        return [(cargos[pk], total) for pk, total in incompletos]
+
 
 class Cargo(models.Model):
     """
@@ -439,6 +476,15 @@ class MetaPeriodo(models.Model):
                 "meta": (
                     "«%s» se mide como porcentaje de compromisos realizados: "
                     "la meta no puede pasar de 100. La matriz usa 80."
+                    % self.item.nombre
+                ),
+            })
+        # DEF-05: lo mismo vale para cualquier ítem cuya unidad es porcentaje.
+        if (self.item_id and self.meta is not None and self.meta > 100
+                and self.item.unidad == self.item.Unidad.PORCENTAJE):
+            raise ValidationError({
+                "meta": (
+                    "«%s» se mide en porcentaje: la meta va de 1 a 100."
                     % self.item.nombre
                 ),
             })

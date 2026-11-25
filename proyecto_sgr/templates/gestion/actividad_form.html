@@ -40,6 +40,7 @@
         {% include "comun/_campo.html" with campo=form.item %}
         {% include "comun/_campo.html" with campo=form.fecha %}
         {% include "comun/_campo.html" with campo=form.cantidad %}
+        {% include "comun/_campo.html" with campo=form.tipo %}
         {% include "comun/_campo.html" with campo=form.accion %}
       </div>
     </div>
@@ -49,6 +50,8 @@
       <p>Es lo que lee el verificador para decidir si la aprueba.</p>
       <div class="form-grid">
         {% include "comun/_campo.html" with campo=form.detalle %}
+        {% include "comun/_campo.html" with campo=form.origen %}
+        {% include "comun/_campo.html" with campo=form.solicitante %}
         {% include "comun/_campo.html" with campo=form.contacto %}
         {% include "comun/_campo.html" with campo=form.territorio %}
       </div>

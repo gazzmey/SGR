@@ -103,6 +103,16 @@ class Reconocimiento(models.Model):
         related_name="reconocimientos_registrados",
         verbose_name="registrado por", null=True, blank=True,
     )
+    # Respaldo formal del delegado (regla del cliente, guía de la evaluación
+    # 3): una felicitación vale solo si el delegado de la delegación la
+    # respalda. Si la registra el propio delegado, queda respaldada al
+    # guardarla; si la registra otra persona, espera su confirmación.
+    respaldada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="felicitaciones_respaldadas", null=True, blank=True,
+        verbose_name="respaldada por el delegado",
+    )
+    respaldada_el = models.DateTimeField("respaldada el", null=True, blank=True)
     activo = models.BooleanField(
         default=True,
         help_text="Desactivado deja de sumar o restar, pero se conserva.",
@@ -132,6 +142,19 @@ class Reconocimiento(models.Model):
     @property
     def es_reclamo(self):
         return self.tipo == self.Tipo.RECLAMO
+
+    @property
+    def cuenta(self):
+        """¿Entra al cálculo? Un reclamo siempre; una felicitación, respaldada."""
+        if not self.activo:
+            return False
+        return self.es_reclamo or self.respaldada_por_id is not None
+
+    def puede_respaldar(self, usuario):
+        """Solo el delegado de la delegación respalda una felicitación."""
+        return (self.tipo == self.Tipo.FELICITACION and self.respaldada_por_id is None
+                and self.activo and getattr(usuario, "pk", None) is not None
+                and self.delegacion.delegado_id == usuario.pk)
 
     def clean(self):
         super().clean()

@@ -336,6 +336,11 @@ def nueva_clave(request):
         if formulario.is_valid():
             formulario.save()          # set_password() + save(): guarda el hash
             registro.consumir()        # el código queda usado
+            # Si tenía una contraseña temporal, ya eligió la suya.
+            perfil = getattr(usuario, "perfil", None)
+            if perfil is not None and perfil.debe_cambiar_clave:
+                perfil.debe_cambiar_clave = False
+                perfil.save(update_fields=["debe_cambiar_clave"])
             request.session.pop(CLAVE_FLUJO, None)
             anunciar(
                 request,
@@ -351,4 +356,54 @@ def nueva_clave(request):
     return render(request, "cuenta/nueva_clave.html", {
         "form": formulario,
         "correo": usuario.email,
+    })
+
+
+# =========================================================================
+# Cambio obligatorio de la contraseña temporal
+# =========================================================================
+
+
+def cambiar_clave(request):
+    """
+    Primer ingreso con contraseña temporal: hay que crear la propia.
+
+    El middleware ``CambioDeClaveObligatorio`` trae aquí a quien tenga la
+    marca, sea cual sea la pantalla que pidió. La nueva no puede ser la
+    temporal, y pasa por los mismos validadores que cualquier otra.
+    """
+    from django.contrib.auth import update_session_auth_hash
+
+    from comun.permisos import redirect_al_login
+
+    if not request.user.is_authenticated:
+        return redirect_al_login(request)
+    perfil = getattr(request.user, "perfil", None)
+    if perfil is None or not perfil.debe_cambiar_clave:
+        return redirect("comun:panel")
+
+    formulario = NuevaClaveForm(request.user, request.POST or None)
+    if request.method == "POST" and formulario.is_valid():
+        if request.user.check_password(formulario.cleaned_data["new_password1"]):
+            formulario.add_error("new_password1",
+                                 "Tiene que ser distinta de la contraseña temporal que te entregaron.")
+        else:
+            formulario.save()
+            update_session_auth_hash(request, request.user)
+            perfil.debe_cambiar_clave = False
+            perfil.save(update_fields=["debe_cambiar_clave"])
+            from comun.auditoria import registrar
+            from comun.models import EventoAuditoria
+
+            registrar(request, EventoAuditoria.Accion.EDITAR, entidad="Usuario",
+                      objeto=perfil, antes="contraseña temporal",
+                      despues="contraseña propia", detalle="Primer ingreso.")
+            anunciar(request, "Contraseña creada",
+                     "Desde ahora entras con la contraseña que elegiste. La "
+                     "temporal dejó de servir.")
+            return redirect("comun:panel")
+
+    return render(request, "cuenta/cambiar_clave.html", {
+        "form": formulario,
+        "correo": request.user.email,
     })

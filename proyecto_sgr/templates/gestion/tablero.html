@@ -187,6 +187,69 @@ eso el pie no se calcula aparte en la plantilla, viene del objeto.
   </div>
 </section>
 
+<div class="graficos mt20">
+  <section class="card" aria-labelledby="t-carga">
+    <div class="card-h">
+      <h2 id="t-carga">Carga de trabajo</h2>
+      <span class="sub">Actividades del período por persona y situación</span>
+    </div>
+    <div class="gr-leyenda" aria-hidden="true">
+      {% for rotulo, clase in carga.leyenda %}<span><i class="gr-sw gr-{{ clase }}"></i>{{ rotulo }}</span>{% endfor %}
+    </div>
+    <ul class="gr-carga">
+      {% for fila in carga.filas %}
+        <li>
+          <span class="quien">{{ fila.perfil.nombre }}<b>{{ fila.total }}</b></span>
+          <span class="gr-pista" role="img" aria-label="{{ fila.perfil.nombre }}: {% for t in fila.tramos %}{{ t.n }} {{ t.rotulo|lower }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+            <span class="gr-apilada" style="width: {{ fila.ancho|unlocalize }}%">
+              {% for t in fila.tramos %}{% if t.n %}<span class="gr-tramo gr-{{ t.clase }}" style="width: {{ t.ancho|unlocalize }}%" title="{{ t.rotulo }}: {{ t.n }}">{{ t.n }}</span>{% endif %}{% endfor %}
+            </span>
+          </span>
+        </li>
+      {% empty %}
+        <li class="soft">Nadie de la delegación tiene actividades en el período.</li>
+      {% endfor %}
+    </ul>
+    {% if carga.sin_actividades and carga.filas %}
+      <p class="small soft mt12">Sin actividades en el período: {% for p in carga.sin_actividades %}{{ p.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>
+    {% endif %}
+  </section>
+
+  <div class="gr-col">
+    <section class="card" aria-labelledby="t-comp">
+      <div class="card-h">
+        <h2 id="t-comp">Estado de los compromisos</h2>
+        <span class="sub">{{ compromisos.total }} en el período{% if compromisos.vencidos %}, <span class="gr-vencidos">{{ compromisos.vencidos }} abierto{{ compromisos.vencidos|pluralize }} con el plazo vencido</span>{% endif %}</span>
+      </div>
+      {% if compromisos.total %}
+        <div class="gr-pista grande" role="img" aria-label="{% for t in compromisos.tramos %}{{ t.n }} {{ t.rotulo|lower }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+          <span class="gr-apilada" style="width: 100%">
+            {% for t in compromisos.tramos %}{% if t.n %}<span class="gr-tramo gr-{{ t.clase }}" style="width: {{ t.ancho|unlocalize }}%" title="{{ t.rotulo }}: {{ t.n }}">{{ t.n }}</span>{% endif %}{% endfor %}
+          </span>
+        </div>
+        <ul class="gr-cifras">
+          {% for t in compromisos.tramos %}<li><i class="gr-sw gr-{{ t.clase }}"></i>{{ t.rotulo }} <b>{{ t.n }}</b></li>{% endfor %}
+        </ul>
+      {% else %}
+        <p class="soft">La delegación no tiene compromisos en el período.</p>
+      {% endif %}
+    </section>
+
+    <section class="card" aria-labelledby="t-tend">
+      <div class="card-h">
+        <h2 id="t-tend">Tendencia semanal</h2>
+        <span class="sub">Actividades por semana del período</span>
+      </div>
+      {% if tendencia.maximo %}
+        <div class="gr-leyenda" aria-hidden="true"><span><i class="gr-sw" style="background:#E4DBD5"></i>Registradas</span><span><i class="gr-sw gr-ok"></i>De esas, aprobadas</span></div>
+        <div class="gr-tend-wrap">{{ tendencia.svg|safe }}</div>
+      {% else %}
+        <p class="soft">Todavía no hay actividades en el período.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+
 <section class="card mt20" aria-labelledby="t-uso">
   <div class="card-h">
     <h2 id="t-uso">Uso de la herramienta</h2>

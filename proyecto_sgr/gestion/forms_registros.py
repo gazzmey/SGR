@@ -321,7 +321,7 @@ class EvidenciaRegistroForm(ConAlcance, ConCodigo):
         # Relleno inteligente: se busca escribiendo, y primero aparecen las
         # actividades que todavía esperan su evidencia.
         esperan = set(actividades.filter(
-            estado__in=[Actividad.Estado.BORRADOR, Actividad.Estado.RECHAZADA]
+            estado__in=Actividad.ESPERAN_EVIDENCIA
         ).values_list("pk", flat=True)[:200])
         R.datos_de_opciones(self.fields["actividad"], lambda a: {
             "detalle": f"{a.fecha:%d-%m-%Y} · {a.get_estado_display()}",
@@ -372,8 +372,7 @@ class EvidenciaRegistroForm(ConAlcance, ConCodigo):
         if commit:
             evidencia.save()
             actividad = evidencia.actividad
-            if actividad is not None and actividad.estado in {
-                    Actividad.Estado.BORRADOR, Actividad.Estado.RECHAZADA}:
+            if actividad is not None and actividad.estado in Actividad.ESPERAN_EVIDENCIA:
                 actividad.estado = Actividad.Estado.PENDIENTE
                 actividad.save(update_fields=["estado"])
         return evidencia

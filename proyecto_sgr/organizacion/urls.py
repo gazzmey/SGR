@@ -48,4 +48,6 @@ urlpatterns = [
     path("usuarios/<int:pk>/", views.UsuarioDetalle.as_view(), name="usuario_detalle"),
     path("usuarios/<int:pk>/editar/", views.UsuarioEditar.as_view(), name="usuario_editar"),
     path("usuarios/<int:pk>/estado/", views.UsuarioEstado.as_view(), name="usuario_estado"),
+    path("usuarios/<int:pk>/clave-temporal/", views.UsuarioClaveTemporal.as_view(),
+         name="usuario_clave_temporal"),
 ]

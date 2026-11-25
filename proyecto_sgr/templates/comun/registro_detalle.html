@@ -9,6 +9,12 @@
 {% block estado_chip %}{{ chip_estado }}{% endblock %}
 
 {% block avisos_estado %}
+  {% if obj.motivo_no_puntua and not anulado %}
+    <div class="notice warn">
+      <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
+      <div><b>No puntúa</b>{{ obj.motivo_no_puntua }}</div>
+    </div>
+  {% endif %}
   {% if anulado %}
     <div class="notice neu">
       <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>

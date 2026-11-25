@@ -10,7 +10,7 @@ delegado podría restarle puntos a alguien de otra delegación.
 from django import forms
 from django.contrib.auth.models import User
 
-from comun.utilidades import proximo_codigo
+from comun.utilidades import guardar_con_codigo, proximo_codigo
 from gestion.modelos_ajustes import Ausencia, Reconocimiento
 from gestion.models import Periodo
 from organizacion.models import Delegacion
@@ -82,7 +82,7 @@ class ReconocimientoForm(forms.ModelForm):
         self.fields["periodo"].queryset = periodos
         self.fields["periodo"].empty_label = "Elige el período"
         if not self.instance.pk and not self.initial.get("periodo"):
-            abierto = periodos.filter(estado=Periodo.Estado.ABIERTO).first()
+            abierto = Periodo.en_curso(periodos)
             if abierto is not None:
                 self.initial["periodo"] = abierto.pk
 
@@ -122,6 +122,16 @@ class ReconocimientoForm(forms.ModelForm):
             registro.codigo = proximo_codigo(Reconocimiento, prefijo, ancho=3)
             if self.usuario is not None and self.usuario.is_authenticated:
                 registro.registrado_por = self.usuario
+                # La registra el propio delegado: el registro es su respaldo.
+                if (registro.tipo == Reconocimiento.Tipo.FELICITACION
+                        and registro.delegacion_id
+                        and registro.delegacion.delegado_id == self.usuario.pk):
+                    from django.utils import timezone
+
+                    registro.respaldada_por = self.usuario
+                    registro.respaldada_el = timezone.now()
+            if commit:
+                return guardar_con_codigo(registro, prefijo, ancho=3)
         if commit:
             registro.save()
         return registro
@@ -169,6 +179,8 @@ class AusenciaForm(forms.ModelForm):
             registro.codigo = proximo_codigo(Ausencia, "AUS", ancho=3)
             if self.usuario is not None and self.usuario.is_authenticated:
                 registro.registrado_por = self.usuario
+            if commit:
+                return guardar_con_codigo(registro, "AUS", ancho=3)
         if commit:
             registro.save()
         return registro

@@ -14,7 +14,7 @@ Piezas que comparten los formularios de las entidades de la Evaluación 3.
 from django import forms
 from django.db.models import Q
 
-from comun.utilidades import proximo_codigo
+from comun.utilidades import guardar_con_codigo, proximo_codigo
 
 
 def fecha():
@@ -182,9 +182,13 @@ class ConCodigo(forms.ModelForm):
 
     def save(self, commit=True):
         objeto = super().save(commit=False)
-        if not objeto.pk and not (objeto.codigo or "").startswith(f"{self.prefijo}-"):
+        nuevo = not objeto.pk
+        if nuevo and not (objeto.codigo or "").startswith(f"{self.prefijo}-"):
             objeto.codigo = proximo_codigo(self._meta.model, self.prefijo, self.ancho)
         if commit:
-            objeto.save()
+            if nuevo:
+                guardar_con_codigo(objeto, self.prefijo, self.ancho)
+            else:
+                objeto.save()
             self.save_m2m()
         return objeto

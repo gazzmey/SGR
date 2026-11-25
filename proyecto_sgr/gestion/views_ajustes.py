@@ -9,6 +9,7 @@ afectada: nadie se pone sus propias felicitaciones ni se borra sus reclamos.
 
 from django.db.models import Q
 from django.utils.html import format_html
+from django.views import View
 
 from comun import permisos as P
 from comun.mantenedor import (
@@ -23,6 +24,7 @@ from comun.mantenedor import (
     enlace_nombre,
     filtro_estado,
 )
+from comun.resultado import anunciar
 from gestion import reglas as R
 from gestion.forms_ajustes import AusenciaForm, ReconocimientoForm
 from gestion.modelos_ajustes import Ausencia, Reconocimiento
@@ -68,6 +70,8 @@ def _efecto(obj):
     regla = R.vigente(obj.periodo)
     if obj.es_reclamo:
         return f"−{regla.valor_reclamo} puntos"
+    if not obj.respaldada_por_id:
+        return "Ninguno todavía: falta el respaldo del delegado"
     return f"+{regla.valor_felicitacion} puntos (cuentan hasta {regla.max_felicitaciones})"
 
 
@@ -113,6 +117,8 @@ class ReconocimientosLista(ListaMantenedor):
             valor=lambda o: o.nombre_funcionario,
         ),
         Columna("tipo", "Tipo", celda=_chip_tipo, valor=lambda o: o.get_tipo_display()),
+        Columna("respaldo_delegado", "Respaldo del delegado", celda=lambda o: _chip_respaldo(o),
+                valor=lambda o: _texto_respaldo(o)),
         Columna("fecha", "Fecha",
                 celda=lambda o: format_html('{}<span class="t2">{}</span>',
                                             o.fecha.strftime("%d-%m-%Y"),
@@ -134,6 +140,7 @@ class ReconocimientosLista(ListaMantenedor):
         Columna("presentado_por", "Quién lo escribió"),
         Columna("respaldo", "Dónde consta"),
         Columna("situacion", "Situación"),
+        Columna("respaldo_delegado", "Respaldo del delegado", valor=lambda o: _texto_respaldo(o)),
         Columna("periodo", "Período", valor=lambda o: o.periodo.nombre),
         Columna("estado", "Estado", valor=lambda o: "Vigente" if o.activo else "Desactivado"),
     ]
@@ -192,8 +199,51 @@ class ReconocimientoEditar(_ConAlcanceEnFormulario, EditarMantenedor):
     secciones = SECCIONES_RECONOCIMIENTO
 
 
+def _texto_respaldo(o):
+    if o.tipo != Reconocimiento.Tipo.FELICITACION:
+        return "No aplica"
+    if o.respaldada_por_id:
+        return "Respaldada por %s" % (o.respaldada_por.get_full_name() or o.respaldada_por.get_username())
+    return "Pendiente: todavía no cuenta"
+
+
+def _chip_respaldo(o):
+    if o.tipo != Reconocimiento.Tipo.FELICITACION:
+        return format_html('<span class="soft">No aplica</span>')
+    if o.respaldada_por_id:
+        return format_html('<span class="chip ok">Respaldada</span>')
+    return format_html('<span class="chip warn">Pendiente</span>')
+
+
+class ReconocimientoRespaldar(View):
+    """El delegado respalda formalmente una felicitación: desde ahí cuenta."""
+
+    def post(self, request, pk):
+        from comun.auditoria import registrar
+        from comun.models import EventoAuditoria
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404, redirect
+        from django.utils import timezone
+
+        registro = get_object_or_404(Reconocimiento.objects.select_related("delegacion"), pk=pk)
+        if not registro.puede_respaldar(request.user):
+            raise PermissionDenied(
+                "Solo el delegado de la delegación respalda una felicitación.")
+        registro.respaldada_por = request.user
+        registro.respaldada_el = timezone.now()
+        registro.save(update_fields=["respaldada_por", "respaldada_el"])
+        registrar(request, EventoAuditoria.Accion.EDITAR, entidad="Felicitación",
+                  objeto=registro, antes="sin respaldo del delegado",
+                  despues="respaldada por el delegado",
+                  delegacion=registro.delegacion)
+        anunciar(request, "Felicitación respaldada",
+                 "Desde ahora cuenta en el resultado de %s." % registro.nombre_funcionario)
+        return redirect("gestion:reconocimiento_detalle", pk=pk)
+
+
 class ReconocimientoDetalle(DetalleMantenedor):
     model = Reconocimiento
+    template_name = "gestion/reconocimiento_detalle.html"
     permiso = P.REGISTRAR_AJUSTE
     campo_delegacion = "delegacion_id"
     menu = "reconocimientos"
@@ -216,6 +266,7 @@ class ReconocimientoDetalle(DetalleMantenedor):
         ("Informado a", lambda o: o.informado_a or "—"),
         ("Registrado por", lambda o: (o.registrado_por.get_full_name()
                                       if o.registrado_por_id else "—")),
+        ("Respaldo del delegado", _texto_respaldo),
     ]
     kpis = [
         ("Efecto en el resultado",
@@ -234,7 +285,12 @@ class ReconocimientoDetalle(DetalleMantenedor):
 
     def get_queryset(self):
         return super().get_queryset().select_related(
-            "funcionario", "delegacion", "periodo", "registrado_por")
+            "funcionario", "delegacion", "periodo", "registrado_por", "respaldada_por")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["puede_respaldar"] = ctx["obj"].puede_respaldar(self.request.user)
+        return ctx
 
 
 class ReconocimientoEstado(CambiarEstado):

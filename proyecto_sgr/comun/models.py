@@ -44,6 +44,7 @@ class EventoAuditoria(models.Model):
         ESTADO = "estado", "Cambió el estado"
         VALIDAR = "validar", "Validó"
         RECHAZAR = "rechazar", "Rechazó"
+        ANTECEDENTES = "antecedentes", "Pidió más antecedentes"
         ANULAR = "anular", "Anuló"
         PERIODO = "periodo", "Movió el período"
         PARAMETRO = "parametro", "Cambió un parámetro del cálculo"

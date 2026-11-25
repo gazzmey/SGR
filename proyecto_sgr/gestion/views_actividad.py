@@ -39,6 +39,7 @@ CHIP_ACTIVIDAD = {
     Actividad.Estado.PENDIENTE: ("warn", "Pendiente"),
     Actividad.Estado.APROBADA: ("ok", "Aprobada"),
     Actividad.Estado.RECHAZADA: ("bad", "Rechazada"),
+    Actividad.Estado.ANTECEDENTES: ("warn", "Faltan antecedentes"),
     Actividad.Estado.ANULADA: ("off", "Anulada"),
 }
 
@@ -51,10 +52,8 @@ def _chip_actividad(actividad):
 
 
 def periodo_abierto():
-    """El período en curso, o None si no hay ninguno abierto."""
-    return Periodo.objects.filter(
-        activo=True, estado=Periodo.Estado.ABIERTO,
-    ).order_by("-inicio").first()
+    """El período en curso, o None si no hay ninguno abierto (ver Periodo.en_curso)."""
+    return Periodo.en_curso()
 
 
 def _exigir(request, permiso, queja):
@@ -172,11 +171,14 @@ def actividad_nueva(request):
 
     if request.method == "POST" and formulario.is_valid():
         actividad = formulario.save()
+        aviso = actividad.motivo_no_puntua
         anunciar(
             request,
             "Actividad registrada",
-            "Quedó con el código %s. Todavía no suma a tu meta: adjúntale una "
-            "evidencia y espera la validación." % actividad.codigo,
+            ("Quedó con el código %s. Todavía no suma a tu meta: adjúntale una "
+             "evidencia y espera la validación." % actividad.codigo)
+            + (" Ojo: %s" % aviso if aviso else ""),
+            icono="warning" if aviso else "success",
             acciones=[
                 ("Adjuntar la evidencia",
                  reverse("gestion:evidencia_nueva", args=[actividad.pk])),
@@ -212,9 +214,10 @@ def actividad_detalle(request, pk):
         "menu": "actividades",
         "obj": actividad,
         "evidencias": actividad.evidencias.select_related("autor", "verificador"),
+        "es_mia": actividad.funcionario_id == request.user.id,
         "puede_adjuntar": (
             actividad.funcionario_id == request.user.id
-            and actividad.estado in {Actividad.Estado.BORRADOR, Actividad.Estado.RECHAZADA}
+            and actividad.estado in Actividad.ESPERAN_EVIDENCIA
             and tiene_permiso(request.user, P.ADJUNTAR_EVIDENCIA)
         ),
     })
@@ -230,7 +233,7 @@ def evidencia_nueva(request, pk):
     actividad = get_object_or_404(Actividad, pk=pk)
     if actividad.funcionario_id != request.user.id:
         raise PermissionDenied("Esa actividad no es tuya.")
-    if actividad.estado not in {Actividad.Estado.BORRADOR, Actividad.Estado.RECHAZADA}:
+    if actividad.estado not in Actividad.ESPERAN_EVIDENCIA:
         anunciar(request, "No corresponde adjuntar ahora",
                  "La actividad está %s." % actividad.get_estado_display().lower(),
                  icono="warning")
@@ -348,6 +351,7 @@ class ColaValidacion(ListaMantenedor):
     filtros = [
         Filtro("decision", "Decisión",
                [("aprobada", "Aprobadas"), ("rechazada", "Rechazadas"),
+                ("antecedentes", "Con más antecedentes pedidos"),
                 ("todas", "Todas")],
                consulta=lambda v: Q() if v == "todas" else Q(decision=v),
                vacio="Solo pendientes"),
@@ -410,6 +414,7 @@ def _chip_decision(evidencia):
         Evidencia.Decision.PENDIENTE: ("warn", "Pendiente"),
         Evidencia.Decision.APROBADA: ("ok", "Aprobada"),
         Evidencia.Decision.RECHAZADA: ("bad", "Rechazada"),
+        Evidencia.Decision.ANTECEDENTES: ("warn", "Más antecedentes"),
     }
     clase, texto = mapa[evidencia.decision]
     return format_html('<span class="chip {}">{}</span>', clase, texto)
@@ -467,6 +472,36 @@ class DecidirEvidencia(View):
     doble puntuación del caso EVI-06.
     """
 
+    @staticmethod
+    def _tomar(evidencia, **campos):
+        """
+        Guarda la decisión solo si la evidencia sigue pendiente.
+
+        Es un UPDATE condicionado en una sola sentencia, atómico en SQLite y
+        en MariaDB: si dos verificadores deciden en el mismo instante, el
+        primero cambia la fila y el segundo no encuentra ninguna pendiente
+        (devuelve False). La comprobación previa de ``pendiente`` avisa en el
+        caso común; esta cubre el caso simultáneo (EVI-06).
+        """
+        cambiadas = (Evidencia.objects
+                     .filter(pk=evidencia.pk, decision=Evidencia.Decision.PENDIENTE, anulada=False)
+                     .update(**campos))
+        if cambiadas:
+            for nombre, valor in campos.items():
+                setattr(evidencia, nombre, valor)
+        return bool(cambiadas)
+
+    def _ya_decidida(self, request, pk):
+        evidencia = Evidencia.objects.get(pk=pk)
+        anunciar(
+            request, "Esta evidencia ya estaba decidida",
+            "Otra persona la decidió en el mismo momento: quedó como «%s». "
+            "No se cuenta dos veces." % (
+                "anulada" if evidencia.anulada else evidencia.get_decision_display().lower()),
+            icono="warning",
+        )
+        return redirect("gestion:evidencia_detalle", pk=pk)
+
     def post(self, request, pk, paso):
         desvio = _exigir(request, P.VALIDAR_EVIDENCIA,
                          "No tienes permiso para validar evidencias.")
@@ -485,7 +520,7 @@ class DecidirEvidencia(View):
                 "administrador. Nadie aprueba ni anula su propio trabajo."
             )
 
-        if paso in {"aprobar", "rechazar"} and not evidencia.pendiente:
+        if paso in {"aprobar", "rechazar", "antecedentes"} and not evidencia.pendiente:
             anunciar(
                 request, "Esta evidencia ya estaba decidida",
                 "Quedó como «%s». No se cuenta dos veces." % (
@@ -495,11 +530,9 @@ class DecidirEvidencia(View):
             return redirect("gestion:evidencia_detalle", pk=pk)
 
         if paso == "aprobar":
-            evidencia.decision = Evidencia.Decision.APROBADA
-            evidencia.verificador = request.user
-            evidencia.decidida = timezone.now()
-            evidencia.motivo = ""
-            evidencia.save(update_fields=["decision", "verificador", "decidida", "motivo"])
+            if not self._tomar(evidencia, decision=Evidencia.Decision.APROBADA,
+                               verificador=request.user, decidida=timezone.now(), motivo=""):
+                return self._ya_decidida(request, pk)
             if actividad is not None:
                 actividad.estado = Actividad.Estado.APROBADA
                 actividad.save(update_fields=["estado"])
@@ -523,11 +556,10 @@ class DecidirEvidencia(View):
                 anunciar(request, "Falta el motivo",
                          formulario.errors["motivo"][0], icono="error")
                 return redirect("gestion:evidencia_detalle", pk=pk)
-            evidencia.decision = Evidencia.Decision.RECHAZADA
-            evidencia.verificador = request.user
-            evidencia.decidida = timezone.now()
-            evidencia.motivo = formulario.cleaned_data["motivo"]
-            evidencia.save(update_fields=["decision", "verificador", "decidida", "motivo"])
+            if not self._tomar(evidencia, decision=Evidencia.Decision.RECHAZADA,
+                               verificador=request.user, decidida=timezone.now(),
+                               motivo=formulario.cleaned_data["motivo"]):
+                return self._ya_decidida(request, pk)
             if actividad is not None:
                 actividad.estado = Actividad.Estado.RECHAZADA
                 actividad.save(update_fields=["estado"])
@@ -539,6 +571,32 @@ class DecidirEvidencia(View):
             anunciar(request, "Evidencia rechazada",
                      "Se devolvió con el motivo. La actividad no suma.",
                      icono="warning")
+
+        elif paso == "antecedentes":
+            # Solicitud de más antecedentes (guía de la evaluación 3): la
+            # evidencia no se rechaza; se pide completarla. La actividad
+            # vuelve a su autor y no suma hasta que llegue lo que falta.
+            formulario = RechazoForm(request.POST)
+            if not formulario.is_valid():
+                anunciar(request, "Falta indicar qué antecedentes",
+                         formulario.errors["motivo"][0], icono="error")
+                return redirect("gestion:evidencia_detalle", pk=pk)
+            if not self._tomar(evidencia, decision=Evidencia.Decision.ANTECEDENTES,
+                               verificador=request.user, decidida=timezone.now(),
+                               motivo=formulario.cleaned_data["motivo"]):
+                return self._ya_decidida(request, pk)
+            if actividad is not None:
+                actividad.estado = Actividad.Estado.ANTECEDENTES
+                actividad.save(update_fields=["estado"])
+            registrar(request, EventoAuditoria.Accion.ANTECEDENTES,
+                      entidad="Evidencia", objeto=evidencia,
+                      antes="pendiente", despues="más antecedentes",
+                      detalle=evidencia.motivo,
+                      delegacion=delegacion)
+            anunciar(request, "Se pidieron más antecedentes",
+                     "La actividad vuelve a su autor con lo que falta. No cuenta "
+                     "como rechazo y no suma hasta que se complete.",
+                     icono="info")
 
         elif paso == "anular":
             if evidencia.decision != Evidencia.Decision.APROBADA:

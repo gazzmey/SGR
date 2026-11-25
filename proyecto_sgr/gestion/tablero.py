@@ -51,7 +51,7 @@ def periodo_elegido(request):
         elegido = periodos_visibles().filter(pk=pedido).first()
         if elegido is not None:
             return elegido
-    abierto = periodos_visibles().filter(estado=Periodo.Estado.ABIERTO).first()
+    abierto = Periodo.en_curso(periodos_visibles())
     return abierto or periodos_visibles().first()
 
 

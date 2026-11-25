@@ -422,6 +422,18 @@ def _actividades(ctx):
             "bad", f"{len(rechazadas)} actividades rechazadas",
             "Corrige su evidencia para que cuenten en tu meta.",
             reverse("gestion:actividades") + "?situacion=rechazada"))
+    pedidas = list(mias.filter(estado=Actividad.Estado.ANTECEDENTES).order_by("fecha")[:20])
+    if len(pedidas) == 1:
+        a = pedidas[0]
+        salida.append(Pendiente(
+            "warn", "Te piden más antecedentes",
+            f"{a.codigo}, {a.accion}. Adjunta lo que falta para que se valide.",
+            reverse("gestion:actividad_detalle", args=[a.pk])))
+    elif pedidas:
+        salida.append(Pendiente(
+            "warn", f"{len(pedidas)} actividades con más antecedentes pedidos",
+            "Adjunta lo que falta para que se validen.",
+            reverse("gestion:actividades") + "?situacion=antecedentes"))
     sin_evidencia = mias.filter(estado=Actividad.Estado.BORRADOR).count()
     if sin_evidencia:
         salida.append(Pendiente(

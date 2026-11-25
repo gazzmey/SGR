@@ -335,6 +335,14 @@ class PerfilUsuario(models.Model):
         verbose_name="delegaciones autorizadas",
         help_text="Si hay más de una, la cabecera ofrece el selector para cambiar.",
     )
+    # Contraseña temporal (guía de la evaluación 3): al crear la cuenta, o
+    # cuando el administrador emite una nueva, la persona entra con una
+    # contraseña que le entregaron y el sistema le exige cambiarla antes de
+    # dejarla hacer cualquier otra cosa (comun/middleware.py).
+    debe_cambiar_clave = models.BooleanField(
+        "debe cambiar la contraseña", default=False,
+        help_text="Entró con una contraseña temporal y todavía no la cambia.",
+    )
     activo = models.BooleanField(default=True)
     creada = models.DateField("creado el", auto_now_add=True)
     desactivada = models.DateField("desactivado el", null=True, blank=True)

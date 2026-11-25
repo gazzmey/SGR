@@ -18,13 +18,14 @@ from comun.formularios import (
     ConAlcance, activos_mas, limpiar_telefono, nombre_de_usuario, telefono_obligatorio,
 )
 from comun.rut import limpiar_rut, rut_valido
+from comun.nombres import NombreSinRepetir
 from comun.utilidades import proximo_codigo
 from organizacion.models import Delegacion, PerfilUsuario, Rol, Territorio
 
 Usuario = get_user_model()
 
 
-class _Base(forms.ModelForm):
+class _Base(NombreSinRepetir, forms.ModelForm):
     """Lo común: el código se asigna solo y no se escribe a mano."""
 
     prefijo = ""
@@ -90,7 +91,8 @@ class DelegacionForm(_Base):
         self.fields["delegado"].empty_label = "Sin delegado asignado"
 
     def clean_nombre(self):
-        nombre = (self.cleaned_data["nombre"] or "").strip()
+        # Primero, que no exista con otra escritura (comun/nombres.py).
+        nombre = (super().clean_nombre() or "").strip()
         if len(nombre) < 3:
             raise forms.ValidationError("El nombre debe tener al menos 3 caracteres.")
         return nombre
@@ -183,7 +185,8 @@ class TerritorioForm(ConAlcance, _Base):
             self.initial["ubicacion"] = self.instance.ubicacion_texto
 
     def clean_nombre(self):
-        nombre = (self.cleaned_data["nombre"] or "").strip()
+        # Primero, que no exista con otra escritura (comun/nombres.py).
+        nombre = (super().clean_nombre() or "").strip()
         if len(nombre) < 3:
             raise forms.ValidationError("El nombre debe tener al menos 3 caracteres.")
         return nombre
@@ -309,9 +312,10 @@ class UsuarioForm(_Base):
     los guarda en una sola transacción: si algo falla, no queda un usuario
     a medio crear sin perfil.
 
-    La contraseña no está aquí a propósito. Una cuenta nueva nace sin
-    contraseña utilizable y la persona crea la suya con el enlace de
-    recuperación; así nadie, ni el administrador, llega a conocerla.
+    La contraseña no se escribe aquí. Al crear la cuenta se genera una
+    contraseña temporal (``cuenta/temporal.py``), que se muestra una sola vez
+    a quien creó la cuenta, y la persona tiene que cambiarla en su primer
+    ingreso: la que use después no la conoce nadie más.
     """
 
     prefijo = "USR"
@@ -465,14 +469,18 @@ class UsuarioForm(_Base):
         """Guarda el usuario de Django y su perfil como una sola operación."""
         correo = self.cleaned_data["correo"]
 
-        if self.instance.pk:
+        nueva = not self.instance.pk
+        if not nueva:
             usuario = self.instance.usuario
         else:
             usuario = Usuario()
-            # Contraseña inutilizable: la persona la define con el enlace de
-            # recuperación. set_unusable_password() no guarda ningún hash
-            # con el que se pueda entrar.
-            usuario.set_unusable_password()
+            # Contraseña temporal (guía de la evaluación 3): la genera el
+            # sistema, se muestra una sola vez a quien crea la cuenta y la
+            # persona tiene que cambiarla en su primer ingreso.
+            from cuenta.temporal import generar
+
+            self.clave_temporal = generar()
+            usuario.set_password(self.clave_temporal)
 
         usuario.username = correo[:150]
         usuario.email = correo
@@ -483,6 +491,8 @@ class UsuarioForm(_Base):
 
         perfil = super().save(commit=False)
         perfil.usuario = usuario
+        if nueva:
+            perfil.debe_cambiar_clave = True
         perfil.save()
         self.save_m2m()
         return perfil

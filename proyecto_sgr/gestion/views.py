@@ -300,6 +300,15 @@ class PeriodoTransicion(View):
                     "No tiene ninguna meta configurada. Un período sin metas "
                     "recibiría actividades que no suman a nada."
                 )
+            incompletos = periodo.cargos_sin_100()
+            if incompletos:
+                # DEF-04: mientras se configura se permite una suma parcial;
+                # para abrir, cada cargo tiene que sumar exactamente 100 %.
+                detalle = "; ".join(f"{cargo.nombre} suma {total} %" for cargo, total in incompletos)
+                return (
+                    "Las ponderaciones de cada cargo tienen que sumar 100 % antes de abrir "
+                    f"el período: {detalle}. Ajústalas en Asignaciones de meta."
+                )
         if paso == "cerrar" and periodo.estado != Periodo.Estado.ABIERTO:
             return "Solo se cierra un período abierto."
         if paso == "reabrir" and periodo.estado != Periodo.Estado.CERRADO:
