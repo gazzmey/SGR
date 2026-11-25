@@ -127,6 +127,8 @@ urlpatterns = [
          name="reconocimiento_editar"),
     path("reconocimientos/<int:pk>/estado/", aj.ReconocimientoEstado.as_view(),
          name="reconocimiento_estado"),
+    path("reconocimientos/<int:pk>/respaldar/", aj.ReconocimientoRespaldar.as_view(),
+         name="reconocimiento_respaldar"),
     path("ausencias/", aj.AusenciasLista.as_view(), name="ausencias"),
     path("ausencias/nueva/", aj.AusenciaNueva.as_view(), name="ausencia_nueva"),
     path("ausencias/<int:pk>/", aj.AusenciaDetalle.as_view(), name="ausencia_detalle"),

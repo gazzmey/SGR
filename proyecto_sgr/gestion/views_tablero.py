@@ -25,6 +25,7 @@ from comun.contexto import delegacion_activa
 from comun.excel import libro_de_listado
 from comun.permisos import redirect_al_login, tiene_permiso
 from gestion import calculo as C
+from gestion import graficos as G
 from gestion import tablero as T
 from organizacion.models import Delegacion
 
@@ -167,6 +168,11 @@ def tablero(request):
         # delegación» incluye los compromisos con la comunidad y no solo las
         # metas personales.
         "agenda": C.logro_agenda(periodo, delegacion),
+        # Los gráficos de carga, compromisos y tendencia (guía de la
+        # evaluación 3). El avance y el cumplimiento están en la tabla.
+        "carga": G.carga_de_trabajo(delegacion, periodo, [p for p, _ in resultado.personas]),
+        "compromisos": G.estado_de_compromisos(delegacion, periodo),
+        "tendencia": G.tendencia_semanal(delegacion, periodo),
         "sin_datos": "",
     })
 

@@ -6,7 +6,7 @@ from django import forms
 
 from catalogos.models import Item
 from comun import relleno as R
-from comun.utilidades import proximo_codigo
+from comun.utilidades import guardar_con_codigo, proximo_codigo
 from gestion import evidencias
 from gestion.modelos_actividad import Actividad, Evidencia
 from gestion.models import MetaPeriodo, Periodo
@@ -28,7 +28,8 @@ class ActividadForm(forms.ModelForm):
 
     class Meta:
         model = Actividad
-        fields = ["item", "fecha", "cantidad", "accion", "detalle", "contacto", "territorio"]
+        fields = ["item", "fecha", "cantidad", "tipo", "accion", "detalle", "origen",
+                  "solicitante", "contacto", "territorio"]
         widgets = {
             "fecha": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "cantidad": forms.NumberInput(attrs={"min": 1, "step": 1}),
@@ -108,6 +109,36 @@ class ActividadForm(forms.ModelForm):
         territorio.empty_label = "No fue en un territorio en particular"
         territorio.help_text = "Dónde ocurrió. Es lo que la ubica en el mapa de presencia."
 
+        # Reglas del cliente que dependen de lo que se registra: el tipo y
+        # quién la pidió. Se dicen aquí, al registrar, y no recién al ver
+        # que la actividad no sumó.
+        # Tienen valor por omisión: si no llegan (un formulario anterior, un
+        # envío a mano), se usa ese en vez de rechazar el registro.
+        self.fields["tipo"].required = False
+        self.fields["origen"].required = False
+        self.fields["tipo"].help_text = (
+            "Una coordinación preparatoria queda registrada, pero no pondera "
+            "como acción cumplida.")
+        self.fields["origen"].help_text = (
+            "Si la pidió la comunidad, indica quién es el usuario más abajo.")
+        from atencion.models import Solicitante
+
+        usuario = self.fields["solicitante"]
+        usuario.label = "Usuario atendido"
+        usuario.required = False
+        usuario.queryset = (
+            Solicitante.objects.filter(activo=True, territorio__delegacion=perfil.delegacion)
+            .order_by("apellidos", "nombres")
+            if perfil is not None else Solicitante.objects.none())
+        usuario.empty_label = "Nadie en particular"
+        usuario.label_from_instance = lambda v: f"{v.nombre} · {R.rut_legible(v.rut)}"
+        R.datos_de_opciones(usuario, lambda v: {
+            "detalle": f"Teléfono {v.telefono}" if v.telefono else "Sin teléfono registrado"})
+        R.buscador(usuario, "Escribe el nombre o el RUT del vecino")
+        usuario.help_text = (
+            "El vecino que la pidió. Si la pidió la comunidad, sin el nombre y "
+            "el teléfono del usuario la actividad no obtiene puntuación.")
+
     def _items_con_meta(self):
         """Los ítems con meta para el cargo de esta persona en este período."""
         if self.perfil is None or self.periodo is None:
@@ -124,6 +155,12 @@ class ActividadForm(forms.ModelForm):
             metas__cargo=cargo,
             metas__activo=True,
         ).exclude(medicion=Item.Medicion.AGENDA).distinct()
+
+    def clean_tipo(self):
+        return self.cleaned_data.get("tipo") or Actividad.Tipo.TERRENO
+
+    def clean_origen(self):
+        return self.cleaned_data.get("origen") or Actividad.Origen.PLANIFICADA
 
     def clean_accion(self):
         texto = (self.cleaned_data["accion"] or "").strip()
@@ -146,6 +183,8 @@ class ActividadForm(forms.ModelForm):
         actividad = super().save(commit=False)
         if not actividad.pk:
             actividad.codigo = proximo_codigo(Actividad, "ACT", ancho=4)
+            if commit:
+                return guardar_con_codigo(actividad, "ACT", ancho=4)
         if commit:
             actividad.save()
         return actividad
@@ -180,6 +219,14 @@ class EvidenciaForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.actividad = actividad
         self.autor = autor
+        # DEF-06: se asignan ANTES de validar. Evidencia.clean() exige que
+        # respalde una actividad o una gestión social, y Django valida el
+        # modelo en _post_clean(): si la actividad se ponía recién al guardar,
+        # toda evidencia nueva se rechazaba con «Revisa los datos».
+        if actividad is not None:
+            self.instance.actividad = actividad
+        if autor is not None:
+            self.instance.autor = autor
 
         self.formatos_texto = evidencias.formatos_texto()
         self.maximo_mb = evidencias.maximo_mb()
@@ -235,6 +282,8 @@ class EvidenciaForm(forms.ModelForm):
             evidencia.tamano = archivo.size
         if not evidencia.pk:
             evidencia.codigo = proximo_codigo(Evidencia, "EVI", ancho=4)
+            if commit:
+                return guardar_con_codigo(evidencia, "EVI", ancho=4)
         if commit:
             evidencia.save()
         return evidencia
@@ -244,7 +293,7 @@ class RechazoForm(forms.Form):
     """El motivo con el que un verificador devuelve una evidencia."""
 
     motivo = forms.CharField(
-        label="Qué hay que corregir",
+        label="Qué hay que corregir o agregar",
         widget=forms.Textarea(attrs={
             "class": "input", "rows": 3,
             "placeholder": "Explica qué falta o qué no corresponde",

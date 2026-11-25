@@ -11,7 +11,7 @@
 <div class="page-head">
   <div>
     <h1>Ingresar compromiso</h1>
-    <p>Queda en <b>{{ periodo.nombre }}</b> y en la delegación <b>{{ delegacion.nombre }}</b>. Lo verá toda la delegación, no solo tú.</p>
+    <p>Queda en <b>{{ periodo.nombre }}</b> y en la delegación <b>{{ delegacion.nombre }}</b>. Lo verá toda la delegación, no solo tú.{% if origen %} Nace de la actividad <b>{{ origen.codigo }}</b> «{{ origen.accion }}»: sus datos ya vienen puestos.{% endif %}</p>
   </div>
   <div class="actions">
     <a class="btn btn-ghost" href="{% url 'gestion:agenda' %}">Volver</a>

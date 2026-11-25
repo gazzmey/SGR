@@ -22,6 +22,7 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Count
 from django.urls import reverse
 from django.utils.html import format_html
+from django.views import View
 
 from comun import permisos as P
 from comun.formularios import nombre_de_usuario
@@ -726,6 +727,62 @@ class UsuarioNuevo(_ConEditor, CrearMantenedor):
     ]
 
 
+    def form_valid(self, form):
+        respuesta = super().form_valid(form)
+        clave = getattr(form, "clave_temporal", "")
+        if clave:
+            _anunciar_temporal(self.request, self.object, clave, "Usuario creado")
+        return respuesta
+
+
+def _anunciar_temporal(request, perfil, clave, titulo):
+    """La contraseña temporal se muestra una sola vez, a quien la emitió."""
+    from comun.resultado import anunciar
+
+    anunciar(
+        request, titulo,
+        f"La contraseña temporal de {perfil.usuario.get_full_name() or perfil.correo} es "
+        f"{clave} . Entrégasela por un medio seguro: no se vuelve a mostrar, y "
+        "tendrá que cambiarla en su primer ingreso.",
+        acciones=[("Ver la ficha", reverse("organizacion:usuario_detalle", args=[perfil.pk]))],
+    )
+
+
+class UsuarioClaveTemporal(View):
+    """
+    Emite una contraseña temporal nueva para otra persona.
+
+    Sirve cuando la persona no puede recuperar la suya por correo. Queda en la
+    auditoría que se emitió, nunca la contraseña.
+    """
+
+    def post(self, request, pk):
+        from django.shortcuts import get_object_or_404, redirect
+
+        from comun.auditoria import registrar
+        from comun.models import EventoAuditoria
+        from cuenta.temporal import emitir
+
+        if not request.user.is_authenticated:
+            return P.redirect_al_login(request)
+        if not P.tiene_permiso(request.user, PERMISO):
+            raise PermissionDenied("No tienes permiso para administrar usuarios.")
+        perfil = get_object_or_404(PerfilUsuario.objects.select_related("usuario", "delegacion"), pk=pk)
+        mio = P.perfil_de(request.user)
+        if mio is not None and not mio.delegaciones_visibles().filter(pk=perfil.delegacion_id).exists():
+            raise PermissionDenied("Esa persona es de una delegación que no administras.")
+        if perfil.usuario_id == request.user.pk:
+            raise PermissionDenied("Tu propia contraseña se cambia con «¿La olvidaste?».")
+        if not perfil.activo:
+            raise PermissionDenied("La cuenta está desactivada: actívala primero.")
+        clave = emitir(perfil.usuario, perfil)
+        registrar(request, EventoAuditoria.Accion.EDITAR, entidad="Usuario", objeto=perfil,
+                  antes="contraseña anterior", despues="contraseña temporal emitida",
+                  detalle="Debe cambiarla en su próximo ingreso.", delegacion=perfil.delegacion)
+        _anunciar_temporal(request, perfil, clave, "Contraseña temporal emitida")
+        return redirect("organizacion:usuario_detalle", pk=pk)
+
+
 class UsuarioEditar(_ConEditor, EditarMantenedor):
     model = PerfilUsuario
     campo_delegacion = "delegacion_id"
@@ -755,6 +812,7 @@ class UsuarioEditar(_ConEditor, EditarMantenedor):
 
 
 class UsuarioDetalle(DetalleMantenedor):
+    template_name = "organizacion/usuario_detalle.html"
     desde_aqui = [
         Desde("Asignarle una meta", "gestion:meta_nueva", "asignacion",
               lambda o: {"funcionario": o.usuario_id},
@@ -790,8 +848,10 @@ class UsuarioDetalle(DetalleMantenedor):
          lambda o: ", ".join(d.nombre for d in o.delegaciones_visibles()),
          {"ancho": True}),
         ("Puede iniciar sesión",
-         lambda o: "Sí" if o.usuario.has_usable_password() else
-                   "Todavía no: debe crear su contraseña con el enlace de recuperación"),
+         lambda o: ("Con contraseña temporal: debe cambiarla en su primer ingreso"
+                    if o.debe_cambiar_clave else
+                    "Sí" if o.usuario.has_usable_password() else
+                    "Todavía no: necesita una contraseña temporal")),
         ("Último acceso",
          lambda o: (o.usuario.last_login.astimezone().strftime("%d-%m-%Y %H:%M")
                     if o.usuario.last_login else "Nunca ha iniciado sesión")),

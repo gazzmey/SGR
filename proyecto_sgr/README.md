@@ -221,9 +221,32 @@ identificador, sin duplicar) y desactivar o anular con el perfil Gestión;
 login inválido y válido y logout por POST; redirección al login sin sesión;
 404 para identificadores inexistentes; GET que no modifica; CSRF obligatorio;
 formularios inválidos que no guardan; relaciones protegidas; y que nadie se
-asigna privilegios. Resultado: 24 pruebas, todas correctas. En MySQL o
-MariaDB el usuario de la conexión necesita permiso para crear la base de
-pruebas (`test_sgr`), que Django crea y borra.
+asigna privilegios. En MySQL o MariaDB el usuario de la conexión necesita
+permiso para crear la base de pruebas (`test_sgr`), que Django crea y borra.
+
+Las demás pruebas de `pruebas/` cubren las reglas de la guía de la evaluación
+3 y los defectos que encontró el protocolo de pruebas de la evaluación 3
+(DEF-01 a DEF-12, numeración propia de ese registro): cada defecto corregido
+en el código tiene una prueba que falla con el código anterior y pasa con la
+corrección (`test_recuperacion.py`, `test_catalogos_nombres.py`,
+`test_metas_y_apertura.py`, `test_evidencia_funcionario.py`,
+`test_compromiso_desde_actividad.py`). DEF-08 es de presentación y se revisa en
+pantalla; DEF-11 es del script de despliegue. En total, 186 pruebas, todas
+correctas.
+
+### Prueba de carga
+
+`herramientas/carga_sgr.py` reproduce el protocolo de carga y estrés del plan
+(mezcla de consultas, fichas, registros y validaciones, por escalones de
+usuarios virtuales) y entrega percentiles, errores y una conciliación de los
+registros. Usa solo la biblioteca estándar de Python y lee la contraseña de
+una variable de entorno. Contra el servidor de producción conviene usar
+`--solo-lectura`, que no escribe en la base:
+
+```bash
+SGR_CARGA_CLAVE='...' python3 herramientas/carga_sgr.py --base http://<servidor> --solo-lectura \
+    --cuentas marcela.rios@ejemplo.cl,camila.otarola@ejemplo.cl --etapas control:1:120,normal:10:300
+```
 
 ### Versiones
 
@@ -742,9 +765,13 @@ ya existen pidiéndola sin mostrarla. El superusuario de revisión se crea con
 Ninguna contraseña está escrita en el código.
 
 En una instalación real este comando no se ejecuta: las cuentas se crean desde
-el mantenedor de Usuarios y nacen **sin contraseña utilizable**, de modo que
-cada persona define la suya con el enlace de recuperación. Así nadie —tampoco
-quien administra— llega a conocerla.
+el mantenedor de Usuarios con una **contraseña temporal** que genera el
+sistema (`cuenta/temporal.py`). Se muestra una sola vez a quien crea la
+cuenta, para entregarla por un medio seguro, y la persona tiene que cambiarla
+en su primer ingreso: hasta hacerlo, cualquier pantalla la lleva a «Crea tu
+contraseña» (`comun/middleware.py`). Desde la ficha del usuario se puede
+emitir otra temporal si no puede recuperar la suya por correo; la auditoría
+registra que se emitió, nunca la contraseña.
 
 ---
 
@@ -803,8 +830,9 @@ bash ~/SGR/desplegar.sh volver    # restaura el código del último respaldo
 
 Antes de copiar, el script revisa la versión nueva con `manage.py check` y
 confirma que no falten migraciones; si algo falla, se detiene sin haber copiado
-nada. Después pide confirmación, respalda el código y la base de datos en
-`~/respaldos` (guarda los diez últimos), copia, aplica las migraciones,
+nada. Después pide confirmación, respalda el código, la base de datos y los
+archivos de evidencia en `~/respaldos` (guarda los diez últimos de cada uno),
+copia, aplica las migraciones,
 recolecta los estáticos, reinicia el servicio y comprueba que la página
 responda. `requirements.txt` solo se reinstala cuando cambia.
 
@@ -839,7 +867,33 @@ es el que puede explicarle a la persona por qué se rechazó su archivo.
 
 ---
 
-## 10. Limitaciones conocidas
+## 10. Reglas de la guía de la evaluación 3
+
+La guía de la evaluación 3 del Proyecto Integrado pide reglas que el sistema
+no tenía. Cada una está en el servidor y tiene su prueba automática
+(`pruebas/test_tubo_y_cierre.py`, `pruebas/test_reglas_cliente.py`,
+`pruebas/test_recuperacion.py`, `pruebas/test_graficos.py`).
+
+| Regla | Dónde vive | Cómo se ve |
+|---|---|---|
+| Contraseña temporal y cambio obligatorio en el primer ingreso | `cuenta/temporal.py`, `comun/middleware.py`, `cuenta.views.cambiar_clave` | Al crear un usuario se muestra la temporal una vez; al entrar con ella, solo se abre «Crea tu contraseña» |
+| Verificación con «solicitud de más antecedentes» | `Evidencia.Decision.ANTECEDENTES`, `Actividad.Estado.ANTECEDENTES`, `DecidirEvidencia` | Botón «Pedir más antecedentes» junto a «Rechazar y devolver»; la actividad vuelve a su autor sin contar como rechazo |
+| Un registro aprobado no admite modificaciones | `motivo_no_editable()` de `Actividad` y `Evidencia`, consultado por `EditarMantenedor` | La ficha dice «Ya no se edita» y la edición responde con el motivo, también por la dirección |
+| Tubo: todos consultan, cada uno modifica lo suyo mientras no esté cerrado | `Compromiso.puede_modificar()`, `CompromisoPaso`, `CompromisoAvisar` | Un colega ve el compromiso sin botones para moverlo; por POST recibe 403 |
+| Búsqueda en el Tubo al escribir, por código, RUT o nombre; filtros por funcionario y fechas | `Agenda` (`gestion/views_agenda.py`), `rango_fechas` del motor de listados, bloque 10 de `sgr-app.js` | Los listados se actualizan mientras se escribe; el solicitante se enlaza al vecino por RUT o nombre |
+| Límite diario de actividades | `ReglaCalculo.limite_diario_actividades` (7), `Actividad.clean()` | La octava actividad del mismo día se rechaza con el motivo |
+| Cierre semanal | `ReglaCalculo.dias_gracia_semana` (1), `gestion/semanas.py` | Una semana (lunes a domingo) se cierra al terminar el lunes siguiente y no admite actividades ni gestiones sociales nuevas |
+| Actividades o solicitudes del delegado no contabilizan | `Actividad.no_puntuan()`, `Compromiso.que_cuentan()` | Se comparan los RUT del usuario atendido y del delegado |
+| Sin nombre y teléfono del usuario no hay puntaje | `Actividad.no_puntuan()` | Vale para lo pedido por la comunidad; la ficha dice «No puntúa» y por qué |
+| Las coordinaciones preparatorias no ponderan | `Actividad.Tipo.COORDINACION` | Se registran y se validan, pero no suman |
+| Las felicitaciones valen con respaldo formal del delegado | `Reconocimiento.respaldada_por`, `ReconocimientoRespaldar` | Si las registra el delegado quedan respaldadas; si no, esperan su botón «Respaldar la felicitación» |
+| Las ausencias informadas ajustan el semáforo | `Ausencia` (ya existía) | Bajan lo esperado de la persona |
+| Tablero con gráficos de carga de trabajo, estado de compromisos y tendencia | `gestion/graficos.py`, `templates/gestion/tablero.html` | Barras dibujadas en el servidor (HTML y SVG, sin bibliotecas externas), cada una con su número y su descripción para lector de pantalla; el avance y el cumplimiento siguen en la tabla por funcionario |
+
+Los dos parámetros nuevos (días para ingresar una semana y actividades por
+día) están en la regla de cálculo y se cambian sin tocar código.
+
+## 11. Limitaciones conocidas
 
 - **Un rol por usuario.** La maqueta contemplaba personas con dos roles —quien
   verifica y a la vez conduce la delegación—. `PerfilUsuario.rol` es una clave
@@ -852,13 +906,13 @@ es el que puede explicarle a la persona por qué se rechazó su archivo.
   mantenedor de Roles, sin tocar código. Sí las consulta: *Comunidad →
   Atenciones registradas* es de lectura para él y para quien supervisa (la
   regla está en `atencion/acceso.py`).
-- **Los archivos de las evidencias no entran en el respaldo del despliegue.**
-  `desplegar.sh` respalda el código y la base, pero no `media/`: el despliegue
-  no toca esos archivos y el sistema nunca los modifica ni los borra. Para
-  respaldarlos aparte basta con
-  `tar -czf ~/respaldos/archivos_$(date +%F).tar.gz -C ~/proyecto_integrado media`.
-  Las evidencias registradas antes de HU-09 no tienen archivo: conservan solo
-  su referencia y siguen siendo válidas.
+- **Los respaldos se hacen al publicar, no todos los días.** `desplegar.sh`
+  guarda la base y los archivos de evidencia antes de cada publicación
+  (defecto DEF-11 del protocolo de la evaluación 3: antes no guardaba las
+  evidencias). Para
+  cumplir un RPO de 24 horas falta programar ese mismo respaldo una vez al
+  día con `cron`. Las evidencias registradas antes de HU-09 no tienen archivo:
+  conservan solo su referencia y siguen siendo válidas.
 - **Sin bloqueo por intentos fallidos.** La maqueta mostraba ese estado de
   pantalla. Hacerlo bien exige registrar los intentos por cuenta y por origen,
   y no está en esta entrega.
@@ -903,10 +957,14 @@ es el que puede explicarle a la persona por qué se rechazó su archivo.
   reprograma, queda pendiente. El aviso tampoco llega por correo: se ve en
   *Mi panel* y en la ficha.
 - Sin copias de seguridad automáticas de la base ni certificado HTTPS propio.
+  El manual de mantenimiento trae la receta del respaldo diario y el manual
+  de instalación, el paso a HTTPS cuando haya un dominio.
+- **Django 5.0 ya no recibe parches de seguridad** (desde abril de 2025). Pasar
+  a Django 5.2 LTS está en los pendientes del manual de mantenimiento.
 
 ---
 
-## 11. Uso de inteligencia artificial y verificación del equipo
+## 12. Uso de inteligencia artificial y verificación del equipo
 
 Se utilizó un asistente de inteligencia artificial de forma intensiva en esta
 entrega. Se declara con precisión porque la pauta lo exige y porque una
@@ -931,11 +989,11 @@ podían encontrar.** De los catorce defectos registrados en el plan, seis los
 encontró el equipo probando a mano sobre MariaDB, y dos eran estructuralmente
 invisibles para las suites, que corren sobre SQLite:
 
-- **DEF-11** — un filtro por fecha que MariaDB resuelve a NULL cuando las
+- **DEF-11 del registro de la evaluación 2** — un filtro por fecha que MariaDB resuelve a NULL cuando las
   tablas de zona horaria vienen vacías, como vienen instaladas de fábrica. Una
   de las cinco alertas no aparecía nunca, sin error y sin aviso. Sobre SQLite
   funcionaba.
-- **DEF-12** — una ficha que se caía cuando el historial tenía una fila sin
+- **DEF-12 del registro de la evaluación 2** — una ficha que se caía cuando el historial tenía una fila sin
   autor. Las suites solo dibujaban objetos creados por ellas mismas, siempre
   completos; los datos de demostración sí tienen huecos.
 
@@ -943,6 +1001,12 @@ Esa diferencia es el argumento de esta sección. El código lo escribió en su
 mayor parte una herramienta; la verificación que lo volvió confiable la hizo
 el equipo, y está documentada caso por caso en el plan de pruebas y en la hoja
 de defectos.
+
+**Evaluación 3.** El asistente también escribió y ejecutó los guiones del
+protocolo de pruebas de esta evaluación (Playwright sobre un ambiente de QA
+local con SQLite) y corrigió los defectos que encontraron, cada uno con su
+prueba automática. Los casos que requieren el servidor de AWS y MariaDB los
+ejecuta el equipo con la lista de verificación del informe de pruebas.
 
 Los cuatro integrantes pueden explicar:
 
@@ -999,7 +1063,7 @@ cargada sin pisarla.
 
 ---
 
-## 12. Estructura del proyecto
+## 13. Estructura del proyecto
 
 Archivos que agrega la Evaluación 3: `comun/entidades.py` (las 17 entidades y
 sus permisos), `comun/formularios.py`, `comun/rut.py`, `organizacion/grupos.py`

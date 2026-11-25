@@ -15,8 +15,8 @@
 #      hay diferencias, termina ahí.
 #   3. Revisa la versión nueva con «manage.py check» y confirma que no falten
 #      migraciones. Si algo falla, se detiene sin haber copiado nada.
-#   4. Pide confirmación y respalda el código y la base de datos en
-#      ~/respaldos (guarda los diez últimos de cada uno).
+#   4. Pide confirmación y respalda el código, la base de datos y los
+#      archivos de evidencia en ~/respaldos (guarda los diez últimos de cada uno).
 #   5. Copia solo los archivos del repositorio que cambiaron. Nunca toca
 #      venv/, .env, staticfiles/ ni nada que no esté en GitHub.
 #   6. Instala dependencias (solo si cambió requirements.txt), aplica las
@@ -148,7 +148,16 @@ respaldar() {
     fi
     printf '  base de datos:  %s\n' "$bd"
 
-    for patron in 'codigo_*.tar.gz' 'bd_*.sql.gz'; do
+    # Las evidencias (fotos, actas en PDF) no están en la base ni en el código:
+    # sin esto, restaurar un respaldo dejaba evidencias sin su archivo (DEF-11).
+    medios="$(leer_env SGR_MEDIA_ROOT "$PROYECTO/media")"
+    if [[ -d "$medios" ]]; then
+        evid="$RESPALDOS/evidencias_$fecha.tar.gz"
+        tar -czf "$evid" -C "$medios" .
+        printf '  evidencias:     %s\n' "$evid"
+    fi
+
+    for patron in 'codigo_*.tar.gz' 'bd_*.sql.gz' 'evidencias_*.tar.gz'; do
         { ls -1t "$RESPALDOS"/$patron 2>/dev/null || true; } \
             | tail -n +$((CONSERVAR + 1)) \
             | while IFS= read -r viejo; do rm -f -- "$viejo"; done

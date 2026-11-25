@@ -7,7 +7,7 @@ from django.utils import timezone
 from atencion.modelos_regalos import CampanaRegalos, InscripcionRegalo
 from atencion.models import Solicitante, limpiar_rut, rut_valido
 from comun.formularios import TELEFONO_FALTA, limpiar_telefono
-from comun.utilidades import proximo_codigo
+from comun.utilidades import guardar_con_codigo, proximo_codigo
 
 FECHA = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
@@ -165,6 +165,8 @@ class InscripcionForm(forms.ModelForm):
         if not inscripcion.pk:
             inscripcion.codigo = proximo_codigo(InscripcionRegalo, "REG", ancho=4)
             inscripcion.registrado_por = self.usuario
+            if commit:
+                return guardar_con_codigo(inscripcion, "REG", ancho=4)
         if commit:
             inscripcion.save()
         return inscripcion

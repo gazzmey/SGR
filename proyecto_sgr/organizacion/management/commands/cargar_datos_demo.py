@@ -26,8 +26,8 @@ Dos cosas que conviene saber antes de preguntar
    en el servidor: ninguna contraseña queda escrita en el código ni en el
    repositorio. ``manage.py claves_de_prueba`` cambia la de las cuentas que
    ya existen. En una instalación real este comando no se
-   ejecuta, y las cuentas nacen sin contraseña utilizable desde el
-   mantenedor de usuarios.
+   ejecuta, y las cuentas se crean desde el mantenedor de usuarios con una
+   contraseña temporal que se cambia en el primer ingreso.
 
 3. **Evaluación 3.** ``_evaluacion3.py`` suma territorios, vecinos, juntas,
    participaciones, hitos, un segundo trimestre, registros inactivos,
@@ -1402,6 +1402,7 @@ class Command(BaseCommand):
         # Después de la Evaluación 3, que es la que nombra a los delegados:
         # el aviso se manda al delegado que la delegación tenga en ese momento.
         self._aviso_demo()
+        self._respaldar_felicitaciones()
 
         if not opciones["sin_superusuario"]:
             self._superusuario()
@@ -1878,9 +1879,27 @@ class Command(BaseCommand):
                     "respaldo": fila["respaldo"],
                     "informado_a": fila.get("informado_a", ""),
                     "registrado_por": quien_registra,
+                    # La registra la delegada: ese registro es su respaldo
+                    # formal, y por eso la felicitación cuenta.
                 },
             )
             self._informar("Felicitación o reclamo", registro, nuevo)
+
+    def _respaldar_felicitaciones(self):
+        """
+        Las felicitaciones de la demostración, con el respaldo formal del
+        delegado de su delegación, que es lo que las hace contar.
+
+        Va después de la Evaluación 3 porque es ahí donde se nombra a los
+        delegados; antes de eso ninguna delegación tiene uno.
+        """
+        codigos = [f["codigo"] for f in RECONOCIMIENTOS_DEMO if f["tipo"] == "felicitacion"]
+        for registro in (Reconocimiento.objects.filter(codigo__in=codigos, respaldada_por__isnull=True)
+                         .select_related("delegacion")):
+            if registro.delegacion.delegado_id:
+                registro.respaldada_por_id = registro.delegacion.delegado_id
+                registro.respaldada_el = timezone.now()
+                registro.save(update_fields=["respaldada_por", "respaldada_el"])
 
     def _cartas(self):
         """Cartas de oficina de partes de DEL-01, una por estado."""

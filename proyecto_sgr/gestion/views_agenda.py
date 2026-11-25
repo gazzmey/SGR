@@ -341,6 +341,27 @@ def compromiso_nuevo(request):
     if request.GET.get("territorio"):
         inicial["territorio"] = request.GET["territorio"].strip()[:120]
 
+    # DEF-07: un compromiso puede nacer de una actividad propia (botón
+    # «Crear compromiso» de la ficha de la actividad). Se proponen sus datos y
+    # el compromiso queda vinculado a ella; el vínculo se muestra en la ficha
+    # («Nació de») y evita contar dos veces el mismo trabajo en el cálculo.
+    origen = None
+    pedida_act = (request.GET.get("actividad") or "").strip()
+    if pedida_act.isdigit():
+        from gestion.modelos_actividad import Actividad
+
+        origen = (Actividad.objects.select_related("item", "territorio", "solicitante")
+                  .filter(pk=pedida_act, funcionario=request.user)
+                  .exclude(estado=Actividad.Estado.ANULADA).first())
+        if origen is not None:
+            inicial.setdefault("descripcion", f"Seguimiento de {origen.codigo}: {origen.accion}"[:300])
+            if origen.territorio_id:
+                inicial.setdefault("territorio", origen.territorio.nombre[:120])
+            if origen.solicitante_id:
+                inicial.setdefault("solicitante", origen.solicitante.nombre)
+            if origen.origen == "comunidad":
+                inicial.setdefault("origen", Compromiso.Origen.EXTERNO)
+
     if perfil is None or periodo is None or delegacion is None:
         return render(request, "gestion/compromiso_imposible.html", {
             "menu": "agenda",
@@ -356,14 +377,17 @@ def compromiso_nuevo(request):
 
     if request.method == "POST" and formulario.is_valid():
         compromiso = formulario.save()
+        if origen is not None:
+            compromiso.actividad = origen
+            compromiso.save(update_fields=["actividad"])
         CambioCompromiso.objects.create(
             compromiso=compromiso,
             tipo=CambioCompromiso.Tipo.CREACION,
             estado_nuevo=compromiso.estado,
             responsable_nuevo=compromiso.responsable,
             quien=request.user,
-            observacion="Ingresado con vencimiento al %s."
-                        % compromiso.vencimiento.strftime("%d-%m-%Y"),
+            observacion=("Ingresado con vencimiento al %s." % compromiso.vencimiento.strftime("%d-%m-%Y"))
+                        + (f" Nació de la actividad {origen.codigo}." if origen is not None else ""),
         )
         anunciar(
             request, "Compromiso ingresado",
@@ -381,6 +405,7 @@ def compromiso_nuevo(request):
         "form": formulario,
         "periodo": periodo,
         "delegacion": delegacion,
+        "origen": origen,
     })
 
 

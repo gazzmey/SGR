@@ -1,0 +1,19 @@
+{% extends "comun/mantenedor_detalle.html" %}
+
+{% comment %}
+  Ficha de un usuario. Agrega «Emitir contraseña temporal»: el sistema
+  genera una al azar, se muestra una sola vez a quien la emite y la persona
+  tiene que cambiarla en su próximo ingreso (guía de la evaluación 3).
+{% endcomment %}
+
+{% block acciones_extra %}
+  {% if url_editar and obj.activo and obj.usuario_id != request.user.pk %}
+    <form method="post" action="{% url 'organizacion:usuario_clave_temporal' obj.pk %}" class="card" style="padding: 16px">
+      {% csrf_token %}
+      <p class="small soft" style="margin-bottom: 12px">Si no puede recuperar su contraseña por correo, emite una temporal. Se muestra una sola vez y tendrá que cambiarla al entrar.</p>
+      <button type="submit" class="btn btn-secondary btn-block"
+              data-confirmar="Emitir una contraseña temporal"
+              data-confirmar-texto="La contraseña actual de {{ obj.usuario.get_full_name|default:obj.correo }} deja de servir.">Emitir contraseña temporal</button>
+    </form>
+  {% endif %}
+{% endblock %}

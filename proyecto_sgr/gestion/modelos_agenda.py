@@ -206,6 +206,26 @@ class Compromiso(models.Model):
         verbose_name_plural = "compromisos"
         ordering = ["vencimiento", "codigo"]
 
+    @classmethod
+    def que_cuentan(cls, consulta):
+        """
+        Deja fuera las solicitudes cuyo usuario es el delegado de la
+        delegación: se registran y se trabajan, pero no contabilizan (regla
+        del cliente, guía de la evaluación 3).
+        """
+        from django.db.models import F
+
+        del_delegado = cls.objects.filter(
+            vecino__isnull=False, vecino__rut=F("delegacion__delegado__perfil__rut"))
+        return consulta.exclude(pk__in=del_delegado.values("pk"))
+
+    @property
+    def es_del_delegado(self):
+        if not (self.vecino_id and self.delegacion_id and self.delegacion.delegado_id):
+            return False
+        perfil = getattr(self.delegacion.delegado, "perfil", None)
+        return perfil is not None and perfil.rut == self.vecino.rut
+
     def puede_modificar(self, usuario):
         """
         Solo el responsable modifica su compromiso, y solo mientras siga

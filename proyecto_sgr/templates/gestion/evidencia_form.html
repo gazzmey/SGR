@@ -23,7 +23,7 @@
     {% if form.errors %}
       <div class="notice bad" role="alert" style="margin: 20px 24px 0">
         <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></svg>
-        <div><b>Revisa los datos</b><ul>{% for c in form %}{% for e in c.errors %}<li>{{ c.label }}: {{ e }}</li>{% endfor %}{% endfor %}</ul></div>
+        <div><b>Revisa los datos</b><ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}{% for c in form %}{% for e in c.errors %}<li>{{ c.label }}: {{ e }}</li>{% endfor %}{% endfor %}</ul></div>
       </div>
     {% endif %}
     <div class="form-sec">

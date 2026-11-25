@@ -3,7 +3,7 @@
 from django import forms
 from django.contrib.auth.models import User
 
-from comun.utilidades import proximo_codigo
+from comun.utilidades import guardar_con_codigo, proximo_codigo
 from gestion.modelos_cartas import Carta
 
 FECHA = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
@@ -80,6 +80,8 @@ class CartaForm(forms.ModelForm):
             carta.codigo = proximo_codigo(Carta, "CTA", ancho=3)
             if self.usuario is not None and self.usuario.is_authenticated:
                 carta.registrada_por = self.usuario
+            if commit:
+                return guardar_con_codigo(carta, "CTA", ancho=3)
         if commit:
             carta.save()
         return carta

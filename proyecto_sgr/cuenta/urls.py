@@ -9,6 +9,7 @@ app_name = "cuenta"
 urlpatterns = [
     path("ingresar/", views.Acceso.as_view(), name="login"),
     path("salir/", views.Salida.as_view(), name="logout"),
+    path("cambiar-clave/", views.cambiar_clave, name="cambiar_clave"),
 
     # El recorrido de recuperación, en el orden en que se recorre.
     path("recuperar/", views.recuperar, name="recuperar"),

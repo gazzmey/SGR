@@ -5,12 +5,13 @@ from django.db import models
 
 from catalogos.models import Item
 from comun import relleno as R
+from comun.nombres import NombreSinRepetir
 from comun.utilidades import proximo_codigo
 from gestion.models import Cargo, MetaPeriodo, Periodo
 from gestion.reglas import ReglaCalculo
 
 
-class _Base(forms.ModelForm):
+class _Base(NombreSinRepetir, forms.ModelForm):
     """El código se asigna solo y no se escribe a mano."""
 
     prefijo = ""
@@ -75,7 +76,8 @@ class PeriodoForm(_Base):
         return numero
 
     def clean_nombre(self):
-        nombre = (self.cleaned_data["nombre"] or "").strip()
+        # Primero, que no exista con otra escritura (comun/nombres.py).
+        nombre = (super().clean_nombre() or "").strip()
         if len(nombre) < 4:
             raise forms.ValidationError("Ponle un nombre reconocible en un informe.")
         return nombre
@@ -277,7 +279,7 @@ class MetaPeriodoForm(forms.ModelForm):
         return datos
 
 
-class ReglaCalculoForm(forms.ModelForm):
+class ReglaCalculoForm(NombreSinRepetir, forms.ModelForm):
     """
     Los parámetros del cálculo, configurables desde pantalla.
 
@@ -339,7 +341,8 @@ class ReglaCalculoForm(forms.ModelForm):
         self.fields["periodo"].empty_label = "Regla general del sistema"
 
     def clean_nombre(self):
-        nombre = (self.cleaned_data["nombre"] or "").strip()
+        # Primero, que no exista con otra escritura (comun/nombres.py).
+        nombre = (super().clean_nombre() or "").strip()
         if len(nombre) < 5:
             raise forms.ValidationError(
                 "Ponle un nombre que se entienda en un informe."
