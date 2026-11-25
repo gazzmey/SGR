@@ -429,14 +429,9 @@ class RegistroEvidenciaEditar(_Evidencia, EditarMantenedor):
     form_class = EvidenciaRegistroForm
     pasa_usuario = True
     secciones = RegistroEvidenciaNueva.secciones
-
-    def get_object(self, queryset=None):
-        evidencia = super().get_object(queryset)
-        if not evidencia.pendiente:
-            raise PermissionDenied(
-                "Solo se edita una evidencia pendiente: esta ya fue %s." % (
-                    "anulada" if evidencia.anulada else evidencia.get_decision_display().lower()))
-        return evidencia
+    # Solo se edita una evidencia pendiente. Lo decide
+    # Evidencia.motivo_no_editable(), que el motor consulta antes de abrir el
+    # formulario y antes de guardar (comun/mantenedor.py).
 
 
 class RegistroEvidenciaDetalle(_Evidencia, DetalleMantenedor):

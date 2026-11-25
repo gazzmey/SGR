@@ -182,15 +182,31 @@ def codigo(request):
             request.session[CLAVE_FLUJO] = flujo
             return redirect("cuenta:nueva_clave")
 
-        # Mismo mensaje haya o no código: si fuera distinto, el texto diría
-        # si el correo está registrado.
-        formulario.add_error("codigo", _por_que_no_sirve(registro))
+        if registro is None:
+            # Sin cuenta detrás no hay código, pero la pantalla tiene que
+            # comportarse como si lo hubiera: los intentos se descuentan y el
+            # plazo corre igual. Si no, el reloj y los intentos delatarían
+            # qué correos están registrados.
+            segundos, quedan = _simulado(flujo)
+            if segundos and quedan:
+                flujo["intentos_simulados"] = flujo.get("intentos_simulados", 0) + 1
+                request.session[CLAVE_FLUJO] = flujo
+
+        # El mismo mensaje haya o no código, por la misma razón.
+        formulario.add_error("codigo", _por_que_no_sirve(registro, flujo))
+
+    if registro is not None:
+        segundos, intentos = registro.segundos_restantes, registro.intentos_restantes
+        if not registro.vigente:
+            intentos = 0
+    else:
+        segundos, intentos = _simulado(flujo)
 
     return render(request, "cuenta/codigo.html", {
         "form": formulario,
         "correo": flujo["correo"],
-        "segundos": registro.segundos_restantes if registro else 0,
-        "intentos": registro.intentos_restantes if registro else 0,
+        "segundos": segundos,
+        "intentos": intentos,
         "espera_reenvio": _espera_restante(flujo),
         "mostrar_codigo": (
             registro.codigo
@@ -207,25 +223,41 @@ def _registro_de(flujo):
     return CodigoRecuperacion.objects.filter(pk=flujo["codigo_id"]).first()
 
 
-def _por_que_no_sirve(registro):
+def _simulado(flujo):
+    """
+    Segundos de vigencia e intentos que quedan cuando el correo no tiene
+    cuenta. Imitan a un código real: corren desde el último envío y se
+    descuentan con cada intento, para que la pantalla no delate si el correo
+    está registrado.
+    """
+    emitido = float(flujo.get("ultimo_envio") or time.time())
+    segundos = max(0, int(emitido + CodigoRecuperacion.VIGENCIA_MINUTOS * 60 - time.time()))
+    if not segundos:
+        return 0, 0
+    quedan = max(0, CodigoRecuperacion.INTENTOS_MAXIMOS - flujo.get("intentos_simulados", 0))
+    return segundos, quedan
+
+
+def _por_que_no_sirve(registro, flujo=None):
     """El mensaje que ve la persona cuando el código no la deja pasar."""
     if registro is None:
-        return (
-            "El código no coincide. Revisa los dígitos o pide uno nuevo."
-        )
-    if registro.vencido:
+        segundos, quedan = _simulado(flujo or {})
+        vencido, usado, agotado = not segundos, False, not quedan
+    else:
+        vencido, usado, agotado = registro.vencido, registro.usado, registro.agotado
+        quedan = registro.intentos_restantes
+    if vencido:
         return (
             f"El código venció: dura {CodigoRecuperacion.VIGENCIA_MINUTOS} "
             "minutos. Pide uno nuevo para continuar."
         )
-    if registro.usado:
+    if usado:
         return "Ese código ya se usó. Pide uno nuevo para continuar."
-    if registro.agotado:
+    if agotado:
         return (
             "Se agotaron los tres intentos de este código. Pide uno nuevo "
             "para continuar."
         )
-    quedan = registro.intentos_restantes
     aviso = "Te queda un intento" if quedan == 1 else f"Te quedan {quedan} intentos"
     return f"El código no coincide. {aviso} antes de tener que pedir uno nuevo."
 
@@ -250,6 +282,7 @@ def reenviar(request):
     flujo["codigo_id"] = registro.pk if registro else None
     flujo["validado"] = False
     flujo["ultimo_envio"] = time.time()
+    flujo["intentos_simulados"] = 0
     request.session[CLAVE_FLUJO] = flujo
 
     messages.success(

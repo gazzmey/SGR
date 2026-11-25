@@ -285,6 +285,24 @@ class Actividad(models.Model):
                 "actividades nuevas." % self.periodo.nombre
             )
 
+        # Cierre semanal: lo de una semana se ingresa hasta poco después del
+        # domingo. Vale al registrar y al mover la fecha de una existente;
+        # completar otros datos de una actividad ya registrada sigue
+        # permitido. Ver gestion/semanas.py.
+        if self._fecha_nueva():
+            from gestion.semanas import motivo_semana_cerrada
+
+            motivo = motivo_semana_cerrada(self.fecha, self.periodo)
+            if motivo:
+                raise ValidationError({"fecha": motivo})
+
+    def _fecha_nueva(self):
+        """True al registrarla o si se le está cambiando la fecha."""
+        if self._state.adding or not self.pk:
+            return True
+        anterior = type(self).objects.filter(pk=self.pk).values_list("fecha", flat=True).first()
+        return anterior != self.fecha
+
     # --- lo que el resto del sistema le pregunta -------------------------
 
     @property
@@ -309,6 +327,24 @@ class Actividad(models.Model):
                 "motivo en vez de desactivarla: así el historial explica por qué "
                 "dejó de contar."
             )
+        return ""
+
+    def motivo_no_editable(self, usuario=None):
+        """
+        Una actividad aprobada ya no se modifica (guía de la evaluación 3).
+
+        Otra persona validó lo que dice; cambiarlo después, aunque sea el
+        detalle, haría que lo aprobado y lo guardado dejen de coincidir. Si
+        tiene un error se anula con motivo y se registra de nuevo.
+        """
+        if self.estado == self.Estado.APROBADA:
+            return (
+                "Está aprobada: un verificador ya la validó y suma a la meta, "
+                "así que no se modifica. Si tiene un error, anúlala con su "
+                "motivo y regístrala de nuevo."
+            )
+        if self.estado == self.Estado.ANULADA:
+            return "Está anulada: se conserva tal como quedó, con su motivo."
         return ""
 
 
@@ -508,5 +544,21 @@ class Evidencia(models.Model):
             return (
                 "Está aprobada y su actividad ya suma al período. Anúlala con "
                 "su motivo si hay que revertirla."
+            )
+        return ""
+
+    def motivo_no_editable(self, usuario=None):
+        """Solo se edita una evidencia pendiente de decisión."""
+        if self.anulada:
+            return "Está anulada: se conserva tal como quedó, con su motivo."
+        if self.decision == self.Decision.APROBADA:
+            return (
+                "Está aprobada: es el respaldo que validó el verificador, así "
+                "que no se modifica. Si hay que revertirla, anúlala con su motivo."
+            )
+        if self.decision == self.Decision.RECHAZADA:
+            return (
+                "Está rechazada y su decisión queda registrada. La corrección "
+                "se hace adjuntando una evidencia nueva a la actividad."
             )
         return ""

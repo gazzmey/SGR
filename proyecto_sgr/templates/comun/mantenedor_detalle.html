@@ -29,6 +29,13 @@
   </div>
 </div>
 
+{% if motivo_no_editable %}
+  <div class="notice info" role="status" style="margin-bottom: 20px">
+    <svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    <div><b>Ya no se edita</b>{{ motivo_no_editable }}</div>
+  </div>
+{% endif %}
+
 <div class="grid g-side">
   <section class="card" style="align-self: start">
     <div class="card-h">

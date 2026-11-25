@@ -286,6 +286,15 @@ class CasoSocial(models.Model):
             if fecha and fecha > hoy:
                 errores[campo] = "Es algo que ya ocurrió: no puede tener fecha futura."
 
+        # Cierre semanal: una gestión social nueva no se ingresa en una
+        # semana ya cerrada (gestion/semanas.py).
+        if (self._state.adding or not self.pk) and "ingreso" not in errores:
+            from gestion.semanas import motivo_semana_cerrada
+
+            motivo = motivo_semana_cerrada(self.ingreso)
+            if motivo:
+                errores["ingreso"] = motivo
+
         no_antes("ingreso", self.ingreso, self.fecha_atencion,
                  "El caso no puede ingresar antes de que se atendiera a la persona.")
         no_antes("visita_programada", self.visita_programada, self.ingreso,

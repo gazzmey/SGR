@@ -112,6 +112,14 @@ class Compromiso(models.Model):
         max_length=120,
         help_text="Quién lo pidió: una junta de vecinos, una persona, otra unidad.",
     )
+    # Si quien lo pidió es un vecino registrado, queda enlazado a su ficha.
+    # Es lo que permite buscar en el Tubo por su RUT. Lo pone el formulario
+    # al reconocer el nombre o el RUT escrito; el texto de arriba se conserva.
+    vecino = models.ForeignKey(
+        "atencion.Solicitante", on_delete=models.PROTECT,
+        related_name="compromisos", null=True, blank=True,
+        verbose_name="vecino que lo pidió",
+    )
     # Vacío solo en los compromisos ingresados antes de que existiera el
     # campo: no se les inventa un origen. Los nuevos lo exigen en el
     # formulario.
@@ -197,6 +205,19 @@ class Compromiso(models.Model):
         verbose_name = "compromiso"
         verbose_name_plural = "compromisos"
         ordering = ["vencimiento", "codigo"]
+
+    def puede_modificar(self, usuario):
+        """
+        Solo el responsable modifica su compromiso, y solo mientras siga
+        abierto (guía de la evaluación 3: «todos los funcionarios de la
+        delegación pueden consultar el Tubo, pero cada funcionario solo puede
+        modificar sus propios registros mientras no estén aprobados»).
+
+        La delegada no lo modifica: si el responsable no puede seguir, lo
+        reasigna, que es otra operación con su propio permiso.
+        """
+        return (getattr(usuario, "pk", None) is not None
+                and self.responsable_id == usuario.pk and self.abierto)
 
     def __str__(self):
         return f"{self.codigo} — {self.solicitante}"

@@ -802,6 +802,11 @@ SECCIONES_REGLA = [
      "el mismo del semáforo: con dos valores distintos, el tablero y la "
      "alerta podrían contradecirse sobre la misma persona.",
      ["dias_aviso_vencimiento", "dias_sin_registrar", "dias_evidencia_espera"]),
+    ("Registro de gestiones",
+     "La semana va de lunes a domingo y se cierra unos días después: pasado "
+     "ese plazo ya no admite actividades ni gestiones sociales nuevas. El "
+     "límite diario cuenta las actividades de una persona con la misma fecha.",
+     ["dias_gracia_semana", "limite_diario_actividades"]),
     ("Felicitaciones y reclamos",
      "Se suman o restan al cumplimiento ponderado, después de los ítems. "
      "El total nunca pasa del tope ni baja de cero.",
@@ -895,6 +900,11 @@ class ReglaDetalle(DetalleMantenedor):
          lambda o: f"a los {o.dias_sin_registrar} días sin registrar"),
         ("Avisa por evidencia en espera",
          lambda o: f"a los {o.dias_evidencia_espera} días esperando decisión"),
+        ("Cierre de la semana",
+         lambda o: (f"se ingresa hasta {o.dias_gracia_semana} día"
+                    f"{'s' if o.dias_gracia_semana != 1 else ''} después del domingo")),
+        ("Actividades por día",
+         lambda o: f"hasta {o.limite_diario_actividades} por persona"),
         ("Felicitaciones",
          lambda o: f"+{o.valor_felicitacion} puntos cada una, hasta {o.max_felicitaciones}"),
         ("Reclamos", lambda o: f"−{o.valor_reclamo} puntos cada uno"),
